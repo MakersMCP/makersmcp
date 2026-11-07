@@ -91,7 +91,7 @@ makersmcp adds `out_dir` and `wait_seconds` to every tool, and `makersmcp_playbo
 
 Each kit runs in a process group of its own, with the browser and ffmpeg it starts, under a small supervisor (`dist/supervise.js`). `cancel_job` stops the group, and so does the supervisor once makersmcp is gone, however it ended, or once its stdin is closed, which is how a service that runs kits as another user cancels one.
 
-A hosted service may run a kit without some of its tools for now, as MakersMCP-Server does when its workers' ffmpeg cannot run `check_video` or `fit_music`. Its backend says so with the `tools` of an available kit, or it passes the kit without those tools in `definitions`. Either way the server lists only the others, and the texts, which still read the whole kit file in `kits/`, fill a default of a tool held back and leave out what names it: a topic that requires it is not offered, its blocks are not shown, and its `makes` is not in the instructions.
+A hosted service may run a kit without some of its tools for now, as MakersMCP-Server does when its workers' ffmpeg cannot run `check_video` or `fit_music`. Its backend says so with the `tools` of an available kit, or it passes the kit without those tools in `definitions`. Either way the server lists only the others, and the texts, which still read the whole kit file in `kits/`, fill a default of a tool held back and leave out what names it: a topic that requires it is not offered, its blocks are not shown, and its `makes` is not in the instructions. A sentence the service adds to a text about a tool it holds back is left out with the rest, so `check_setup` is the place to say why, as in "Held back: <tool> (<why>)".
 
 ## Its playbook
 
