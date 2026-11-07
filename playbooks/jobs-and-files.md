@@ -2,7 +2,7 @@
 name: jobs-and-files
 title: Jobs, waits and files
 index: long jobs, calls that end early, cancelling, folders, passing one job's files to the next
-description: Explains how a MakersMCP job runs and ends, how to wait for a long one, what to do after a call that ended with no result, what cancel_job and list_jobs do, where each kit saves its files and what a new run replaces, and how one job's files go into the next. Use it before running jobs side by side, after a call ended early, when a folder already holds files, or when a file from one job has to go into another.
+description: Explains how a MakersMCP job runs and ends, how to wait for a long one, what to do after a call that ended with no result, what cancel_job and list_jobs do, where each job's files go and, locally, what a new run replaces, and how one job's files go into the next. Use it before running jobs side by side, after a call ended early, before reusing a folder, or when a file from one job has to go into another.
 kit: makersmcp
 requires: []
 optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music]
@@ -111,7 +111,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 - Other files go as https links where a parameter takes a file: a public address, at most 200 MB, sent within 5 minutes. A parameter that takes an address or a file reads a link as the address.
 - Nothing here uploads a file the assistant wrote, so a file goes in only as a link the user gives or as a file an earlier job saved, used as it is. Say so instead of offering to change one.
 - "Job <job_id> has no file <path>." means the path is not as that job's file list writes it. "There is no job <job_id> with files to use. list_jobs shows your jobs; files are kept for a few days." means the job is not the user's, did not end done, or its files are gone.
-- A link that fails says why: "The link's host <host> was not found.", "The link's host <host> is not on the public internet.", "The link answered <status> instead of the file.", "The file is over <size>.", "The link took more than <time> to send the file.", "The link stopped sending the file." or "Only http and https links work." Ask the user for a public link to the file itself.
+- A link that fails says why: "The link's host <host> was not found.", "The link's host <host> is not on the public internet.", "The link answered <status> instead of the file.", "The file is over <size>.", "The link took too long to answer.", "The link took more than <time> to send the file.", "The link stopped sending the file.", "The link redirects too many times.", "A link with a user name or password in it is not allowed." or "Only http and https links work." Ask the user for a public link to the file itself.
 <!-- end -->
 
 ## Passing files from job to job

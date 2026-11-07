@@ -33,7 +33,8 @@
       "next": {
         "done": [
           "Tell the user each role's font and its license from the table below, with the closest free font beside any commercial or unknown one, and let them choose.",
-          "Check that the page {name:FONTS.md} below names is the one the user meant: an error page or a login page gives its own fonts."
+          "{name:FONTS.md} below names the address asked even when that page answered with an error, which the kit does not say: when every role is a system font like Times New Roman, check that the page opens before handing the fonts over.",
+          "A login page shows as the address it led to."
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",

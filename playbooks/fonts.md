@@ -37,7 +37,7 @@ make_font_kit {"url": "https://linear.app/docs", "out_dir": "fonts/docs"}
 ```
 <!-- end -->
 
-2. Read `FONTS.md` in the result. The line under its heading names the page read. An error page, a login page or a cookie wall gives its own fonts, often a system font like Times New Roman, and the kit reports them as the site's: check the page before you hand anything over.
+2. Read `FONTS.md` in the result. The line under its heading names the address read: the one asked, even when that page answered with an error, which the kit does not say, or the one a redirect led to, like a login page. An error page, a login page or a cookie wall gives its own fonts, often a system font like Times New Roman, and the kit reports them as the site's: when every role is a system font, check that the page opens before you hand the fonts over.
 3. Tell the user each role's font, its weights and its license, with the closest free font beside each commercial or unknown one. The kit holds every font's files whatever its license, and the user decides which to use.
 
 ## Every parameter
@@ -78,7 +78,7 @@ Each error as the result shows it, then the fix.
 - "Could not open <url>: <reason>": the address does not answer. Check it with the user.
 - "<url> was not a usable font file: <reason>.", a note in a finished result: that file could not be read, so its family has no license from a file. The reason is "not a font file", "too short to be a font", "the server answered <status>" or the like.
 - "Some of the <roles> was drawn with <fallback>, a fallback, because <family> loaded too late for it. That text is counted as <family>, the font the site asks for.": a note, nothing to fix.
-- A page that answers with an error still comes back done, with the error page's fonts and no word about it. Check the page `FONTS.md` names before you hand the fonts over.
+- A page that answers with an error still comes back done, with the error page's fonts and no word about it, and `FONTS.md` names the address asked as if it were the page: when every role is a system font like Times New Roman, check that the page opens before you hand the fonts over. A login page shows as the address it led to.
 <!-- local -->
 - "<folder> is not empty and holds no earlier font kit. Pick another folder with out_dir.": the folder holds other files, and the kit never mixes into them. Give another `out_dir`.
 - A run deletes the font kit an earlier run left in its folder before it opens the page, so a failed run, or a run on an error page, loses a good kit too; only a refused address or folder leaves it. Run the good page again to bring its kit back.

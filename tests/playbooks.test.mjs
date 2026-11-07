@@ -1769,6 +1769,25 @@ test('jobs-and-files gives the numbers of jobs and files makersmcp keeps and lis
   assert.match(rendered, new RegExp(`${MAX_LISTED} in the text and up to ${MAX_FILES} in \`files\``));
 });
 
+test('hosted, jobs-and-files quotes every error a failed link gives, as tests/fixtures/hosted-errors.json lists them', () => {
+  const definitions = loadKitDefinitions();
+  const rendered = renderTopic(loadPlaybooks(), 'jobs-and-files', {
+    where: 'hosted', place: 'on makersmcp.com', definitions, limits: LIMITS,
+    enabled: new Set(definitions.map(kit => kit.kit)), versions: new Map(definitions.map(kit => [kit.kit, '9.9.9'])),
+  });
+  const line = rendered.split('\n').find(entry => entry.startsWith('- A link that fails says why: '));
+  assert.ok(line, rendered);
+  // A download stopped is a canceled job, no link that failed.
+  const errors = readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors
+    .filter(entry => /fetch-input\.js/.test(entry.from) && entry.text !== 'The download was stopped.');
+  assert.ok(errors.length >= 9, errors.length);
+  for (const { text: error } of errors) {
+    // The list names a size and a time where the fixture writes them in numbers.
+    const quoted = error.replace('<n> MB', '<size>').replace('<n> minutes', '<time>');
+    assert.ok(line.includes(`"${quoted}"`), `jobs-and-files leaves out "${error}": ${line}`);
+  }
+});
+
 test('a result lists take_screenshots\' own pages, NN-<page>-<size>.png in its writes, before its manifest screenshots', () => {
   const tool = loadKitDefinitions().flatMap(kit => kit.tools).find(entry => entry.name === 'take_screenshots');
   const files = ['pwa/manifest-screenshots.json', 'pwa/screenshots/wide-01.png', '01-home-desktop.png', 'SCREENSHOTS.md', '02-pricing-mobile.png', 'manifest.json', 'sheet.png']

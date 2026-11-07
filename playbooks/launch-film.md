@@ -165,14 +165,14 @@ A run writes only the places it is given, and `stills/STILLS.md` lists only thos
 <!-- hosted -->
   A plan cannot be changed here: tell the user what each line says.
 <!-- end -->
-- `clip <n>: no logo could close the film: <reasons>`: no logo file of the brand kit could be used.
+- `clip <n>: no logo could close the film: <reasons>`: no logo file of the brand kit, nor its app's icon, could be used. `make_launch_stills` stops with it too when `for` holds ph, as it does by default, since those pictures are drawn from the film's clips.
 <!-- local -->
   Point the logo clip at another logo file or an app icon, as the film-json topic says, or ask the user for a logo file. When every reason says "could not be read as a picture", look at the ffprobe line of `check_setup` first: without ffprobe launch-film reads no picture, and the troubleshooting topic has the fix.
 <!-- end -->
 <!-- hosted -->
-  Ask the user for a logo, since a plan cannot be changed here.
+  No tool here takes a logo the user gives, and a plan cannot be changed, so tell the user that no film can be made from this brand kit here. For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, uses the app's icon, which can close the film instead. Pictures for places without ph still come out, with the name where the logo goes.
 <!-- end -->
-- `No logo could be used (<reasons>), so the name stands in for it.` is a note of `make_launch_stills`, which then ends done with the brand's name where the logo goes: tell the user.
+- `No logo could be used (<reasons>), so the name stands in for it.` is a note of `make_launch_stills` for places without ph, which then ends done with the brand's name where the logo goes: tell the user.
 <!-- local -->
   When its reasons say "could not be read as a picture", look at the ffprobe line of `check_setup` as above: without ffprobe the pictures lack the screen too, so make them again once it is fixed.
 <!-- end -->
