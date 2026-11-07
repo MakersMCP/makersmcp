@@ -1063,7 +1063,7 @@ test('a kit tool\'s description says when to use it, what it makes, its topic an
       assert.match(params.wait_seconds.description, where === 'local' ? /Some clients end a call after 60 or 240 seconds; 45 is safe in all of them\.$/ : /Each call waits at most 47 seconds here, whatever this asks\.$/);
       if (where === 'local') {
         assert.equal(params.out_dir.description, `Folder to save into, absolute or relative to ${LOCAL_DIR}. Default: paintkit-<host>, where <host> is the site's host without www or the port. `
-          + 'A run may replace the files an earlier run of this kit left there, even one that fails, so give each version its own out_dir. The folder must be empty or hold an earlier run of this kit: any other folder stops it.');
+          + 'A run may replace the files an earlier run of this kit left there, even one that fails, so give each version its own out_dir. The folder must be empty or hold an earlier run of this tool: any other folder stops it.');
         const check = session.tools.find(entry => entry.name === 'check_picture');
         assert.equal(check.inputSchema.properties.out_dir.description, `Folder to save into, absolute or relative to ${LOCAL_DIR}. Default: <picture-folder>/check, where <picture-folder> is the folder picture is in.`);
         assert.equal(check.annotations.destructiveHint, false);

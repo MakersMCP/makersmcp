@@ -19,7 +19,7 @@
       "playbook": "fonts",
       "description": "Reads one page of a website in a headless browser and saves its fonts in one folder: which font draws its headings, body text, buttons and code, every font file the page loads, how each one is licensed, and the closest free font for each one that is not free. FONTS.md is the file to read first, fonts.css is for pages, with a variable for each role, and fonts.json for tools. The license of each font is written next to it so the user can decide what to use. It reads only the page at url, so a font used only on another page needs a run on that page, and a page that answers with an error gives that error page's fonts. For a whole brand kit with logos and colors, use make_brand_kit instead.",
       "args": ["{url}"],
-      "out": { "flag": "--out", "name": "easyfontkit-{host}" },
+      "out": { "flag": "--out", "name": "easyfontkit-{host}", "ownOnly": true },
       "params": {
         "url": { "type": "url", "required": true, "description": "The page whose fonts to read, like https://linear.app. Only that page is read, and fonts can differ between pages, so give the one whose look is needed." },
         "files": { "type": "boolean", "flag": "--no-files", "when": false, "default": true, "description": "Save every font file the page loads in files/ (default {default:make_font_kit.files}). Set to false to read the font files without saving them; fonts.css then loads none of the site's own files." },

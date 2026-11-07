@@ -195,7 +195,8 @@ function outDirHelp(tool: ToolDefinition, baseDir: string | undefined): string {
   let help = `Folder to save into, absolute or relative to ${baseDir}. Default: ${templateInWords(out.name)}${parts.length ? `, where ${inWords(parts)}` : ''}.`;
   // A check writes only its report; every other kit replaces the files of its earlier run.
   if (!tool.check) help += ' A run may replace the files an earlier run of this kit left there, even one that fails, so give each version its own out_dir.';
-  if (out.ownOnly) help += ' The folder must be empty or hold an earlier run of this kit: any other folder stops it.';
+  // The screenshot kit tells its screenshots and its demos apart, so the earlier run is this tool's.
+  if (out.ownOnly) help += ' The folder must be empty or hold an earlier run of this tool: any other folder stops it.';
   if (out.otherwise) help += ` Given a file instead of an address, the kit saves in ${inPlainWords(out.otherwise)} and takes no out_dir.`;
   for (const [name, kind] of Object.entries(out.replaces ?? {})) {
     // A kit that deletes the folder for some addresses only makes it again where it is for the others.
