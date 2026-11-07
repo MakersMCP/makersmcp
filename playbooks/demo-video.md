@@ -172,12 +172,13 @@ Each error as the result shows it, then the fix.
 - A steps file the kit cannot read stops it before the site opens, naming the file and the step, with reasons like "a target is a CSS selector or text=<words>, not <value>", "unknown key <key>; <action> takes <keys>", "one action per step, got <actions>" or "<word> is read as a comment; put a selector that starts with # in quotes: <step>". Fix that step.
 <!-- local -->
 - "<folder> is not empty and holds no earlier easyscreenshotkit demo. Pick another folder with out_dir.": give another `out_dir`.
+- "<param>: <file> is the <name> of <folder>, where record_demo_video saves, and a run there deletes or writes over that file.": nothing started. Give the steps file or the picture another name, or the demo another `out_dir`.
 <!-- end -->
 
 ## Files
 
 <!-- local -->
-`steps` is a path, absolute or relative to {base_dir}, and the file may sit in the demo's own folder.
+`steps` is a path, absolute or relative to {base_dir}. The file may sit in the demo's own folder under any name but `demo.mp4`, `demo.gif`, `poster.png` and `steps.json`, which a run deletes or writes over there; `demo.yaml` is safe, since a run from a steps file never touches it.
 <!-- with check_video -->
 Pass `demo.mp4` on by its path.
 <!-- end -->

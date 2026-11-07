@@ -79,6 +79,12 @@ export interface OutDefinition {
    */
   ownOnly?: boolean;
   /**
+   * The files a run writes in the folder and deletes there when it fails, by name, like the
+   * demo's demo.mp4 and steps.json. makersmcp does not start the kit when a file the call
+   * gives is one of them, since the kit would delete it or write over it.
+   */
+  runFiles?: string[];
+  /**
    * Folders in the folder given with `flag` that the kit deletes and makes again, like
    * brand, each with how to tell one a kit made. makersmcp does not start the kit when it
    * finds the kit would lose anything else there. It tells folders apart by what the disk
@@ -392,6 +398,10 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
           fail(`${tool.name}.refuses: ${whole} is no file the call gives; write {<param>} for a file parameter's path as the kit gets it, or {<param>:name} for its name`);
         }
       }
+    }
+    if (tool.out?.runFiles !== undefined && !(Array.isArray(tool.out.runFiles) && tool.out.runFiles.length
+      && tool.out.runFiles.every(file => typeof file === 'string' && staysInside(file) && !/[\\/]/.test(file)))) {
+      fail(`${tool.name}: out.runFiles names the files a run writes in its folder, like demo.mp4`);
     }
     if (tool.out?.ownOnly !== undefined && (typeof tool.out.ownOnly !== 'boolean' || !tool.out.flag)) {
       fail(`${tool.name}: out.ownOnly is true or false, for a tool whose folder the agent gives with out.flag`);

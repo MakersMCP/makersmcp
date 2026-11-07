@@ -176,6 +176,7 @@ export function buildCommand(
         args.push(tool.out.flag, folder);
       }
     }
+    if (folder !== undefined) refuseRunFiles(tool, folder, inputs);
   }
 
   for (const [flag, kit] of Object.entries(tool.uses ?? {})) {
@@ -184,6 +185,24 @@ export function buildCommand(
   }
 
   return { args, folder, inputs };
+}
+
+/**
+ * Refuses a call that gives the kit one of the files a run writes in its folder and deletes
+ * there when it fails (out.runFiles), like a steps file saved as the demo's own steps.json:
+ * the kit would delete it or write over it. A file is told by its identity on the disk, so
+ * the same file by another path, in other letters on a disk that ignores case or through a
+ * link, counts.
+ */
+function refuseRunFiles(tool: ToolDefinition, folder: string, inputs: Record<string, string>): void {
+  for (const name of tool.out?.runFiles ?? []) {
+    const own = identity(path.join(folder, name));
+    if (own === undefined) continue;
+    for (const [param, file] of Object.entries(inputs)) {
+      if (identity(file) !== own) continue;
+      throw new ArgumentError(`${param}: ${file} is the ${name} of ${folder}, where ${tool.name} saves, and a run there deletes or writes over that file. Give it another name or folder, or give another out_dir.`);
+    }
+  }
 }
 
 function nothingAt(name: string, param: ParamDefinition, full: string, text: string): string {

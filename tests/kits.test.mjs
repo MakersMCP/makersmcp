@@ -767,6 +767,9 @@ const REFUSALS = [
   ['record_demo_video', 'Not a web address', { url: 'https://[bad]/' }, EARLIER.demo],
   ['record_demo_video', 'easyscreenshotkit demo: {steps:name}: ', { url: SITE, steps: '@/bad.yaml' }, { ...EARLIER.demo, 'bad.yaml': BAD_STEPS }],
   ['record_demo_video', 'could not read {steps}: ', { url: SITE, steps: '@/sub' }, { ...EARLIER.demo, 'sub/notes.txt': 'mine' }],
+  // A file that is no picture, or a folder, which makersmcp passes on as a file and the kit refuses as no colour either.
+  ['record_demo_video', '--background takes a colour', { url: SITE, background: '@/backdrop.bmp' }, { ...EARLIER.demo, 'backdrop.bmp': 'BM' }],
+  ['record_demo_video', '--background takes a colour', { url: SITE, background: '@/pictures' }, { ...EARLIER.demo, 'pictures/backdrop.png': 'png' }],
   ['make_launch_film', 'is not a command or an address', { url: 'http://localhost:9/' }, EARLIER.film],
   ['make_launch_film', "not the brand's own site", { url: 'https://x.com/acme' }, EARLIER.film],
   ['make_launch_film', 'no brand.json at', { url: SITE, brand: 'kitless' }, EARLIER.film],
@@ -886,6 +889,60 @@ test('a call a kit refuses before it touches its folder leaves an earlier run th
       await client.close();
       await server.close();
     }
+    rmSync(baseDir, { recursive: true, force: true });
+  }
+});
+
+test('a file the call gives that a demo run deletes or writes over in its folder, like a steps file saved as its steps.json, stops the call before the job starts', async () => {
+  const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-runfiles-'));
+  // No browser: a call that starts fails as the kit starts one.
+  const env = { ...process.env, CHROME_PATH: path.join(baseDir, 'no-chrome'), LAUNCH_FILM_CHROME: path.join(baseDir, 'no-chrome') };
+  const server = createMcpServer({ backend: new LocalBackend({ baseDir, kitPaths, env }) });
+  const client = new Client({ name: 'test-client', version: '1.0.0' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  const steps = `${JSON.stringify({ url: SITE, steps: [{ visit: SITE }, { wait: 1 }] })}\n`;
+  const write = (file, body) => {
+    mkdirSync(path.dirname(path.join(baseDir, file)), { recursive: true });
+    writeFileSync(path.join(baseDir, file), body);
+  };
+  const call = args => client.callTool({ name: 'record_demo_video', arguments: { url: SITE, wait_seconds: 60, ...args } });
+  try {
+    const refused = [
+      // The user's steps file, saved in the demo's folder as steps.json.
+      [{ steps: 'one/steps.json', out_dir: 'one' }, { 'one/steps.json': steps }, 'steps', 'steps.json'],
+      // An earlier demo's poster as the backdrop, which the run deletes before it records.
+      [{ background: 'two/poster.png', out_dir: 'two' }, Object.fromEntries(Object.entries(EARLIER.demo).map(([name, body]) => [`two/${name}`, body])), 'background', 'poster.png'],
+    ];
+    if (process.platform !== 'win32') refused.push([{ steps: 'mine.json', out_dir: 'three' }, { 'mine.json': steps }, 'steps', 'steps.json']);
+    for (const [args, files, param, name] of refused) {
+      for (const [file, body] of Object.entries(files)) write(file, body);
+      // The third: the folder's steps.json is a link to the steps file the call gives by its own path.
+      if (args.out_dir === 'three') {
+        mkdirSync(path.join(baseDir, 'three'));
+        symlinkSync(path.join(baseDir, 'mine.json'), path.join(baseDir, 'three', 'steps.json'));
+      }
+      const before = filesIn(path.join(baseDir, args.out_dir));
+      const result = await call(args);
+      const label = JSON.stringify(args);
+      assert.equal(result.isError, true, label);
+      assert.equal(result.structuredContent, undefined, `${label}: no job started`);
+      assert.match(text(result), /^## Demo video of a website: not started\n\n/, label);
+      const given = path.join(baseDir, args[param]);
+      assert.ok(text(result).includes(`${param}: ${given} is the ${name} of ${path.join(baseDir, args.out_dir)}, where record_demo_video saves, and a run there deletes or writes over that file. Give it another name or folder, or give another out_dir.`), text(result));
+      assert.deepEqual(filesIn(path.join(baseDir, args.out_dir)), before, `${label} left the folder as it was`);
+    }
+    // Under any other name the steps file may sit in the demo's folder: the run starts, and fails here for want of a browser, leaving it.
+    write('four/app.json', steps);
+    const started = await call({ steps: 'four/app.json', out_dir: 'four' });
+    assert.equal(started.structuredContent?.status, 'failed', text(started));
+    assert.match(text(started), /No Chrome, Chromium, Edge or Brave found/);
+    assert.deepEqual(filesIn(path.join(baseDir, 'four')), ['app.json']);
+    assert.match(started.structuredContent.next, /a steps file it read stays\.$/);
+  } finally {
+    await client.close();
+    await server.close();
     rmSync(baseDir, { recursive: true, force: true });
   }
 });
