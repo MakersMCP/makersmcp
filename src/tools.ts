@@ -2,9 +2,18 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { textPattern } from './args.js';
 import { NotStartedError, type AvailableKit, type JobView, type KitBackend } from './backend.js';
 import type { ParamDefinition, ToolDefinition } from './kits.js';
-import { errorResult, jobOutputSchema, jobResult, jobStructured } from './results.js';
+import { PLAYBOOK_TOOL } from './playbooks.js';
+import { errorResult, jobListed, jobOutputSchema, jobResult, type ResultContext } from './results.js';
+import { fillText, inWords, templateInWords, TextError, WAIT_SECONDS, type TextContext } from './texts.js';
+
+/** A kit tool this server lists, with the kit it is of. */
+export interface RegisteredKitTool {
+  kit: AvailableKit;
+  tool: ToolDefinition;
+}
 
 export interface ToolContext {
   version: string;
@@ -13,14 +22,26 @@ export interface ToolContext {
   baseDir?: string;
   /** The kits this server turned on. */
   enabled: Set<string>;
+  /** What the placeholders in the kits' texts are filled from. */
+  text: TextContext;
+  /** The playbook topics this server offers, which the descriptions and the Next lines may point to. */
+  topics: Set<string>;
+  /** The kit tools registered so far, by name, for the results of wait_for_job and cancel_job. */
+  tools: Map<string, RegisteredKitTool>;
 }
 
 type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
-const DEFAULT_WAIT = 45;
-
-const waitSeconds = z.number().int().min(0).max(600).default(DEFAULT_WAIT)
-  .describe('How long to wait for the result before returning a job_id to wait on. 45 is safe for clients that stop a tool call after 60 seconds.');
+function waitSeconds(context: ToolContext): z.ZodType {
+  const limit = context.text.limits?.maxWaitSeconds;
+  const words = context.backend.where === 'local'
+    ? 'Some clients end a call after 60 or 240 seconds; 45 is safe in all of them.'
+    : limit !== undefined
+      ? `Each call waits at most ${limit} seconds here, whatever this asks.`
+      : 'A call here may come back sooner, with the job_id to wait on.';
+  return z.number().int().min(WAIT_SECONDS.min).max(WAIT_SECONDS.max).default(WAIT_SECONDS.default)
+    .describe(`How long to wait for the result before returning a job_id to wait on. ${words}`);
+}
 
 // A hosted kit cannot read the agent's disk: a file comes as a link, or as a file an
 // earlier job of the same user saved.
@@ -40,14 +61,38 @@ function hostedAddressOrFile(filePattern: string): RegExp {
   return new RegExp(`^(?:(?!${file})https?:\\/\\/\\S+|(?=${file})job:[^\\s/]+\\/\\S+)$`, 'i');
 }
 
-function paramSchema(param: ParamDefinition, where: KitBackend['where']): z.ZodType {
-  const hosted = where === 'hosted';
+/**
+ * Whether a parameter the kit reads as text also takes a number, written as text before the
+ * job starts: a string, a text_or_path whose text can be a number (cuts), and an enum whose
+ * values are all digits (meter). So length 29.333 and meter 4 work, and the kit and a hosted
+ * service still see the text they check.
+ */
+export function takesNumber(param: ParamDefinition): boolean {
+  if (param.type === 'string') return true;
+  if (param.type === 'text_or_path') return ['1', '1.5'].some(text => textPattern(param).test(text));
+  if (param.type === 'enum') return Boolean(param.values?.length) && param.values!.every(value => /^\d+$/.test(value));
+  return false;
+}
+
+/** A kit text with its placeholders filled, or an error that names where it is. */
+function kitText(text: string, context: ToolContext, where: string): string {
+  try {
+    return fillText(text, context.text, { kind: 'kit' });
+  } catch (error) {
+    if (error instanceof TextError) throw new Error(`${where}: ${error.message}`);
+    throw error;
+  }
+}
+
+function paramSchema(tool: ToolDefinition, name: string, param: ParamDefinition, context: ToolContext): z.ZodType {
+  const hosted = context.backend.where === 'hosted';
   let schema: z.ZodType;
   // A hosted text of its own replaces the usual words about links.
-  let description = hosted && param.hostedDescription ? param.hostedDescription : param.description;
+  let description = kitText(hosted && param.hostedDescription ? param.hostedDescription : param.description, context, `${tool.name}.${name}`);
   const linkHelp = (help: string) => {
     if (!param.hostedDescription) description += help;
   };
+  const number = takesNumber(param);
   switch (param.type) {
     case 'url':
       schema = z.string().regex(/^https?:\/\/\S+$/i, 'an address starting with http:// or https://');
@@ -67,32 +112,36 @@ function paramSchema(param: ParamDefinition, where: KitBackend['where']): z.ZodT
         schema = z.string().min(1);
       }
       break;
-    case 'text_or_path':
-      if (hosted) {
-        // The text as the kit takes it, or a file the service brings in. Never a path on its disk.
-        schema = z.string().regex(
-          new RegExp(`^(?:${param.pattern})$|^${HOSTED_FILE_SOURCE}$`, 'i'),
-          'the text itself, an https link, or job:<job_id>/<path>',
-        );
-        linkHelp(HOSTED_TEXT_OR_FILE_HELP);
-      } else {
-        schema = z.string().min(1);
-      }
+    case 'text_or_path': {
+      const message = hosted ? 'the text itself, an https link, or job:<job_id>/<path>' : 'the text itself, or a file';
+      // The text as the kit takes it, or a file the service brings in. Never a path on its disk.
+      const text = hosted
+        ? z.string().regex(new RegExp(`^(?:${param.pattern})$|^${HOSTED_FILE_SOURCE}$`, 'i'), message)
+        : z.string().min(1);
+      if (hosted) linkHelp(HOSTED_TEXT_OR_FILE_HELP);
+      schema = number
+        ? z.union([text, z.number().refine(value => textPattern(param).test(String(value)), message)], { error: message })
+        : text;
       break;
+    }
     case 'integer':
     case 'number': {
-      let number = param.type === 'integer' ? z.number().int() : z.number();
-      if (param.min !== undefined) number = number.min(param.min);
-      if (param.max !== undefined) number = number.max(param.max);
-      schema = number;
+      let value = param.type === 'integer' ? z.number().int() : z.number();
+      if (param.min !== undefined) value = value.min(param.min);
+      if (param.max !== undefined) value = value.max(param.max);
+      schema = value;
       break;
     }
     case 'boolean':
       schema = z.boolean();
       break;
-    case 'enum':
-      schema = z.enum(param.values as [string, ...string[]]);
+    case 'enum': {
+      const values = param.values as [string, ...string[]];
+      schema = number
+        ? z.union([z.enum(values), z.literal(values.map(Number))], { error: `one of ${values.map(value => `"${value}"`).join('|')}, or that number` })
+        : z.enum(values);
       break;
+    }
     case 'list':
       schema = z.array(param.values ? z.enum(param.values as [string, ...string[]]) : z.string().min(1)).min(1);
       break;
@@ -100,7 +149,7 @@ function paramSchema(param: ParamDefinition, where: KitBackend['where']): z.ZodT
       schema = z.array(z.string().min(1)).min(1);
       break;
     default:
-      schema = z.string().min(1);
+      schema = number ? z.union([z.string().min(1), z.number()], { error: 'text, or a number' }) : z.string().min(1);
   }
   schema = schema.describe(description);
   return param.required ? schema : schema.optional();
@@ -125,17 +174,29 @@ function waitFor(context: ToolContext, id: string, seconds: number, extra: Extra
 }
 
 /** A folder name template in words, like "the folder of source" for {dir:source}. */
-function inWords(template: string): string {
+function inPlainWords(template: string): string {
   return template
     .replace(/\{dir:(\w+)\}/g, 'the folder of $1')
     .replace(/\{stem:(\w+)\}/g, "$1's name")
     .replace(/\{host\}/g, "the site's host");
 }
 
+/**
+ * out_dir's description: the plain case first (the folder it saves in by default, and that
+ * a run replaces what an earlier one left there), then the rules for the folders a kit
+ * makes again in it, like launch-film's brand/.
+ */
 function outDirHelp(tool: ToolDefinition, baseDir: string | undefined): string {
   const out = tool.out!;
-  let help = `Folder to save into, absolute or relative to ${baseDir}. Default: ${out.name}.`;
-  if (out.otherwise) help += ` Given a file instead of an address, the kit saves in ${inWords(out.otherwise)} and takes no out_dir.`;
+  const parts: string[] = [];
+  if (out.name.includes('{host}')) parts.push("<host> is the site's host without www or the port");
+  for (const [, name] of out.name.matchAll(/\{stem:(\w+)\}/g)) parts.push(`<${name}-name> is the name of ${name} without its extension`);
+  for (const [, name] of out.name.matchAll(/\{dir:(\w+)\}/g)) parts.push(`<${name}-folder> is the folder ${name} is in`);
+  let help = `Folder to save into, absolute or relative to ${baseDir}. Default: ${templateInWords(out.name)}${parts.length ? `, where ${inWords(parts)}` : ''}.`;
+  // A check writes only its report; every other kit replaces the files of its earlier run.
+  if (!tool.check) help += ' A run may replace the files an earlier run of this kit left there, even one that fails, so give each version its own out_dir.';
+  if (out.ownOnly) help += ' The folder must be empty or hold an earlier run of this kit: any other folder stops it.';
+  if (out.otherwise) help += ` Given a file instead of an address, the kit saves in ${inPlainWords(out.otherwise)} and takes no out_dir.`;
   for (const [name, kind] of Object.entries(out.replaces ?? {})) {
     // A kit that deletes the folder for some addresses only makes it again where it is for the others.
     const when = kind.addresses
@@ -150,70 +211,114 @@ function outDirHelp(tool: ToolDefinition, baseDir: string | undefined): string {
   return help;
 }
 
+/**
+ * A kit tool's description as the client gets it: when to use it in the user's words
+ * (asks), what it makes (the kit file's description, or hostedDescription on a hosted
+ * server), the topic that has the whole job, and last the kit, its version and where it runs.
+ */
+export function kitToolDescription(context: ToolContext, kit: AvailableKit, tool: ToolDefinition): string {
+  const hosted = context.backend.where === 'hosted';
+  const place = context.text.place;
+  const parts: string[] = [];
+  if (tool.asks) parts.push(`Use it when the user wants ${kitText(tool.asks, context, `${tool.name}.asks`)}.`);
+  parts.push(kitText(hosted && tool.hostedDescription ? tool.hostedDescription : tool.description, context, tool.name));
+  if (tool.playbook && context.topics.has(tool.playbook)) parts.push(`The ${tool.playbook} playbook (${PLAYBOOK_TOOL}) has the whole job.`);
+  parts.push(`(${kit.definition.kit} ${kit.version}, ${place}.)`);
+  return parts.join(' ');
+}
+
+/** A message with any placeholders of the kits' texts filled, or as it is when one cannot be. */
+function filledMessage(message: string, context: ToolContext): string {
+  try {
+    return fillText(message, context.text, { kind: 'kit', keepUnknown: true });
+  } catch {
+    return message;
+  }
+}
+
+/** What a result needs to say what comes next, for a job of this tool. */
+function resultContext(context: ToolContext, entry: RegisteredKitTool | undefined): ResultContext {
+  return { text: context.text, topics: context.topics, ...(entry ? { kit: entry.kit.definition, tool: entry.tool } : {}) };
+}
+
 export function registerKitTool(server: McpServer, context: ToolContext, kit: AvailableKit, tool: ToolDefinition): void {
   const { backend } = context;
   const hosted = backend.where === 'hosted';
   const inputSchema: Record<string, z.ZodType> = {};
-  for (const [name, param] of Object.entries(tool.params)) inputSchema[name] = paramSchema(param, backend.where);
+  for (const [name, param] of Object.entries(tool.params)) {
+    // A local parameter, like keep, means nothing where each job's work files are swept away.
+    if (hosted && param.where === 'local') continue;
+    inputSchema[name] = paramSchema(tool, name, param, context);
+  }
   if (tool.out?.flag && !hosted) {
     inputSchema['out_dir'] = z.string().min(1).optional().describe(outDirHelp(tool, context.baseDir));
   }
-  inputSchema['wait_seconds'] = waitSeconds;
-  const place = backend.place ?? (hosted ? 'on a server' : 'on this machine');
-  const description = hosted && tool.hostedDescription ? tool.hostedDescription : tool.description;
+  inputSchema['wait_seconds'] = waitSeconds(context);
+  const numbers = Object.entries(tool.params).filter(([, param]) => takesNumber(param)).map(([name]) => name);
+  const entry = { kit, tool };
+  context.tools.set(tool.name, entry);
 
   server.registerTool(
     tool.name,
     {
       title: tool.title,
-      description: `${description} (${kit.definition.kit} ${kit.version}, ${place}.)`,
+      description: kitToolDescription(context, kit, tool),
       inputSchema,
       outputSchema: jobOutputSchema,
       annotations: {
         title: tool.title,
         readOnlyHint: tool.readOnly === true,
-        destructiveHint: tool.destructive === true,
+        // destructive is about the local folder: a hosted job writes a folder of its own, and
+        // one that takes an earlier job's files works on a copy of them.
+        destructiveHint: !hosted && tool.destructive === true,
         idempotentHint: tool.readOnly === true,
-        openWorldHint: backend.where === 'hosted'
+        openWorldHint: hosted
           || Object.values(tool.params).some(param => param.type === 'url' || param.type === 'url_or_path'),
       },
     },
     async (input: Record<string, unknown>, extra: Extra) => {
       const { wait_seconds: wait, ...args } = input;
+      // The kit, and a hosted service, check text: a number given for one is written as text.
+      for (const name of numbers) if (typeof args[name] === 'number') args[name] = String(args[name]);
       let view: JobView;
       try {
         view = await backend.start({ kit, tool, input: args });
       } catch (error) {
-        if (error instanceof NotStartedError) return errorResult(`## ${tool.title}: not started\n\n${error.message}`);
+        // A local refusal may quote a parameter's text, whose placeholders are filled here too.
+        if (error instanceof NotStartedError) return errorResult(`## ${tool.title}: not started\n\n${filledMessage(error.message, context)}`);
         throw error;
       }
       if (view.status === 'running') {
-        view = (await waitFor(context, view.id, Number(wait ?? DEFAULT_WAIT), extra)) ?? view;
+        view = (await waitFor(context, view.id, Number(wait ?? WAIT_SECONDS.default), extra)) ?? view;
       }
-      return jobResult(view);
+      return jobResult(view, resultContext(context, entry));
     },
   );
 }
 
 export function registerCoreTools(server: McpServer, context: ToolContext): void {
   const { backend } = context;
+  const local = backend.where === 'local';
   const jobId = z.string().min(1).describe('The job_id a makersmcp tool returned.');
-  const unknownJob = (id: string) => errorResult(backend.where === 'local'
+  const unknownJob = (id: string) => errorResult(local
     ? `## No job ${id}\n\nJobs last only while this makersmcp runs. list_jobs shows the ones it has.`
     : `## No job ${id}\n\nlist_jobs shows your jobs.`);
+  const result = (view: JobView) => jobResult(view, resultContext(context, context.tools.get(view.tool)));
 
   server.registerTool(
     'wait_for_job',
     {
       title: 'Wait for a job',
-      description: 'Waits for a job a makersmcp tool started and returns its result once it ends. If it is still running, call this again with the same job_id. Never start the original tool again to check on a job: that starts a second one.',
-      inputSchema: { job_id: jobId, wait_seconds: waitSeconds },
+      description: 'Waits for a job a makersmcp tool started and returns its result once it ends. It also returns a finished job\'s result again. '
+        + 'If it is still running, call this again with the same job_id. Never start the original tool again to check on a job: that starts a second one. '
+        + 'A call that ended with no result may still have started a job: list_jobs shows it.',
+      inputSchema: { job_id: jobId, wait_seconds: waitSeconds(context) },
       outputSchema: jobOutputSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id, wait_seconds }, extra) => {
-      const view = await waitFor(context, job_id, wait_seconds, extra);
-      return view ? jobResult(view) : unknownJob(job_id);
+      const view = await waitFor(context, job_id, wait_seconds as number, extra);
+      return view ? result(view) : unknownJob(job_id);
     },
   );
 
@@ -221,7 +326,7 @@ export function registerCoreTools(server: McpServer, context: ToolContext): void
     'cancel_job',
     {
       title: 'Cancel a job',
-      description: backend.where === 'local'
+      description: local
         ? 'Stops a running job and the browser or ffmpeg it started. Files it already saved stay where they are.'
         : 'Stops a running job. Files it already saved are not kept.',
       inputSchema: { job_id: jobId },
@@ -230,17 +335,18 @@ export function registerCoreTools(server: McpServer, context: ToolContext): void
     },
     async ({ job_id }) => {
       const view = await backend.cancel(job_id);
-      return view ? jobResult(view) : unknownJob(job_id);
+      return view ? result(view) : unknownJob(job_id);
     },
   );
 
+  const again = 'Use it after a call that ended with no result, before starting that tool again: the job may be running.';
   server.registerTool(
     'list_jobs',
     {
       title: 'List jobs',
-      description: backend.where === 'local'
-        ? 'Lists the jobs makersmcp started since it was launched, running or ended, with their folders.'
-        : 'Lists your recent jobs, running or ended, newest first.',
+      description: local
+        ? `Lists the jobs makersmcp started since it was launched, running or ended, with their folders. ${again} Jobs end when makersmcp ends, and a finished job's files stay in its folder.`
+        : `Lists your recent jobs, running or ended, newest first. ${again}`,
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -250,7 +356,8 @@ export function registerCoreTools(server: McpServer, context: ToolContext): void
         + (view.folder ? `, ${view.folder}` : ''));
       return {
         content: [{ type: 'text', text: lines.length ? `## Jobs\n\n${lines.join('\n')}` : 'No jobs yet.' }],
-        structuredContent: { jobs: jobs.map(view => jobStructured(view)) },
+        // A count, not each job's files: wait_for_job gives a job's whole result.
+        structuredContent: { jobs: jobs.map(jobListed) },
       };
     },
   );
@@ -259,8 +366,9 @@ export function registerCoreTools(server: McpServer, context: ToolContext): void
     'check_setup',
     {
       title: 'Check the setup',
-      description: backend.where === 'local'
-        ? 'Shows which kits makersmcp has and their versions, whether Chrome and ffmpeg were found, and where files are saved. Use it when a tool is missing or a kit fails to start.'
+      description: local
+        ? 'Shows which kits makersmcp has and their versions, whether Chrome and ffmpeg were found, and where files are saved. Use it when a tool is missing or a kit fails to start. '
+          + 'Settings like CHROME_PATH, FFMPEG_PATH and MAKERSMCP_OUT go in this server\'s entry in the MCP client\'s settings, and take effect when the client starts it again.'
         : 'Shows which kits are running and their versions, and how long files are kept. Use it when a tool is missing.',
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

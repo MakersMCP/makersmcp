@@ -6,15 +6,29 @@ import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import { isAvailable, type AvailableKit, type KitBackend } from './backend.js';
 import { loadKitDefinitions, type KitDefinition } from './kits.js';
 import { LocalBackend } from './local-backend.js';
+import {
+  instructionsText,
+  loadPlaybooks,
+  offeredTopics,
+  PlaybookError,
+  registerPlaybookResources,
+  registerPlaybookTool,
+  type Playbooks,
+} from './playbooks.js';
 import { withDraft2020 } from './schema-dialect.js';
 import { defaultOutDir } from './setup.js';
+import type { TextContext } from './texts.js';
 import { registerCoreTools, registerKitTool, type ToolContext } from './tools.js';
 
-export { loadKitDefinitions, resolveKit, validateKitDefinition, KITS_DIR } from './kits.js';
+export { loadKitDefinitions, resolveKit, validateKitDefinition, docNames, docEntry, KITS_DIR } from './kits.js';
 export type {
+  DocEntry,
+  FactValue,
+  Facts,
   InstalledKit,
   KitDefinition,
   MissingKit,
+  NextLines,
   OutDefinition,
   ParamDefinition,
   ParamType,
@@ -22,6 +36,18 @@ export type {
   ReplacedFor,
   ToolDefinition,
 } from './kits.js';
+export {
+  indexText,
+  instructionsText,
+  loadPlaybooks,
+  offeredTopics,
+  renderTopic,
+  PlaybookError,
+  PLAYBOOK_TOOL,
+  PLAYBOOKS_DIR,
+} from './playbooks.js';
+export type { Playbooks, Topic } from './playbooks.js';
+export type { TextContext } from './texts.js';
 export { JobManager, Job, FolderBusyError } from './jobs.js';
 export type { JobSpec } from './jobs.js';
 export { ArgumentError, buildCommand, expandHome } from './args.js';
@@ -31,6 +57,7 @@ export type { LocalBackendOptions } from './local-backend.js';
 export { NotStartedError, isAvailable } from './backend.js';
 export type {
   AvailableKit,
+  HostedLimits,
   JobDoc,
   JobFile,
   JobStatus,
@@ -56,11 +83,18 @@ export interface MakersMcpOptions {
   definitions?: KitDefinition[];
   /** Where the jobs run. Default: a LocalBackend on outDir and kitPaths. */
   backend?: KitBackend;
+  /**
+   * The playbooks, as a folder of topics and its _instructions.md, or as loadPlaybooks read
+   * them. Default: the package's playbooks/, read once per process.
+   */
+  playbooks?: string | Playbooks;
 }
 
 interface Prepared {
-  context: ToolContext;
+  backend: KitBackend;
+  definitions: KitDefinition[];
   available: AvailableKit[];
+  enabled: Set<string>;
 }
 
 function prepare(options: MakersMcpOptions): Prepared {
@@ -87,53 +121,71 @@ function prepare(options: MakersMcpOptions): Prepared {
   const available = backend.available(definitions).filter(isAvailable);
   const wanted = all ? undefined : new Set(asked);
   const enabled = new Set(available.map(kit => kit.definition.kit).filter(kit => !wanted || wanted.has(kit)));
-
-  return {
-    context: { version, backend, baseDir: backend instanceof LocalBackend ? backend.baseDir : undefined, enabled },
-    available,
-  };
+  return { backend, definitions, available, enabled };
 }
 
 /** The setup report that check_setup gives, for `makersmcp --check`. */
 export async function describeSetup(options: MakersMcpOptions = {}): Promise<string> {
-  const { context } = prepare(options);
-  return context.backend.setupReport({ version, enabled: context.enabled });
+  const { backend, enabled } = prepare(options);
+  return backend.setupReport({ version, enabled });
 }
 
-function instructions(context: ToolContext): string {
-  if (context.backend.where === 'hosted') {
-    // Each parameter's own text says what it takes; this only must not promise more.
-    return 'MakersMCP runs open source kits for you on its servers: brand kits, fonts, screenshots, '
-      + 'demo videos, launch films and more, each from a website or a file. A file an earlier job saved '
-      + 'goes in as job:<job_id>/<path>, so the files it names come with it: give a film.json or a brand '
-      + 'kit that way. Other files go as https links where a parameter takes one, and a parameter that '
-      + 'takes an address or a file reads a link only as the address. Every tool returns links to the '
-      + 'files it made, which work for a few days, and the kit\'s own notes. A tool that is still working '
-      + 'after wait_seconds returns a job_id: call wait_for_job with it, never the same tool again.';
+/** The tools' and the playbooks' context: the side, the kits on, their versions and texts, and the topics offered. */
+function toolContext(prepared: Prepared, playbooks: Playbooks): ToolContext {
+  const { backend, definitions, available, enabled } = prepared;
+  const hosted = backend.where === 'hosted';
+  const baseDir = backend.baseDir;
+  const text: TextContext = {
+    where: backend.where,
+    place: backend.place ?? (hosted ? 'on a server' : 'on this machine'),
+    ...(baseDir !== undefined && !hosted ? { baseDir } : {}),
+    definitions,
+    enabled,
+    versions: new Map(available.map(kit => [kit.definition.kit, kit.version])),
+    ...(hosted && backend.limits ? { limits: backend.limits } : {}),
+  };
+  // A tool's topic is one of the playbooks, so its description never points at nothing.
+  const names = new Set(playbooks.topics.map(topic => topic.name));
+  for (const definition of definitions) {
+    for (const tool of definition.tools) {
+      if (tool.playbook !== undefined && !names.has(tool.playbook)) {
+        throw new PlaybookError(`${definition.kit}: ${tool.name}'s playbook is ${tool.playbook}, which is not a topic in ${playbooks.dir}`);
+      }
+    }
   }
-  return 'MakersMCP runs open source kits on this machine: brand kits, fonts, screenshots, '
-    + 'demo videos, launch films and more, each from a website or a file. Every tool saves its '
-    + `files in a folder (relative ones go under ${context.baseDir}) and returns the folder, the `
-    + 'files and the kit\'s own notes. A tool that is still working after wait_seconds returns a '
-    + 'job_id: call wait_for_job with it, never the same tool again. check_setup tells what is '
-    + 'missing when a tool fails to start.';
+  return {
+    version,
+    backend,
+    baseDir,
+    enabled,
+    text,
+    topics: new Set(offeredTopics(playbooks, enabled).map(topic => topic.name)),
+    tools: new Map(),
+  };
 }
 
 /**
  * An MCP server with a tool for each tool of each kit the backend can run and the
- * server turned on, plus wait_for_job, cancel_job, list_jobs and check_setup. Connect
+ * server turned on, plus makersmcp_playbook, wait_for_job, cancel_job, list_jobs and
+ * check_setup, and the playbooks offered as resources too. Connect
  * it to any transport. With the local backend, its running jobs stop when the server
  * or the transport closes, and with this process. On stdio, use serveStdio: the stdio
  * transport does not close when the client goes away.
  */
 export function createMcpServer(options: MakersMcpOptions = {}): McpServer {
-  const { context, available } = prepare(options);
+  const prepared = prepare(options);
+  const playbooks = typeof options.playbooks === 'object' ? options.playbooks : loadPlaybooks(options.playbooks);
+  const context = toolContext(prepared, playbooks);
   const server = new McpServer(
     { name: 'makersmcp', title: 'MakersMCP', version, websiteUrl: 'https://makersmcp.com' },
-    { instructions: instructions(context) },
+    // Rendered from playbooks/_instructions.md for this side and the kits that are on. The
+    // hosted text must not promise more than each parameter's own text says it takes.
+    { instructions: instructionsText(playbooks, context.text) },
   );
 
-  for (const kit of available) {
+  registerPlaybookTool(server, playbooks, context.text);
+  registerPlaybookResources(server, playbooks, context.text);
+  for (const kit of prepared.available) {
     if (!context.enabled.has(kit.definition.kit)) continue;
     for (const tool of kit.definition.tools) registerKitTool(server, context, kit, tool);
   }

@@ -5,20 +5,64 @@
   "about": "A website's brand kit: its real logo files, colors, fonts and first screen.",
   "repository": "https://github.com/EminBudak/easybrandkit",
   "needs": ["chrome"],
+  "makes": ["a website's brand kit"],
+  "facts": {
+    "screen_size": "3200x1800",
+    "card_size": "2400x1350",
+    "logo_min_side": 240,
+    "facts_timeout": 240,
+    "slow_timeout": 240,
+    "run_seconds": "20 to 90",
+    "facts_run_minutes": "one to three"
+  },
   "tools": [
     {
       "name": "make_brand_kit",
       "title": "Brand kit from a website",
-      "description": "Reads a website in a headless browser, the way it is drawn, and saves its brand in one folder: the logo files cut from their real background (PNG and SVG), the colors with where each one is used, the fonts, the first screen, a brand card, and the app store icon and screenshots when the site links to its apps. BRAND.md is for people and agents, brand.json for tools, _brand.yml for Quarto and Shiny. With facts, it also lists what the site claims about itself, each claim with its page, in FACTS.md. Read BRAND.md before designing anything for that product.",
+      "asks": "a site's logo, colors, fonts or brand guidelines, or to design, build or animate anything for a product whose site is known",
+      "playbook": "brand",
+      "description": "Reads a website in a headless browser, the way it is drawn, and saves its brand in one folder: the logo files cut from their real background (PNG and SVG), the colors with where each one is used, the fonts, the first screen, a brand card, and the app store icon and screenshots when the site links to its apps. BRAND.md is the file to read first and card.png the picture to show the user; brand.json is for tools and _brand.yml for Quarto and Shiny. With facts, it also saves what the site claims about itself, each claim with its page, in FACTS.md, for copy that needs the site's numbers, customers, quotes or prices; a launch film does not read it. An App Store or Google Play listing works as the address, a social profile is refused, and a deeper page is read from the home page. For font files and their licenses, use make_font_kit instead.",
       "args": ["{url}"],
       "out": { "flag": "--out", "name": "easybrandkit-{host}" },
       "params": {
-        "url": { "type": "url", "required": true, "description": "The website, like https://linear.app" },
-        "facts": { "type": "boolean", "flag": "--facts", "description": "Also read what the site claims about itself from its home, pricing, customers, security, integrations and about pages. Takes longer." },
-        "stores": { "type": "boolean", "flag": "--no-stores", "when": false, "description": "Set to false to skip app store listings and social profiles." },
-        "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 30, "max": 600, "description": "Give up after this many seconds (default 120, or 240 with facts)." }
+        "url": { "type": "url", "required": true, "description": "The product's website, like https://linear.app, or its App Store or Google Play listing. A deeper page is read from the home page, and a social profile is refused." },
+        "facts": { "type": "boolean", "flag": "--facts", "default": false, "description": "Also save what the site claims about itself, each claim quoted with its page: numbers, testimonials, customers, prices, integrations and security standards, read from the home page and, where its robots.txt allows, the pricing, customers, security, integrations and about pages it links to. For copy that needs those claims. Takes longer (default {default:make_brand_kit.facts})." },
+        "stores": { "type": "boolean", "flag": "--no-stores", "when": false, "default": true, "description": "Also save the icon and screenshots of the App Store and Google Play apps the site links to, and the profile pictures of its X, YouTube, LinkedIn, Threads and Pinterest pages (default {default:make_brand_kit.stores}). Set to false to skip them." },
+        "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 30, "max": 600, "default": 120, "description": "Give up after this many seconds (default {default:make_brand_kit.timeout_seconds}, or {fact:easybrandkit.facts_timeout} with facts). A slow site, or a kit made from a loading screen, can need {fact:easybrandkit.slow_timeout}." }
       },
-      "docs": ["BRAND.md", "FACTS.md"]
+      "docs": [
+        { "file": "BRAND.md", "site": true },
+        { "file": "FACTS.md", "site": true }
+      ],
+      "writes": [
+        "BRAND.md", "brand.json", "_brand.yml", "card.png", "logo-*.png", "logo-*.svg", "screen-01.png",
+        "appstore-icon.*", "appstore-shot-*", "googleplay-icon.*", "googleplay-shot-*",
+        "x-profile.*", "youtube-profile.*", "linkedin-profile.*", "threads-profile.*", "pinterest-profile.*",
+        "FACTS.md", "facts.json", "pages/*.md"
+      ],
+      "next": {
+        "done": [
+          "Check the brand's name, logo and colors below before building on the kit, and ask the user when one is wrong.",
+          "Show {file:card.png} to the user: the whole kit on one picture.",
+          "Use facts from {file:FACTS.md} only as quoted there, with the page each one is on.",
+          "For a launch film, give brand {folder} to plan_launch_film or make_launch_film."
+        ],
+        "failed": [
+          "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
+          "Unless it refused the address or the folder, a failed run has also deleted any kit an earlier run left in {folder}."
+        ]
+      },
+      "hostedNext": {
+        "done": [
+          "Check the brand's name, logo and colors below before building on the kit, and ask the user when one is wrong.",
+          "Show the user the link to {file:card.png} from the list below: the whole kit on one picture.",
+          "Use facts from {file:FACTS.md} only as quoted there, with the page each one is on.",
+          "For a launch film, give brand {file:brand.json} to plan_launch_film or make_launch_film."
+        ],
+        "failed": [
+          "makersmcp_playbook {topic} lists this tool's errors and their fixes."
+        ]
+      }
     }
   ]
 }

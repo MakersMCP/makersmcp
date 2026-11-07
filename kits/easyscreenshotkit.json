@@ -5,62 +5,138 @@
   "about": "Clean screenshots of a website, a demo video of it, and screenshots for its web app manifest.",
   "repository": "https://github.com/EminBudak/easyscreenshotkit",
   "needs": ["chrome", "ffmpeg"],
+  "makes": ["screenshots", "demo videos"],
+  "facts": {
+    "size": { "desktop": "3200x1800", "mobile": "1080x1920", "iphone": "1320x2868" },
+    "window": { "desktop": "1600x900", "mobile": "360x640", "iphone": "440x956" },
+    "scale": { "desktop": 2, "mobile": 3, "iphone": 3, "full": 1, "mobile_full": 2 },
+    "custom": { "side_min": 240, "side_max": 3840, "scale_min": 0.5, "scale_max": 4, "phone_below": 600 },
+    "full_page_max": 15000,
+    "slow_timeout": 600,
+    "pwa": { "wide": "1920x1080", "narrow": "1080x1920", "max": 8, "side_min": 320, "side_max": 3840, "ratio_max": 2.3, "phone_max": 5, "description_chars": 300 },
+    "demo": { "size": "1920x1080", "window": "1600x900", "gif_max_mb": 8, "time_left": 60 },
+    "steps": { "max": 200, "type_max": 500, "wait_max": 60, "timeout": 15, "timeout_max": 120, "pause_max": 30, "duration_min": 0.2, "duration_max": 20, "zoom_max": 3, "find_seconds": 8 },
+    "tour": { "page_seconds": "4 to 8", "short_page_seconds": 2, "four_pages_seconds": "22 to 26", "pick_seconds": 240 }
+  },
   "tools": [
     {
       "name": "take_screenshots",
       "title": "Screenshots of a website",
-      "description": "Opens a website in a headless browser, picks the pages worth showing (home, pricing, features and the like), hides cookie banners, chat bubbles and other floating boxes, and saves desktop, phone and whole-page screenshots in one folder. SCREENSHOTS.md is for people and agents, manifest.json for tools, sheet.png shows every page on one picture. Sizes: desktop is 1600x900 at 2x, mobile 360x640 at 3x, iphone 440x956 at 3x, full the whole page at 1x, mobile-full the whole phone page at 2x, or any WxH with an optional @scale (1270x760@2 is a Product Hunt gallery image).",
+      "asks": "screenshots of a site, App Store or Google Play screenshots, Product Hunt gallery images, or a web app manifest's screenshots",
+      "playbook": "screenshots",
+      "description": "Opens a website in a headless browser, picks the pages worth showing (home, pricing, features and the like), hides cookie banners, chat bubbles and other floating boxes, and saves desktop, phone and whole-page screenshots in one folder. sheet.png, every page on one picture, is the picture to show first; SCREENSHOTS.md lists each page with why it was picked, its files and its headings. url and page are paths of one public site: a #route is dropped, nothing behind a login is reached, and above one page it starts at the site's root. clean hides everything fixed on the screen but a top bar and a side bar, so an app's own tab bar too. iphone is {fact:easyscreenshotkit.size.iphone}, the App Store's 6.9 inch size; mobile is {fact:easyscreenshotkit.size.mobile}, for Google Play phones. For the Google Play feature graphic and Chrome Web Store tiles, use make_launch_stills instead; for a view behind a click or a #route, record_demo_video with steps.",
       "args": ["{url}"],
       "out": { "flag": "--out", "name": "easyscreenshotkit-{host}" },
       "params": {
-        "url": { "type": "url", "required": true, "description": "The website, like https://linear.app" },
-        "pages": { "type": "integer", "flag": "--pages", "min": 1, "max": 12, "description": "How many pages, the home page included (default 5)." },
-        "page": { "type": "repeat", "flag": "--page", "description": "Pages to take too, like /pricing." },
-        "sizes": { "type": "list", "flag": "--sizes", "description": "Any of desktop, mobile, iphone, full, mobile-full or WxH, each with an optional @scale (default desktop, mobile and full)." },
-        "theme": { "type": "enum", "flag": "--theme", "values": ["light", "dark", "both"], "description": "The site's light or dark look, or both (default light)." },
-        "lang": { "type": "string", "flag": "--lang", "description": "The site's version in this language, when it has one, like de." },
-        "hide": { "type": "repeat", "flag": "--hide", "description": "CSS selectors of more elements to hide." },
-        "reduced_motion": { "type": "boolean", "flag": "--reduced-motion", "description": "Ask the site for its reduced-motion version." },
-        "clean": { "type": "boolean", "flag": "--no-clean", "when": false, "description": "Set to false to take the pages as they come, banners and bubbles included." },
-        "pwa": { "type": "boolean", "flag": "--pwa", "description": "Also save screenshots for a web app manifest in pwa/: each page's first screen at 1920x1080 and on a phone at 1080x1920, checked against Chrome's rules for its richer install dialog, with the manifest entries in pwa/manifest-screenshots.json." },
-        "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 30, "max": 900, "description": "Give up after this many seconds (default 300)." }
+        "url": { "type": "url", "required": true, "description": "The website, like https://linear.app, or a page of it. A #route in it is dropped, so a view an app shows behind one is not reached." },
+        "pages": { "type": "integer", "flag": "--pages", "min": 1, "max": 12, "default": 5, "description": "How many pages, the home page included (default {default:take_screenshots.pages}). Above 1 the site's root comes first, then url when it is a deeper page, then each page, then pages from the site's menu. With 1, only url is taken and page is not read." },
+        "page": { "type": "repeat", "flag": "--page", "description": "Pages of the same site to take too, like /pricing. Each counts toward pages and is taken even past it, but not with pages 1. A #route or a query is dropped, so /app/#/plants is /app/." },
+        "sizes": { "type": "list", "flag": "--sizes", "default": "desktop, mobile and full", "description": "Any of desktop ({fact:easyscreenshotkit.size.desktop}), mobile ({fact:easyscreenshotkit.size.mobile}, a Google Play phone screenshot), iphone ({fact:easyscreenshotkit.size.iphone}, the App Store's 6.9 inch size), full (the whole page at 1x), mobile-full (the whole phone page at 2x), or WxH from {fact:easyscreenshotkit.custom.side_min} to {fact:easyscreenshotkit.custom.side_max} a side, like 1270x760 for a Product Hunt gallery image. Each takes an optional @scale from {fact:easyscreenshotkit.custom.scale_min} to {fact:easyscreenshotkit.custom.scale_max}, and each size goes in once (default {default:take_screenshots.sizes})." },
+        "theme": { "type": "enum", "flag": "--theme", "values": ["light", "dark", "both"], "default": "light", "description": "The site's light or dark look, or both, which adds a -dark twin of every picture (default {default:take_screenshots.theme}). A site without a dark theme looks the same in both." },
+        "lang": { "type": "string", "flag": "--lang", "description": "The site's version in this language, when it has one: a language code like de, tr or pt-BR." },
+        "hide": { "type": "repeat", "flag": "--hide", "description": "CSS selectors of more elements to hide, like .promo-bar, when something still covers a page." },
+        "reduced_motion": { "type": "boolean", "flag": "--reduced-motion", "default": false, "description": "Ask the site for its reduced-motion version." },
+        "clean": { "type": "boolean", "flag": "--no-clean", "when": false, "default": true, "description": "Set to false to take the pages as they come. Otherwise cookie banners, chat bubbles and everything else fixed on the screen are hidden, except a bar along its top and a tall bar down a side, so an app's own bottom tab bar is hidden too." },
+        "pwa": { "type": "boolean", "flag": "--pwa", "default": false, "description": "Also save screenshots for a web app manifest in pwa/: each page's first screen at {fact:easyscreenshotkit.pwa.wide} and on a phone at {fact:easyscreenshotkit.pwa.narrow}, at most {fact:easyscreenshotkit.pwa.max} in all, checked against Chrome's rules for its richer install dialog, with the manifest entries in pwa/manifest-screenshots.json." },
+        "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 30, "max": 900, "default": 300, "description": "Give up after this many seconds (default {default:take_screenshots.timeout_seconds}). A run takes two or three minutes, up to five on very long pages, and a slow site can take {fact:easyscreenshotkit.slow_timeout}.", "hostedDescription": "Give up after this many seconds (default {default:take_screenshots.timeout_seconds}). A job here stops after {limit:job_minutes} whatever this says, so more does not help." }
       },
-      "docs": ["SCREENSHOTS.md"]
+      "docs": [{ "file": "SCREENSHOTS.md", "site": true }],
+      "writes": ["SCREENSHOTS.md", "manifest.json", "sheet.png", "*-*.png", "pwa/manifest-screenshots.json", "pwa/screenshots/wide-*.png", "pwa/screenshots/narrow-*.png"],
+      "next": {
+        "done": [
+          "Show {file:sheet.png} to the user and check that every page needed is there.",
+          "For a page that is missing, run again with it in page: SCREENSHOTS.md lists the pages left out, with why, and others the kit could take.",
+          "check_pwa_screenshots with manifest {file:pwa/manifest-screenshots.json} checks the screenshots for a web app manifest."
+        ],
+        "failed": [
+          "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
+          "Unless it refused a size, a page or the folder, a failed run has also deleted the screenshots an earlier run left in {folder}."
+        ]
+      },
+      "hostedNext": {
+        "done": [
+          "Show the user the link to {file:sheet.png} from the list below and check that every page needed is there.",
+          "For a page that is missing, run again with it in page: SCREENSHOTS.md lists the pages left out, with why, and others the kit could take.",
+          "check_pwa_screenshots with manifest {file:pwa/manifest-screenshots.json} checks the screenshots for a web app manifest."
+        ],
+        "failed": [
+          "makersmcp_playbook {topic} lists this tool's errors and their fixes."
+        ]
+      }
     },
     {
       "name": "record_demo_video",
       "title": "Demo video of a website",
-      "description": "Records a short demo video of a website: a tour of the pages worth showing, or the steps in a file. The page plays in a browser window on a backdrop, with a visible pointer, smooth scrolling and a zoom on each click. Cookie banners and chat bubbles are hidden, never clicked. Saves demo.mp4 (1920x1080, H.264), demo.gif, poster.png and steps.json, which says where every step starts and ends, in seconds and in frames.",
+      "asks": "a demo video, a walkthrough, a GIF of a site, or footage of the real site for a video",
+      "playbook": "demo-video",
+      "description": "Records a short demo video of a website: a tour of the pages worth showing, or the steps in a file. The page plays in a browser window on a backdrop, with a visible pointer, smooth scrolling and a zoom on each click; cookie banners and chat bubbles are hidden, never clicked. Saves demo.mp4 ({fact:easyscreenshotkit.demo.size}, H.264, no sound), demo.gif, poster.png, the picture to show first, and steps.json: each step's start and end, and each click's moment as pressedAt, which music and captions are timed from. A steps file's targets are CSS selectors or text=<words>, and pages and page are for a tour only. A tour gives a page about {fact:easyscreenshotkit.tour.page_seconds} seconds. For still screenshots, use take_screenshots instead.",
       "args": ["demo", "{url}"],
       "out": { "flag": "--out", "name": "easyscreenshotkit-demo-{host}" },
       "params": {
-        "url": { "type": "url", "required": true, "description": "The website, like https://linear.app" },
-        "steps": { "type": "path", "flag": "--steps", "description": "A YAML or JSON file of steps to follow instead of a tour: visit, scroll, click, type, wait, hover, key." },
-        "pages": { "type": "integer", "flag": "--pages", "min": 1, "max": 8, "description": "Pages in the tour, the home page included (default 4)." },
-        "page": { "type": "repeat", "flag": "--page", "description": "Pages to take in the tour, like /pricing." },
-        "zoom": { "type": "number", "flag": "--zoom", "min": 1, "max": 2.5, "description": "How far a click zooms in, 1 to 2.5 (default 1.5). 1 means no zoom." },
-        "background": { "type": "text_or_path", "flag": "--background", "pattern": "\\s*(?:#[0-9a-fA-F]{3,8}|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([\\d\\s.,%/+-]+\\)|[a-zA-Z]{3,30})(?:\\s*,\\s*(?:#[0-9a-fA-F]{3,8}|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([\\d\\s.,%/+-]+\\)|[a-zA-Z]{3,30})){0,2}\\s*", "description": "Behind the window: a colour like #0f172a, two or three colours for a gradient, or a picture file." },
-        "frame": { "type": "boolean", "flag": "--no-frame", "when": false, "description": "Set to false for the page alone, filling the video." },
-        "fps": { "type": "integer", "flag": "--fps", "min": 24, "max": 60, "description": "Frames a second (default 30)." },
-        "theme": { "type": "enum", "flag": "--theme", "values": ["light", "dark"], "description": "The site's light or dark look (default light)." },
-        "lang": { "type": "string", "flag": "--lang", "description": "The site's version in this language, when it has one." },
-        "hide": { "type": "repeat", "flag": "--hide", "description": "CSS selectors of more elements to hide." },
-        "reduced_motion": { "type": "boolean", "flag": "--reduced-motion", "description": "Ask the site for its reduced-motion version." },
-        "clean": { "type": "boolean", "flag": "--no-clean", "when": false, "description": "Set to false to keep the banners and bubbles." },
-        "gif": { "type": "boolean", "flag": "--no-gif", "when": false, "description": "Set to false to skip demo.gif." },
-        "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 60, "max": 1800, "description": "Give up after this many seconds (default 900)." }
+        "url": { "type": "url", "required": true, "description": "The website, like https://linear.app. It wins over the url in a steps file, and a steps file whose first step is no visit starts here." },
+        "steps": { "type": "path", "flag": "--steps", "description": "A YAML or JSON file of steps to follow instead of a tour, one action a step: visit, scroll, click, type, key, hover or wait. A target is a CSS selector or text=<words>, and a selector that starts with # goes in quotes. demo.yaml from an earlier tour is one to start from. Not with pages or page.", "hostedDescription": "A YAML or JSON file of steps to follow instead of a tour, as an https link to it, or as job:<job_id>/demo.yaml for the tour an earlier job recorded, used as it is. One action a step: visit, scroll, click, type, key, hover or wait; a target is a CSS selector or text=<words>. Not with pages or page." },
+        "pages": { "type": "integer", "flag": "--pages", "min": 1, "max": 8, "default": 4, "description": "Pages in the tour, the home page included (default {default:record_demo_video.pages}). A page that scrolls takes about {fact:easyscreenshotkit.tour.page_seconds} seconds and one that fits on the screen about {fact:easyscreenshotkit.tour.short_page_seconds}. The tour starts at the site's root and puts pricing last. For a tour only." },
+        "page": { "type": "repeat", "flag": "--page", "description": "Pages of the same site to take in the tour, like /pricing, each taken even past pages. A #route is dropped: a view behind one needs steps. For a tour only." },
+        "zoom": { "type": "number", "flag": "--zoom", "min": 1, "max": 2.5, "default": 1.5, "description": "How far a click zooms in, {bounds:record_demo_video.zoom} (default {default:record_demo_video.zoom}). 1 means no zoom. A step in a steps file can set its own." },
+        "background": { "type": "text_or_path", "flag": "--background", "pattern": "\\s*(?:#[0-9a-fA-F]{3,8}|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([\\d\\s.,%/+-]+\\)|[a-zA-Z]{3,30})(?:\\s*,\\s*(?:#[0-9a-fA-F]{3,8}|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([\\d\\s.,%/+-]+\\)|[a-zA-Z]{3,30})){0,2}\\s*", "description": "Behind the window: a colour like #0f172a, two or three colours for a gradient, or a picture file whose name ends in .png, .jpg, .jpeg, .webp, .gif, .avif or .svg. By default a gradient, dark behind a light site and light behind a dark one." },
+        "frame": { "type": "boolean", "flag": "--no-frame", "when": false, "default": true, "description": "Set to false for the page alone, filling the video, without the window and the backdrop." },
+        "fps": { "type": "integer", "flag": "--fps", "min": 24, "max": 60, "default": 30, "description": "Frames a second (default {default:record_demo_video.fps}); steps.json counts its frames at this rate." },
+        "theme": { "type": "enum", "flag": "--theme", "values": ["light", "dark"], "default": "light", "description": "The site's light or dark look (default {default:record_demo_video.theme})." },
+        "lang": { "type": "string", "flag": "--lang", "description": "The site's version in this language, when it has one: a language code like de or pt-BR." },
+        "hide": { "type": "repeat", "flag": "--hide", "description": "CSS selectors of more elements to hide, on top of any under hide in steps." },
+        "reduced_motion": { "type": "boolean", "flag": "--reduced-motion", "default": false, "description": "Ask the site for its reduced-motion version." },
+        "clean": { "type": "boolean", "flag": "--no-clean", "when": false, "default": true, "description": "Set to false to keep the banners and bubbles. Otherwise everything fixed on the screen is hidden but a bar along its top and one down a side, so a step that clicks in an app's bottom tab bar needs this false." },
+        "gif": { "type": "boolean", "flag": "--no-gif", "when": false, "default": true, "description": "Set to false to skip demo.gif, which is made smaller until it is {fact:easyscreenshotkit.demo.gif_max_mb} MB at most." },
+        "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 60, "max": 1800, "default": 900, "description": "Give up after this many seconds (default {default:record_demo_video.timeout_seconds}). A tour looks for more pages only while more than {fact:easyscreenshotkit.tour.pick_seconds} seconds are left, so a short one records the home page alone, and every step needs {fact:easyscreenshotkit.demo.time_left} seconds left.", "hostedDescription": "Give up after this many seconds (default {default:record_demo_video.timeout_seconds}). A job here stops after {limit:job_minutes} whatever this says, so more does not help. A tour looks for more pages only while more than {fact:easyscreenshotkit.tour.pick_seconds} seconds are left, so a short one records the home page alone." }
+      },
+      "docs": [{ "file": "steps.json", "site": true }],
+      "writes": ["demo.mp4", "demo.gif", "poster.png", "steps.json", "demo.yaml"],
+      "next": {
+        "done": [
+          "Show {file:poster.png} to the user before building on the video; it has no sound.",
+          "{file:demo.gif} is the same video as a GIF, for a README or a post.",
+          "Music, a voice and captions take their times from {file:steps.json}: video.duration is the length and each click's pressedAt its moment.",
+          "To change the tour, edit {file:demo.yaml} and record again with it as steps."
+        ],
+        "failed": [
+          "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
+          "A step that failed is named with its number: check its target against the page, write words as text=<words>, or wait for it first.",
+          "Unless it refused the steps file or found no ffmpeg, a failed run has also deleted the video an earlier run left in {folder}."
+        ]
+      },
+      "hostedNext": {
+        "done": [
+          "Show the user the link to {file:poster.png} from the list below before building on the video; it has no sound.",
+          "{file:demo.gif} is the same video as a GIF, for a README or a post.",
+          "Music, a voice and captions take their times from {file:steps.json}: video.duration is the length and each click's pressedAt its moment.",
+          "To record this tour again, give steps {file:demo.yaml}; it cannot be changed here."
+        ],
+        "failed": [
+          "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
+          "A step that failed is named with its number: check its target against the page, write words as text=<words>, or wait for it first."
+        ]
       }
     },
     {
       "name": "check_pwa_screenshots",
       "title": "Check a web app manifest's screenshots",
-      "description": "Checks the screenshots a web app manifest lists against Chrome's rules for its richer install dialog, without a browser. Passes or lists what needs fixing.",
+      "asks": "to know whether a web app's install dialog will show screenshots, or a manifest's screenshots checked",
+      "playbook": "screenshots",
+      "description": "Checks the screenshots a web app manifest lists against Chrome's rules for its richer install dialog, without a browser: which ones a desktop and a phone would show, and what to fix. A failed check is a normal result, with the report as its summary. It takes a pwa/manifest-screenshots.json from take_screenshots as it is; when the check fails for want of screenshots, take_screenshots with pwa makes ones that pass.",
       "args": ["--pwa-check", "{manifest}"],
       "check": true,
       "report": "stdout",
       "readOnly": true,
       "params": {
-        "manifest": { "type": "url_or_path", "required": true, "description": "The manifest's file or address, or the site's address, like https://linear.app." }
+        "manifest": { "type": "url_or_path", "required": true, "description": "The manifest's file or address, or the site's address, like https://linear.app, when its page links the manifest. A pwa/manifest-screenshots.json from take_screenshots is checked as it is." }
+      },
+      "writes": [],
+      "next": {
+        "passed": ["Tell the user which screenshots a desktop and a phone will show."],
+        "check_failed": [
+          "Tell the user what the report lists to fix.",
+          "take_screenshots with pwa true makes screenshots that meet these rules, with their manifest entries."
+        ]
       }
     }
   ]

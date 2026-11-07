@@ -1,0 +1,65 @@
+{
+  "kit": "paintkit",
+  "package": "paintkit",
+  "field": "test",
+  "about": "A kit for the playbook tests: a picture of a website, and a check of it.",
+  "repository": "https://example.com/paintkit",
+  "needs": [],
+  "makes": ["a picture of a website", "a check of any picture"],
+  "facts": { "size": "1200x630", "width": 1200, "hues": { "warm": 3, "cool": 4 } },
+  "tools": [
+    {
+      "name": "paint_picture",
+      "title": "Paint a picture",
+      "asks": "a picture of a site, a cover, or art for a post about it",
+      "playbook": "painting",
+      "description": "Paints a {fact:paintkit.size} picture of a website and writes picture.png, its layers and PAINT.md, which says what is on it. Read PAINT.md first.",
+      "hostedDescription": "Paints a {fact:paintkit.size} picture of a website and writes picture.png and PAINT.md. A job stops after {limit:job_minutes} here.",
+      "args": ["{url}"],
+      "out": { "flag": "--out", "name": "paintkit-{host}", "ownOnly": true },
+      "destructive": true,
+      "params": {
+        "url": { "type": "url", "required": true, "description": "The website, like https://example.com" },
+        "hue": { "type": "enum", "flag": "--hue", "values": ["warm", "cool"], "default": "warm", "description": "The colors, warm or cool (default {default:paint_picture.hue})." },
+        "layers": { "type": "enum", "flag": "--layers", "values": ["1", "2", "3"], "description": "How many layers, 1, 2 or 3." },
+        "length": { "type": "string", "flag": "--length", "description": "How long each stroke is, like 3.5 or 2s." },
+        "marks": { "type": "text_or_path", "flag": "--marks", "pattern": "\\s*\\d+(?:\\.\\d+)?(?:\\s*,\\s*\\d+(?:\\.\\d+)?)*\\s*", "description": "Marks in seconds, like 1.5,3, or a JSON file of them." },
+        "width": { "type": "integer", "flag": "--width", "min": 240, "max": 3840, "default": 1200, "description": "How wide, {bounds:paint_picture.width} pixels (default {default:paint_picture.width})." },
+        "clean": { "type": "boolean", "flag": "--no-clean", "when": false, "description": "Set to false to keep the page's banners." },
+        "keep": { "type": "boolean", "flag": "--keep", "where": "local", "description": "Keep the work files in the system's temporary folder." },
+        "sketch": { "type": "path", "flag": "--sketch", "description": "A sketch to start from." },
+        "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 30, "max": 600, "description": "Give up after this many seconds.", "hostedDescription": "Give up after this many seconds. A job stops after {limit:job_minutes} here, so more does not help." }
+      },
+      "writes": ["picture.png", "PAINT.md", "layers/*.png", "words.json"],
+      "docs": [{ "file": "PAINT.md", "site": true }, "words.json"],
+      "next": {
+        "done": ["Show {file:picture.png} to the user.", "Look at each layer, like {file:layers/one.png}.", "Everything is in {folder}."],
+        "failed": ["Read why it failed; the {topic} playbook has the fixes."]
+      },
+      "hostedNext": {
+        "done": ["Show {file:picture.png} to the user; its link works for {limit:keep_days}.", "Give {file:words.json} to the next job."]
+      }
+    },
+    {
+      "name": "check_picture",
+      "title": "Check a picture",
+      "asks": "a picture checked before it goes out",
+      "playbook": "painting",
+      "description": "Checks a picture's size and writes CHECK.md with every check.",
+      "args": ["check", "{picture}"],
+      "check": true,
+      "report": "CHECK.md",
+      "out": { "flag": "--out", "name": "{dir:picture}/check" },
+      "params": {
+        "picture": { "type": "path", "required": true, "description": "The picture to check, like picture.png." },
+        "expect": { "type": "string", "flag": "--expect", "description": "The size it should have, like 1200x630." }
+      },
+      "writes": ["CHECK.md", "check.json"],
+      "docs": ["CHECK.md"],
+      "next": {
+        "passed": ["Tell the user the picture passed."],
+        "check_failed": ["Read the FAIL lines in {file:CHECK.md} first."]
+      }
+    }
+  ]
+}

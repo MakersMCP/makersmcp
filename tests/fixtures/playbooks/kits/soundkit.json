@@ -1,0 +1,28 @@
+{
+  "kit": "soundkit",
+  "package": "soundkit",
+  "field": "test",
+  "about": "A second kit for the playbook tests: a sound mixed for a picture.",
+  "repository": "https://example.com/soundkit",
+  "needs": [],
+  "makes": ["a sound for a picture"],
+  "facts": { "rate": 48000 },
+  "tools": [
+    {
+      "name": "mix_sound",
+      "title": "Mix a sound",
+      "asks": "a sound for a picture, or music under it",
+      "playbook": "sound",
+      "description": "Mixes a sound at {fact:soundkit.rate} Hz and writes mix.wav and MIX.md.",
+      "args": ["{track}"],
+      "out": { "flag": "--out", "name": "soundkit-{stem:track}" },
+      "params": {
+        "track": { "type": "path", "required": true, "description": "The sound to mix." },
+        "meter": { "type": "enum", "flag": "--meter", "values": ["3", "4"], "description": "Beats to a bar." }
+      },
+      "writes": ["mix.wav", "MIX.md"],
+      "docs": ["MIX.md"],
+      "next": { "done": ["Play {file:mix.wav} to the user."] }
+    }
+  ]
+}

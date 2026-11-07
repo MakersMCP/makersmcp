@@ -221,7 +221,8 @@ test('hosted, the tool descriptions speak of the server, not of the agent\'s mac
       }
     }
     const byName = Object.fromEntries(tools.map(entry => [entry.name, entry]));
-    assert.match(byName.render_launch_film.description, /^Renders the film\.json of an earlier make_launch_film or plan_launch_film job/);
+    // The description starts with "Use it when the user wants ..." once the kit file gives asks.
+    assert.match(byName.render_launch_film.description, /Renders the film\.json of an earlier make_launch_film or plan_launch_film job/);
     assert.match(byName.render_launch_film.inputSchema.properties.film.description, /job:<job_id>\/film\.json/);
     assert.match(byName.plan_launch_film.description, /A film\.json cannot be changed here yet/);
     const source = byName.make_launch_stills.inputSchema.properties.source.description;

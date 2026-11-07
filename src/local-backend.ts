@@ -14,7 +14,7 @@ import {
   type WaitOptions,
 } from './backend.js';
 import { FolderBusyError, JobManager, launcherProblem, type Job } from './jobs.js';
-import { isInstalled, resolveKit, type InstalledKit, type KitDefinition, type MissingKit } from './kits.js';
+import { docNames, isInstalled, resolveKit, type DocEntry, type InstalledKit, type KitDefinition, type MissingKit } from './kits.js';
 import { setupReport } from './setup.js';
 
 const MAX_FILES = 200;
@@ -156,13 +156,16 @@ function readDoc(file: string, within?: string): string | undefined {
 }
 
 /**
- * The kit's notes in a folder, cut at MAX_DOC_CHARS each. A doc that is not a regular file
- * with one name, like a link, a fifo or a hard link, is left out as a missing one is, and
- * so is one not reached from `within` through folders, when that is given (readDoc).
+ * The kit's notes in a folder, by name or as a tool's docs entries, cut at MAX_DOC_CHARS
+ * each, the most one result shows of all its docs together (results.ts shares that among
+ * them). A doc that is not a regular file with one name, like a link, a fifo or a hard
+ * link, is left out as a missing one is, and so is one not reached from `within` through
+ * folders, when that is given (readDoc).
  */
-export function readDocs(folder: string, names: string[] = [], within?: string): JobDoc[] {
+export function readDocs(folder: string, entries: Array<string | DocEntry> = [], within?: string): JobDoc[] {
   const docs: JobDoc[] = [];
-  for (const name of names) {
+  for (const entry of entries) {
+    const name = typeof entry === 'string' ? entry : entry.file;
     const file = path.join(folder, name);
     const text = readDoc(file, within);
     if (text === undefined) continue;
@@ -313,7 +316,7 @@ export class LocalBackend implements KitBackend {
         args: command.args,
         cwd: this.baseDir,
         folder: command.folder,
-        docs: tool.docs,
+        docs: docNames(tool),
         check: tool.check,
         report: tool.report,
         env: this.env,

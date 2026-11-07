@@ -64,7 +64,7 @@ test('tools/list has the installed kits, the core tools and 2020-12 schemas', as
     const { tools } = await client.listTools();
     const names = tools.map(tool => tool.name).sort();
     assert.deepEqual(names, [
-      'cancel_job', 'check_setup', 'fake_check', 'fake_file', 'fake_make', 'fake_report', 'list_jobs', 'other_make', 'wait_for_job',
+      'cancel_job', 'check_setup', 'fake_check', 'fake_file', 'fake_make', 'fake_report', 'list_jobs', 'makersmcp_playbook', 'other_make', 'wait_for_job',
     ]);
     for (const tool of tools) assert.equal(tool.inputSchema.$schema, DRAFT_2020_12);
     const make = tools.find(tool => tool.name === 'fake_make');
@@ -334,7 +334,8 @@ test('an argument error keeps the kit\'s reason and leaves out its usage text', 
   await withClient({}, async client => {
     const result = await client.callTool({ name: 'fake_make', arguments: { url: 'https://usage.example.com' } });
     assert.equal(result.isError, true);
-    assert.match(text(result), /failed after \d+ s \(exit code 2\)\n\nOpening https:\/\/usage\.example\.com\.\.\.\nfakekit: --count takes 1 to 5\n\nJob ID/);
+    // The kit's --count is written as the tool's parameter, count.
+    assert.match(text(result), /failed after \d+ s \(exit code 2\)\n\nOpening https:\/\/usage\.example\.com\.\.\.\nfakekit: count takes 1 to 5\n\nJob ID/);
     assert.doesNotMatch(text(result), /Usage:|--option-/);
     assert.equal(result.structuredContent.last_line, undefined);
   });

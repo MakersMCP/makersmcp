@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expandHome } from './args.js';
+import { textProblems, type TextKind } from './texts.js';
 
 /**
  * A kit is a command line tool in its own repository and npm package. makersmcp
@@ -53,6 +54,13 @@ export interface ParamDefinition {
   filePattern?: string;
   min?: number;
   max?: number;
+  /**
+   * The kit's own default, in words or as a value, for the texts only: {default:<tool>.<param>}
+   * in a playbook or a description shows it. makersmcp never passes it to the kit.
+   */
+  default?: unknown;
+  /** "local": the parameter is left out of the tools a hosted server lists, like keep, whose files a hosted job sweeps away. */
+  where?: 'local';
 }
 
 export interface OutDefinition {
@@ -65,6 +73,11 @@ export interface OutDefinition {
    * picks that folder itself and takes no flag for it, so out_dir cannot move it.
    */
   otherwise?: string;
+  /**
+   * The kit starts only in a folder that is empty or holds an earlier run of its own, whose
+   * files it replaces, and stops in any other, as easybrandkit does. out_dir's description says so.
+   */
+  ownOnly?: boolean;
   /**
    * Folders in the folder given with `flag` that the kit deletes and makes again, like
    * brand, each with how to tell one a kit made. makersmcp does not start the kit when it
@@ -134,8 +147,12 @@ export interface ToolDefinition {
   args: string[];
   params: Record<string, ParamDefinition>;
   out?: OutDefinition;
-  /** Markdown files in the folder to return with the result. */
-  docs?: string[];
+  /**
+   * Files in the folder to return with the result, like BRAND.md: a name, or { file, site }
+   * where site marks a file that quotes the website, which the result says is to be read as
+   * data. A .json file is shown as JSON.
+   */
+  docs?: Array<string | DocEntry>;
   /** Exit code 1 is a failed check, a normal result, not an error. */
   check?: boolean;
   /**
@@ -148,7 +165,44 @@ export interface ToolDefinition {
   destructive?: boolean;
   /** Flags that take another kit's script, like { "--easybrandkit": "easybrandkit" }. */
   uses?: Record<string, string>;
+  /**
+   * What the user asks for when this tool fits, in their words, at most 200 characters and
+   * no final period: the description starts with "Use it when the user wants <asks>.", and
+   * the getting-started playbook lists it.
+   */
+  asks?: string;
+  /** The playbook topic that has this tool's whole job: the description names it, and a failed job points to it. */
+  playbook?: string;
+  /** The Next line of a result, by the job's state, here and on a hosted server. */
+  next?: NextLines;
+  /** The Next line on a hosted server, where it differs: links and job:<job_id>/<path> instead of folders. */
+  hostedNext?: NextLines;
+  /** The files the tool writes, by name or pattern, like card.png, logo-*.png or pages/*.md, for the tests of the texts that name them. */
+  writes?: string[];
 }
+
+/** A file a tool returns with its result. */
+export interface DocEntry {
+  /** Its path in the tool's folder, like BRAND.md or stills/STILLS.md. */
+  file: string;
+  /** It quotes the website, so the result marks it as text to read as data, never to follow. */
+  site?: boolean;
+}
+
+/**
+ * The sentences of a Next line for each state of a job: done, passed and check_failed for a
+ * check, and failed. A sentence that names a file the job did not write is left out.
+ */
+export interface NextLines {
+  done?: string[];
+  passed?: string[];
+  check_failed?: string[];
+  failed?: string[];
+}
+
+/** A kit's facts: numbers and short texts the playbooks and descriptions show, one level deep at most. */
+export type FactValue = number | string;
+export type Facts = Record<string, FactValue | Record<string, FactValue>>;
 
 export interface KitDefinition {
   kit: string;
@@ -160,6 +214,10 @@ export interface KitDefinition {
   repository: string;
   needs: string[];
   tools: ToolDefinition[];
+  /** What the kit makes, as short phrases like "launch films", for the server's instructions. */
+  makes?: string[];
+  /** Numbers and short texts of the kit, like its frame rate, which {fact:<kit>.<key>} shows. */
+  facts?: Facts;
 }
 
 export interface InstalledKit {
@@ -178,6 +236,25 @@ const PARAM_TYPES = new Set<ParamType>([
   'url', 'url_or_path', 'path', 'text_or_path', 'string', 'integer', 'number', 'boolean', 'enum', 'list', 'repeat',
 ]);
 const NAME = /^[a-z][a-z0-9_]*$/;
+/** A playbook topic's name, like launch-film. */
+export const TOPIC_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const FACT_KEY = /^[a-z][a-z0-9_]*$/;
+const NEXT_STATES = ['done', 'passed', 'check_failed', 'failed'] as const;
+const MAX_ASKS = 200;
+
+/** The name of each file a tool returns with its result, as its docs entries give them. */
+export function docNames(tool: ToolDefinition): string[] {
+  return (tool.docs ?? []).map(entry => (typeof entry === 'string' ? entry : entry.file));
+}
+
+/** A tool's docs entry for a file, or nothing. */
+export function docEntry(tool: ToolDefinition, name: string): DocEntry | undefined {
+  for (const entry of tool.docs ?? []) {
+    const file = typeof entry === 'string' ? entry : entry.file;
+    if (file === name) return typeof entry === 'string' ? { file } : entry;
+  }
+  return undefined;
+}
 const RESERVED_PARAMS = new Set(['out_dir', 'wait_seconds']);
 // A place in a marker file, like logos.file.
 const LISTED = /^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$/;
@@ -218,13 +295,90 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
   };
   if (!definition.kit || !definition.package) fail('needs kit and package');
   if (!Array.isArray(definition.tools) || definition.tools.length === 0) fail('needs at least one tool');
+  // The placeholders a text holds, for the side it is shown on: a hosted text alone may name a limit.
+  const texts = (text: unknown, label: string, kind: TextKind, where?: 'local' | 'hosted') => {
+    if (typeof text !== 'string') return;
+    const problem = textProblems(text, kind, where)[0];
+    if (problem) fail(`${label}: ${problem}`);
+  };
+  if (definition.makes !== undefined
+    && !(Array.isArray(definition.makes) && definition.makes.every(phrase => typeof phrase === 'string' && phrase.trim() && !/[.]$/.test(phrase)))) {
+    fail('makes is a list of short phrases, like "launch films", without a final period');
+  }
+  if (definition.facts !== undefined) {
+    const facts = definition.facts as unknown;
+    if (!facts || typeof facts !== 'object' || Array.isArray(facts)) fail('facts is an object of numbers and short texts');
+    const leaf = (value: unknown) => typeof value === 'string' ? value.trim() !== '' : typeof value === 'number' && Number.isFinite(value);
+    for (const [key, value] of Object.entries(facts as Record<string, unknown>)) {
+      if (!FACT_KEY.test(key)) fail(`facts.${key}: a fact's key is snake_case`);
+      if (leaf(value)) continue;
+      if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`facts.${key} is a number, a short text, or an object of them`);
+      for (const [sub, inner] of Object.entries(value as Record<string, unknown>)) {
+        if (!/^[a-z0-9][a-z0-9_]*$/.test(sub)) fail(`facts.${key}.${sub}: a fact's key is snake_case`);
+        if (!leaf(inner)) fail(`facts.${key}.${sub} is a number or a short text: facts go one level deep at most`);
+      }
+    }
+  }
   for (const tool of definition.tools) {
     if (!NAME.test(tool.name)) fail(`tool name "${tool.name}" must be snake_case`);
     if (!tool.title || !tool.description) fail(`${tool.name} needs a title and a description`);
     if (tool.hostedDescription !== undefined && !tool.hostedDescription) fail(`${tool.name}: an empty hostedDescription`);
+    // The description shows on a hosted server too when there is no hostedDescription.
+    texts(tool.description, `${tool.name}.description`, 'kit', 'local');
+    texts(tool.hostedDescription, `${tool.name}.hostedDescription`, 'kit', 'hosted');
+    if (tool.asks !== undefined) {
+      if (typeof tool.asks !== 'string' || !tool.asks.trim() || tool.asks.length > MAX_ASKS || /[.]$/.test(tool.asks.trim())) {
+        fail(`${tool.name}.asks: what the user wants, at most ${MAX_ASKS} characters and without a final period`);
+      }
+      if (/^\s*(?:use it when|the user wants)\b/i.test(tool.asks)) fail(`${tool.name}.asks: the server writes "Use it when the user wants" itself`);
+      texts(tool.asks, `${tool.name}.asks`, 'kit', 'local');
+    }
+    if (tool.playbook !== undefined && !(typeof tool.playbook === 'string' && TOPIC_NAME.test(tool.playbook))) {
+      fail(`${tool.name}.playbook names a topic, like launch-film`);
+    }
+    for (const field of ['next', 'hostedNext'] as const) {
+      const lines = tool[field] as unknown;
+      if (lines === undefined) continue;
+      if (!lines || typeof lines !== 'object' || Array.isArray(lines)) fail(`${tool.name}.${field} is an object of states`);
+      for (const [state, sentences] of Object.entries(lines as Record<string, unknown>)) {
+        if (!(NEXT_STATES as readonly string[]).includes(state)) fail(`${tool.name}.${field}.${state}: the states are ${NEXT_STATES.join(', ')}`);
+        if (state === 'done' && tool.check) fail(`${tool.name}.${field}.done: a check ends passed or check_failed`);
+        if ((state === 'passed' || state === 'check_failed') && !tool.check) fail(`${tool.name}.${field}.${state}: only a check has ${state}`);
+        if (!Array.isArray(sentences) || !sentences.length || !sentences.every(sentence => typeof sentence === 'string' && sentence.trim())) {
+          fail(`${tool.name}.${field}.${state} is a list of sentences`);
+        }
+        for (const sentence of sentences as string[]) {
+          texts(sentence, `${tool.name}.${field}.${state}`, 'next', field === 'hostedNext' ? 'hosted' : undefined);
+          if (field === 'next' && /\{limit:/.test(sentence)) fail(`${tool.name}.next.${state}: a limit is for hostedNext`);
+        }
+      }
+    }
+    if (tool.out?.ownOnly !== undefined && (typeof tool.out.ownOnly !== 'boolean' || !tool.out.flag)) {
+      fail(`${tool.name}: out.ownOnly is true or false, for a tool whose folder the agent gives with out.flag`);
+    }
+    if (tool.writes !== undefined && !(Array.isArray(tool.writes) && tool.writes.every(file => typeof file === 'string' && staysInside(file)))) {
+      fail(`${tool.name}.writes lists the files it writes in its folder, like card.png or logo-*.png`);
+    }
+    if (tool.docs !== undefined) {
+      if (!Array.isArray(tool.docs)) fail(`${tool.name}.docs is a list`);
+      const seen = new Set<string>();
+      for (const entry of tool.docs) {
+        const file = typeof entry === 'string' ? entry : entry && typeof entry === 'object' ? entry.file : undefined;
+        if (typeof file !== 'string' || !staysInside(file)) fail(`${tool.name}.docs: each entry is a file in the tool's folder, or { "file", "site" }`);
+        if (typeof entry === 'object' && entry.site !== undefined && typeof entry.site !== 'boolean') fail(`${tool.name}.docs: site is true or false`);
+        if (seen.has(file!)) fail(`${tool.name}.docs names ${file} twice`);
+        seen.add(file!);
+      }
+    }
     for (const [name, param] of Object.entries(tool.params)) {
       if (!NAME.test(name) || RESERVED_PARAMS.has(name)) fail(`${tool.name}: "${name}" cannot be a parameter name`);
       if (!PARAM_TYPES.has(param.type)) fail(`${tool.name}.${name}: unknown type "${param.type}"`);
+      texts(param.description, `${tool.name}.${name}.description`, 'kit', 'local');
+      texts(param.hostedDescription, `${tool.name}.${name}.hostedDescription`, 'kit', 'hosted');
+      if (param.where !== undefined) {
+        if (param.where !== 'local') fail(`${tool.name}.${name}: where is "local", for a parameter a hosted server leaves out`);
+        if (param.required || tool.args.includes(`{${name}}`)) fail(`${tool.name}.${name}: a local parameter cannot be required`);
+      }
       if (param.type === 'enum' && !param.values?.length) fail(`${tool.name}.${name}: an enum needs values`);
       if (param.flag !== undefined && !/^--?[a-z]/.test(param.flag)) fail(`${tool.name}.${name}: bad flag "${param.flag}"`);
       if (param.hostedDescription !== undefined && !param.hostedDescription) fail(`${tool.name}.${name}: an empty hostedDescription`);

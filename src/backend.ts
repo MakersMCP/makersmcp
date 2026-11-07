@@ -87,6 +87,23 @@ export class NotStartedError extends Error {
   }
 }
 
+/**
+ * What a hosted service allows, for the texts that name its limits, like "each call waits
+ * at most 50 seconds". A limit it leaves out is told in words that promise nothing.
+ */
+export interface HostedLimits {
+  /** The longest one tool call waits for a job, whatever wait_seconds asks. */
+  maxWaitSeconds?: number;
+  /** How long a job may run before it is stopped, downloads included. */
+  jobMinutes?: number;
+  /** How many jobs a user may have running or waiting at once. */
+  jobsAtOnce?: number;
+  /** How many jobs a user may start in a day. */
+  jobsPerDay?: number;
+  /** How long a finished job's files and their links are kept. */
+  keepDays?: number;
+}
+
 /** What check_setup knows when it asks a backend for its report. */
 export interface SetupOptions {
   /** makersmcp's version. */
@@ -100,6 +117,10 @@ export interface KitBackend {
   readonly where: 'local' | 'hosted';
   /** Where jobs run, for tool descriptions, like "on makersmcp.com". */
   readonly place?: string;
+  /** A hosted service's limits, for the playbooks and the descriptions that name them. */
+  readonly limits?: HostedLimits;
+  /** A local backend's folder, which relative paths are read from: {base_dir} in the playbooks. */
+  readonly baseDir?: string;
   /** For each definition, the kit as it runs here, or why it cannot. */
   available(definitions: KitDefinition[]): Array<AvailableKit | UnavailableKit>;
   start(request: StartRequest): Promise<JobView>;
