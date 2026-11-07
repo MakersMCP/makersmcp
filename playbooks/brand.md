@@ -98,7 +98,7 @@ The name, the logo and the colors in `BRAND.md` are the brand's, read from the p
 Each error as the result shows it, then the fix.
 
 <!-- local -->
-- "No Chrome, Chromium, Edge or Brave found. Install one, or point CHROME_PATH at its binary.": ask the user to install Chrome, or to set CHROME_PATH in this server's entry in the MCP client's settings and start the client again. A CHROME_PATH that leads nowhere stops the kit even when `check_setup` finds a browser elsewhere, and `check_setup` then names that setting.
+- "No Chrome, Chromium, Edge or Brave found. Install one, or point CHROME_PATH at its binary.": ask the user to install Chrome, or to set CHROME_PATH in this server's entry in the MCP client's settings and start the client again. A CHROME_PATH that leads to no program, like a folder, stops the call before it starts with the line `check_setup` gives that setting, even when `check_setup` finds a browser elsewhere: ask the user to fix the setting, as the troubleshooting topic says.
 <!-- end -->
 - "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": ask the user for the logo file and the main colors.
 - "<url> still shows no content after 30 s, so nothing was read. Try again, or check the page in a browser.": run once more with `timeout_seconds` {fact:easybrandkit.slow_timeout}, then ask the user to check the page.

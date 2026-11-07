@@ -12,8 +12,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { buildCommand, createMcpServer, LocalBackend, loadKitDefinitions, resolveKit } from '../dist/server.js';
-import { kitEnvironment, setupReport } from '../dist/setup.js';
+import { buildCommand, createMcpServer, LocalBackend, loadKitDefinitions, resolveKit, validateKitDefinition } from '../dist/server.js';
+import { kitEnvironment, settingProblems, settingsRead, setupReport } from '../dist/setup.js';
 import { flagWords, inParameterWords } from '../dist/texts.js';
 
 const kitPaths = Object.fromEntries((process.env.MAKERSMCP_KIT_PATHS ?? '').split(',').map(entry => entry.trim())
@@ -667,6 +667,29 @@ test('each kit gets the Chrome, the ffmpeg and the ffprobe check_setup reports u
     assert.deepEqual(report(ownGone).filter(line => line.startsWith('LAUNCH_FILM_')), [noProgram('LAUNCH_FILM_CHROME', gone), noProgram('LAUNCH_FILM_FFMPEG', gone)]);
     // A setting that names no file gives way to another name's that does, and is then no fault.
     assert.deepEqual(report({ ...unusable, LAUNCH_FILM_CHROME: otherChrome }).slice(0, 2), [`Chrome: ${otherChrome}`, `ffmpeg: ${pathFfmpeg}`]);
+
+    // A bare command name is the program of that name on PATH, as a kit that spawns it finds it: each kit gets its full path,
+    // so easyscreenshotkit, which looks for a file, runs it too, and neither check_setup nor a tool's start finds a fault in it.
+    const both2 = { PATH: [bin, path.join(dir, 'a')].join(path.delimiter), FFMPEG_PATH: 'ffmpeg', LAUNCH_FILM_FFPROBE: 'ffprobe', CHROME_PATH: 'google-chrome' };
+    const bare = env(both2);
+    assert.deepEqual(bare, { ...both2, CHROME_PATH: pathChrome, LAUNCH_FILM_CHROME: pathChrome, FFMPEG_PATH: pathFfmpeg, LAUNCH_FILM_FFMPEG: pathFfmpeg, LAUNCH_FILM_FFPROBE: ffprobe });
+    assert.deepEqual(report(both2), [`Chrome: ${pathChrome}`, `ffmpeg: ${pathFfmpeg}`, `ffprobe: ${ffprobe}`]);
+    const every = kits.flatMap(kit => kit.tools.map(tool => settingsRead(kit.kit, tool.needs ?? kit.needs))).flat();
+    assert.deepEqual(settingProblems(bare, every), []);
+    // A bare name that is not on PATH names no program: check_setup's line, and the line a tool that runs it does not start with.
+    const nowhere = env({ FFMPEG_PATH: 'ffmpeg7', LAUNCH_FILM_FFPROBE: 'ffprobe' });
+    assert.deepEqual(nowhere, { PATH, FFMPEG_PATH: 'ffmpeg7', LAUNCH_FILM_FFPROBE: 'ffprobe' });
+    assert.deepEqual(report({ FFMPEG_PATH: 'ffmpeg7', LAUNCH_FILM_FFPROBE: 'ffprobe' }).filter(line => / is no program file/.test(line)),
+      [noProgram('FFMPEG_PATH', 'ffmpeg7'), noProgram('LAUNCH_FILM_FFPROBE', 'ffprobe')]);
+    assert.deepEqual(settingProblems(nowhere, settingsRead('musicfit', ['ffmpeg'])), [noProgram('FFMPEG_PATH', 'ffmpeg7')]);
+    // launch-film reads its own names, CHROME_PATH after LAUNCH_FILM_CHROME: a CHROME_PATH that names a folder stops the kits that
+    // read it, while launch-film runs the Chrome found for its own name.
+    const folderChrome = env({ PATH: bin, CHROME_PATH: path.join(dir, 'c') });
+    assert.deepEqual(settingProblems(folderChrome, settingsRead('easybrandkit', ['chrome'])), [noProgram('CHROME_PATH', path.join(dir, 'c'))]);
+    assert.deepEqual(settingProblems(folderChrome, settingsRead('launch-film', ['chrome', 'ffmpeg'])), []);
+    assert.deepEqual(settingProblems(env({ CHROME_PATH: gone }), settingsRead('launch-film', ['chrome'])), [noProgram('CHROME_PATH', gone)]);
+    assert.deepEqual(settingProblems(env({ LAUNCH_FILM_FFPROBE: gone, FFMPEG_PATH: other }), settingsRead('launch-film', ['ffmpeg'])), []);
+    assert.deepEqual(settingProblems(env({ LAUNCH_FILM_FFPROBE: gone }), settingsRead('launch-film', ['ffmpeg'])), [noProgram('LAUNCH_FILM_FFPROBE', gone)]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -700,6 +723,92 @@ test('with ffmpeg reachable only through the backend\'s FFMPEG_PATH, check_setup
   } finally {
     rmSync(broken, { recursive: true, force: true });
     rmSync(linked, { recursive: true, force: true });
+  }
+});
+
+test('a tool that reads a program from a setting that names no program file does not start, with check_setup\'s line, and its folder stays as it was', async () => {
+  const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-settings-'));
+  const folder = path.join(baseDir, 'apps');
+  const gone = path.join(baseDir, 'gone', 'ffprobe');
+  mkdirSync(folder);
+  const noProgram = (name, value) => `${name}: ${value} is no program file, so the kits that read ${name} cannot run it. Point it at the program, or take it out.`;
+  const sessions = [];
+  const connect = async vars => {
+    const env = { ...process.env, ...vars };
+    for (const name of ['CHROME_PATH', 'LAUNCH_FILM_CHROME', 'FFMPEG_PATH', 'LAUNCH_FILM_FFMPEG', 'LAUNCH_FILM_FFPROBE']) if (!(name in vars)) delete env[name];
+    const server = createMcpServer({ backend: new LocalBackend({ baseDir, kitPaths, env }) });
+    const client = new Client({ name: 'test-client', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    sessions.push({ client, server });
+    return client;
+  };
+  const earlier = (out, files) => {
+    for (const [file, body] of Object.entries(files)) {
+      mkdirSync(path.dirname(path.join(baseDir, out, file)), { recursive: true });
+      writeFileSync(path.join(baseDir, out, file), body);
+    }
+  };
+  try {
+    // A folder, like a whole app bundle, as CHROME_PATH: no tool that opens a browser starts, and a brand kit there stays.
+    const folderChrome = await connect({ CHROME_PATH: folder });
+    earlier('brand', EARLIER.brand);
+    const before = filesIn(path.join(baseDir, 'brand'));
+    for (const [tool, args] of [['make_brand_kit', { url: SITE, out_dir: 'brand' }], ['take_screenshots', { url: SITE, out_dir: 'brand' }], ['plan_launch_film', { url: SITE, out_dir: 'brand' }]]) {
+      const result = await folderChrome.callTool({ name: tool, arguments: { ...args, wait_seconds: 60 } });
+      assert.equal(result.isError, true, tool);
+      assert.equal(result.structuredContent, undefined, `${tool}: no job started`);
+      assert.match(text(result), /: not started\n\n/, tool);
+      assert.ok(text(result).endsWith(noProgram('CHROME_PATH', folder)), `${tool}: ${text(result)}`);
+      assert.deepEqual(filesIn(path.join(baseDir, 'brand')), before, `${tool} left the folder as it was`);
+    }
+
+    // ffmpeg and ffprobe settings that name nothing: the tools that run them do not start, and a demo there stays.
+    const noFfmpeg = await connect({ FFMPEG_PATH: path.join(baseDir, 'gone', 'ffmpeg'), LAUNCH_FILM_FFPROBE: gone });
+    earlier('demo', EARLIER.demo);
+    const demo = filesIn(path.join(baseDir, 'demo'));
+    writeFileSync(path.join(baseDir, 'film.mp4'), 'mp4');
+    for (const [tool, args, name, value] of [
+      ['record_demo_video', { url: SITE, out_dir: 'demo' }, 'FFMPEG_PATH', path.join(baseDir, 'gone', 'ffmpeg')],
+      ['analyze_music', { track: 'film.mp4', out_dir: 'demo' }, 'FFMPEG_PATH', path.join(baseDir, 'gone', 'ffmpeg')],
+      ['check_video', { film: 'film.mp4' }, 'LAUNCH_FILM_FFPROBE', gone],
+    ]) {
+      const result = await noFfmpeg.callTool({ name: tool, arguments: { ...args, wait_seconds: 60 } });
+      assert.equal(result.structuredContent, undefined, `${tool}: no job started: ${text(result)}`);
+      assert.ok(text(result).endsWith(noProgram(name, value)), `${tool}: ${text(result)}`);
+      assert.deepEqual(filesIn(path.join(baseDir, 'demo')), demo, `${tool} left the folder as it was`);
+    }
+    assert.ok(!existsSync(path.join(baseDir, 'check')), 'check_video wrote nothing');
+    // A tool that runs fewer programs than its kit is not stopped by the others' settings: take_screenshots runs no ffmpeg,
+    // and launch_film_guide no program at all.
+    const shots = await noFfmpeg.callTool({ name: 'take_screenshots', arguments: { url: 'http://127.0.0.1:9/', out_dir: 'shots', wait_seconds: 0 } });
+    assert.ok(shots.structuredContent?.job_id, text(shots));
+    await noFfmpeg.callTool({ name: 'cancel_job', arguments: { job_id: shots.structuredContent.job_id } });
+    const guide = await noFfmpeg.callTool({ name: 'launch_film_guide', arguments: { topic: 'looks', wait_seconds: 60 } });
+    assert.equal(guide.structuredContent?.status, 'done', text(guide));
+    // A tool's needs are some of its kit's.
+    for (const needs of [['gpu'], 'chrome']) {
+      const broken = structuredClone(kits.find(kit => kit.kit === 'musicfit'));
+      broken.tools[0].needs = needs;
+      assert.throws(() => validateKitDefinition(broken), /needs lists the programs the tool runs, some of its kit's needs \(ffmpeg\)/, JSON.stringify(needs));
+    }
+
+    // A bare command name the kits find on PATH is a working setting: check_video reads a video with ffprobe by that name.
+    if (hasFfmpeg) {
+      const bare = await connect({ FFMPEG_PATH: 'ffmpeg', LAUNCH_FILM_FFMPEG: 'ffmpeg', LAUNCH_FILM_FFPROBE: 'ffprobe' });
+      const setup = text(await bare.callTool({ name: 'check_setup', arguments: {} }));
+      assert.doesNotMatch(setup, /is no program file/);
+      tinyVideo(baseDir);
+      const checked = await bare.callTool({ name: 'check_video', arguments: { film: 'tiny.mp4', out_dir: 'tiny-check', wait_seconds: 60 } });
+      assert.equal(checked.structuredContent?.status, 'done', text(checked));
+    }
+  } finally {
+    for (const { client, server } of sessions) {
+      await client.close();
+      await server.close();
+    }
+    rmSync(baseDir, { recursive: true, force: true });
   }
 });
 
@@ -793,6 +902,16 @@ const EARLIER = {
   film: { 'film.json': '{ "version": 1 }\n', 'words.json': '{}\n', 'film.mp4': 'mp4', 'film.timeline.json': '{}\n' },
 };
 
+/**
+ * A launcher (LocalBackendOptions.launcher) that runs each kit's supervisor with some of the kit's settings set apart, as a
+ * service's run-kit sets them, like a browser that is not there. makersmcp starts no tool whose own setting names no program
+ * file, so such a setting can reach a kit only this way. It needs /usr/bin/env.
+ */
+const SUPERVISOR = fileURLToPath(new URL('../dist/supervise.js', import.meta.url));
+const launcherWith = settings => ['/usr/bin/env', ...Object.entries(settings).map(([name, value]) => `${name}=${value}`), process.execPath, SUPERVISOR];
+/** The settings of a browser that is not there, so each kit that gets past its own checks fails as it starts one. */
+const noBrowser = dir => ({ CHROME_PATH: path.join(dir, 'no-chrome'), LAUNCH_FILM_CHROME: path.join(dir, 'no-chrome') });
+
 // Each refusal a kit file lists, as a call its kit refuses with those words: [tool, refuses entry, arguments, the
 // files of the folder it saves in, which hold an earlier run, and the ffmpeg it gets]. @/ is a path in that folder.
 const SITE = 'https://acme.example.com/';
@@ -840,12 +959,11 @@ test('every refusal a kit file lists has a call here that the kit refuses with i
   for (const [name, words] of REFUSALS) assert.ok(tools.get(name)?.refuses?.includes(words), `REFUSALS: "${words}" is not in ${name}.refuses`);
 });
 
-test('a call a kit refuses before it touches its folder leaves an earlier run there, and its Next line says nothing was deleted; one that fails after says what is gone', async () => {
+test('a call a kit refuses before it touches its folder leaves an earlier run there, and its Next line says nothing was deleted; one that fails after says what is gone', { skip: process.platform === 'win32' && 'its launcher needs /usr/bin/env' }, async () => {
   const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-refused-'));
-  // No browser: each kit that gets past its own checks fails as it starts one.
-  const env = { ...process.env, CHROME_PATH: path.join(baseDir, 'no-chrome'), LAUNCH_FILM_CHROME: path.join(baseDir, 'no-chrome') };
-  delete env.FFMPEG_PATH;
-  delete env.LAUNCH_FILM_FFMPEG;
+  // No browser for the kits, which the launcher sets: each kit that gets past its own checks fails as it starts one.
+  const env = { ...process.env };
+  for (const name of ['CHROME_PATH', 'LAUNCH_FILM_CHROME', 'FFMPEG_PATH', 'LAUNCH_FILM_FFMPEG']) delete env[name];
   // An ffmpeg that lists its encoders, with H.264 or without, for the checks the demo makes before its folder.
   const fake = (name, encoders) => {
     const file = path.join(baseDir, name);
@@ -853,7 +971,7 @@ test('a call a kit refuses before it touches its folder leaves an earlier run th
     chmodSync(file, 0o755);
     return file;
   };
-  const ffmpegs = process.platform === 'win32' ? {} : {
+  const ffmpegs = {
     none: path.join(baseDir, 'no-ffmpeg'),
     'no H.264': fake('ffmpeg-without-h264', ' V....D mjpeg  Motion JPEG'),
     'H.264': fake('ffmpeg-with-h264', ' V....D libx264  libx264 H.264'),
@@ -863,7 +981,7 @@ test('a call a kit refuses before it touches its folder leaves an earlier run th
   const sessions = new Map();
   const clientFor = async ffmpeg => {
     if (!sessions.has(ffmpeg)) {
-      const backend = new LocalBackend({ baseDir, kitPaths, env: ffmpeg ? { ...env, FFMPEG_PATH: ffmpegs[ffmpeg] } : env });
+      const backend = new LocalBackend({ baseDir, kitPaths, env, launcher: launcherWith({ ...noBrowser(baseDir), ...(ffmpeg ? { FFMPEG_PATH: ffmpegs[ffmpeg] } : {}) }) });
       const server = createMcpServer({ backend });
       const client = new Client({ name: 'test-client', version: '1.0.0' });
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -889,7 +1007,6 @@ test('a call a kit refuses before it touches its folder leaves an earlier run th
   };
   try {
     for (const [tool, words, args, earlier, ffmpeg] of REFUSALS) {
-      if (ffmpeg && !ffmpegs[ffmpeg]) continue;
       const { result, call, before, after, next } = await run(tool, args, earlier, ffmpeg);
       const label = `${tool} ${JSON.stringify(args)}`;
       assert.equal(result.structuredContent?.status, 'failed', `${label}: ${text(result)}`);
@@ -945,9 +1062,11 @@ test('a call a kit refuses before it touches its folder leaves an earlier run th
 
 test('a file the call gives that a demo run deletes or writes over in its folder, like a steps file saved as its steps.json, stops the call before the job starts', async () => {
   const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-runfiles-'));
-  // No browser: a call that starts fails as the kit starts one.
-  const env = { ...process.env, CHROME_PATH: path.join(baseDir, 'no-chrome'), LAUNCH_FILM_CHROME: path.join(baseDir, 'no-chrome') };
-  const server = createMcpServer({ backend: new LocalBackend({ baseDir, kitPaths, env }) });
+  // No browser for the kit, which the launcher sets: a call that starts fails as the kit starts one.
+  const posix = process.platform !== 'win32';
+  const env = { ...process.env };
+  for (const name of ['CHROME_PATH', 'LAUNCH_FILM_CHROME']) delete env[name];
+  const server = createMcpServer({ backend: new LocalBackend({ baseDir, kitPaths, env, ...(posix ? { launcher: launcherWith(noBrowser(baseDir)) } : {}) }) });
   const client = new Client({ name: 'test-client', version: '1.0.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
@@ -961,35 +1080,37 @@ test('a file the call gives that a demo run deletes or writes over in its folder
   try {
     const refused = [
       // The user's steps file, saved in the demo's folder as steps.json.
-      [{ steps: 'one/steps.json', out_dir: 'one' }, { 'one/steps.json': steps }, 'steps', 'steps.json'],
+      [{ steps: 'one/steps.json', out_dir: 'one' }, { 'one/steps.json': steps }, 'steps', 'steps.json', 'one'],
       // An earlier demo's poster as the backdrop, which the run deletes before it records.
-      [{ background: 'two/poster.png', out_dir: 'two' }, Object.fromEntries(Object.entries(EARLIER.demo).map(([name, body]) => [`two/${name}`, body])), 'background', 'poster.png'],
+      [{ background: 'two/poster.png', out_dir: 'two' }, Object.fromEntries(Object.entries(EARLIER.demo).map(([name, body]) => [`two/${name}`, body])), 'background', 'poster.png', 'two'],
     ];
-    if (process.platform !== 'win32') refused.push([{ steps: 'mine.json', out_dir: 'three' }, { 'mine.json': steps }, 'steps', 'steps.json']);
-    for (const [args, files, param, name] of refused) {
+    if (posix) refused.push([{ steps: 'mine.json', out_dir: 'three' }, { 'mine.json': steps }, 'steps', 'steps.json', 'three']);
+    for (const [args, files, param, name, folder] of refused) {
       for (const [file, body] of Object.entries(files)) write(file, body);
       // The third: the folder's steps.json is a link to the steps file the call gives by its own path.
-      if (args.out_dir === 'three') {
+      if (folder === 'three') {
         mkdirSync(path.join(baseDir, 'three'));
         symlinkSync(path.join(baseDir, 'mine.json'), path.join(baseDir, 'three', 'steps.json'));
       }
-      const before = filesIn(path.join(baseDir, args.out_dir));
+      const before = filesIn(path.join(baseDir, folder));
       const result = await call(args);
       const label = JSON.stringify(args);
       assert.equal(result.isError, true, label);
       assert.equal(result.structuredContent, undefined, `${label}: no job started`);
       assert.match(text(result), /^## Demo video of a website: not started\n\n/, label);
       const given = path.join(baseDir, args[param]);
-      assert.ok(text(result).includes(`${param}: ${given} is the ${name} of ${path.join(baseDir, args.out_dir)}, where record_demo_video saves, and a run there deletes or writes over that file. Give it another name or folder, or give another out_dir.`), text(result));
-      assert.deepEqual(filesIn(path.join(baseDir, args.out_dir)), before, `${label} left the folder as it was`);
+      assert.ok(text(result).includes(`${param}: ${given} is the ${name} of ${path.join(baseDir, folder)}, where record_demo_video saves, and a run there deletes or writes over that file. Give it another name or folder, or give another out_dir.`), text(result));
+      assert.deepEqual(filesIn(path.join(baseDir, folder)), before, `${label} left the folder as it was`);
     }
     // Under any other name the steps file may sit in the demo's folder: the run starts, and fails here for want of a browser, leaving it.
-    write('four/app.json', steps);
-    const started = await call({ steps: 'four/app.json', out_dir: 'four' });
-    assert.equal(started.structuredContent?.status, 'failed', text(started));
-    assert.match(text(started), /No Chrome, Chromium, Edge or Brave found/);
-    assert.deepEqual(filesIn(path.join(baseDir, 'four')), ['app.json']);
-    assert.match(started.structuredContent.next, /a steps file it read stays\.$/);
+    if (posix) {
+      write('four/app.json', steps);
+      const started = await call({ steps: 'four/app.json', out_dir: 'four' });
+      assert.equal(started.structuredContent?.status, 'failed', text(started));
+      assert.match(text(started), /No Chrome, Chromium, Edge or Brave found/);
+      assert.deepEqual(filesIn(path.join(baseDir, 'four')), ['app.json']);
+      assert.match(started.structuredContent.next, /a steps file it read stays\.$/);
+    }
   } finally {
     await client.close();
     await server.close();

@@ -14,8 +14,8 @@ import {
   type WaitOptions,
 } from './backend.js';
 import { FolderBusyError, JobManager, launcherProblem, type Job } from './jobs.js';
-import { docNames, isInstalled, resolveKit, type DocEntry, type InstalledKit, type KitDefinition, type MissingKit } from './kits.js';
-import { kitEnvironment, setupReport } from './setup.js';
+import { docNames, isInstalled, resolveKit, type DocEntry, type InstalledKit, type KitDefinition, type MissingKit, type ToolDefinition } from './kits.js';
+import { kitEnvironment, settingProblems, settingsRead, setupReport } from './setup.js';
 
 /** The most files a job lists in `files`. */
 export const MAX_FILES = 200;
@@ -201,6 +201,19 @@ export function failureText(stderr: string, exitCode: number | null): string {
   return lines.join('\n');
 }
 
+/**
+ * The settings a tool's run reads its programs from: those of the programs it runs (its needs,
+ * else its kit's), and those of each kit it runs, like easybrandkit for a plan of launch-film.
+ */
+function toolSettings(kit: KitDefinition, tool: ToolDefinition, installed: Map<string, InstalledKit>): string[][] {
+  const lists = settingsRead(kit.kit, tool.needs ?? kit.needs);
+  for (const used of Object.values(tool.uses ?? {})) {
+    const other = installed.get(used)?.definition;
+    if (other) lists.push(...settingsRead(other.kit, other.needs));
+  }
+  return lists;
+}
+
 /** A job of this machine as the tools show it. */
 export function viewJob(job: Job): JobView {
   const { spec } = job;
@@ -295,6 +308,13 @@ export class LocalBackend implements KitBackend {
     const installed = this.installed.get(kit.definition.kit);
     if (!installed) throw new NotStartedError(`${kit.definition.kit} is not installed here.`);
 
+    // The Chrome and ffmpeg a setting names, under each name a kit reads them by. A setting the
+    // tool reads a program from that names no program file, like a folder, would stop the kit, some
+    // only after they cleared their folder: the tool does not start, with check_setup's line for it.
+    const env = kitEnvironment(this.env ?? process.env);
+    const problems = settingProblems(env, toolSettings(installed.definition, tool, this.installed));
+    if (problems.length) throw new NotStartedError(problems.join(' '));
+
     let command;
     try {
       command = buildCommand(tool, input, { baseDir: this.baseDir, installed: this.installed, confine: this.confine });
@@ -325,8 +345,7 @@ export class LocalBackend implements KitBackend {
         docs: docNames(tool),
         check: tool.check,
         report: tool.report,
-        // The Chrome and ffmpeg a setting names, under each name a kit reads them by.
-        env: kitEnvironment(this.env ?? process.env),
+        env,
         ...(this.launcher ? { launcher: this.launcher } : {}),
         ...(this.confine ? { within: this.baseDir } : {}),
         inputs: command.inputs,

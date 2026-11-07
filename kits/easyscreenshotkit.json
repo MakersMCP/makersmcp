@@ -26,6 +26,7 @@
       "playbook": "screenshots",
       "description": "Opens a website in a headless browser, picks the pages worth showing (home, pricing, features and the like), hides cookie banners, chat bubbles and other floating boxes, and saves desktop, phone and whole-page screenshots in one folder. sheet.png, every page on one picture, is the picture to show first; SCREENSHOTS.md lists each page with why it was picked, its files and its headings. url and page are paths of one public site: a #route is dropped, nothing behind a login is reached, and above one page it starts at the site's root. clean hides everything fixed on the screen but a top bar and a side bar, so an app's own tab bar too. iphone is {fact:easyscreenshotkit.size.iphone}, the App Store's 6.9 inch size; mobile is {fact:easyscreenshotkit.size.mobile}, for Google Play phones. For the Google Play feature graphic and Chrome Web Store tiles, use make_launch_stills instead. For a view behind a click or a #route, use record_demo_video with steps.",
       "args": ["{url}"],
+      "needs": ["chrome"],
       "out": { "flag": "--out", "name": "easyscreenshotkit-{host}", "ownOnly": true },
       "params": {
         "url": { "type": "url", "required": true, "description": "The website, like https://linear.app, or a page of it. A #route in it is dropped, so a view an app shows behind one is not reached." },
@@ -127,6 +128,7 @@
       "playbook": "screenshots",
       "description": "Checks the screenshots a web app manifest lists against Chrome's rules for its richer install dialog, without a browser: which ones a desktop and a phone would show, and what to fix. A failed check is a normal result, with the report as its summary. It takes a pwa/manifest-screenshots.json from take_screenshots as it is; when the check fails for want of screenshots, take_screenshots with pwa makes ones that pass.",
       "args": ["--pwa-check", "{manifest}"],
+      "needs": [],
       "check": true,
       "report": "stdout",
       "readOnly": true,

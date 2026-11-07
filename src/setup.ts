@@ -74,8 +74,26 @@ function onPath(name: string, env: Env): string | undefined {
   return undefined;
 }
 
+/** A bare command name, like ffmpeg, with no folder in it: a kit that spawns it finds it on PATH. */
+function isCommand(value: string): boolean {
+  return !value.includes('/') && !(process.platform === 'win32' && value.includes('\\'));
+}
+
+/**
+ * The program a setting names, the way a kit spawns it: a path when it names a file, and a
+ * bare command name, like ffmpeg, as the program of that name on PATH. Nothing when it names
+ * no program file: a folder, like a macOS app bundle, a file that is not there, or a command
+ * that is not on PATH.
+ */
+function programOf(value: string | undefined, env: Env): string | undefined {
+  if (!value) return undefined;
+  if (isCommand(value)) return onPath(value, env);
+  return namesFile(value) ? value : undefined;
+}
+
+/** The program the first of these settings that names one names. */
 function fromEnv(env: Env, names: string[]): string | undefined {
-  return names.map(name => env[name]).find(namesFile);
+  return names.map(name => programOf(env[name], env)).find(Boolean);
 }
 
 /** A browser the kits can use: the one a setting names, else one on PATH, else one in its usual places. */
@@ -113,19 +131,27 @@ export function findFfprobe(env: Env = process.env): string | undefined {
 /**
  * The environment a kit runs with: the one given, with the Chrome, the ffmpeg and the ffprobe
  * check_setup reports under each name a kit reads them by, so every kit runs the program
- * check_setup names. A name that names a file is kept, as the user's choice for the kits that
- * read it. Any other name gets the program a setting names under another of its names, so
+ * check_setup names. A name that names a program is kept, as the user's choice for the kits
+ * that read it: a path to a file as it is, and a bare command name, like ffmpeg, as the
+ * program of that name on PATH, which a kit that spawns it runs, and which a kit that looks
+ * for a file, like easyscreenshotkit, then finds too. Any other name gets the program a
+ * setting names under another of its names, so
  * FFMPEG_PATH, which check_setup tells the user to set, reaches launch-film as
  * LAUNCH_FILM_FFMPEG with LAUNCH_FILM_FFPROBE the ffprobe beside it. Without such a setting,
  * a name that is not set gets the program found on PATH or in its usual places, which not
- * every kit looks in, while a setting that names no file, like a folder, is left as the user
- * set it: the kits that read it then stop, and check_setup names it.
+ * every kit looks in, while a setting that names no program file, like a folder, is left as
+ * the user set it: check_setup names it, and LocalBackend starts no tool that reads a
+ * program from it (settingProblems).
  */
 export function kitEnvironment(env: Env = process.env, places: ProgramPlaces = PROGRAM_PLACES): Env {
   const out: Env = { ...env };
   const give = (names: string[], set: string | undefined, found: string | undefined) => {
     for (const name of names) {
-      if (namesFile(out[name])) continue;
+      const own = programOf(out[name], env);
+      if (own) {
+        out[name] = own;
+        continue;
+      }
       const program = set ?? (out[name] ? undefined : found);
       if (program) out[name] = program;
     }
@@ -135,6 +161,40 @@ export function kitEnvironment(env: Env = process.env, places: ProgramPlaces = P
   // ffprobe comes with ffmpeg, so a setting for an ffmpeg brings the ffprobe beside it.
   give(FFPROBE_SETTINGS, besideSetting(env), findFfprobe(out));
   return out;
+}
+
+/**
+ * The settings a kit reads the programs it runs from, one list for each program, in the order
+ * the kit reads them, so the first one set is the one it runs: CHROME_PATH and FFMPEG_PATH,
+ * and launch-film's own names for launch-film, which reads CHROME_PATH after
+ * LAUNCH_FILM_CHROME and ffprobe by LAUNCH_FILM_FFPROBE. `needs` are the programs the tool
+ * runs, chrome and ffmpeg.
+ */
+export function settingsRead(kit: string, needs: readonly string[]): string[][] {
+  const launchFilm = kit === 'launch-film';
+  const lists: string[][] = [];
+  if (needs.includes('chrome')) lists.push(launchFilm ? ['LAUNCH_FILM_CHROME', 'CHROME_PATH'] : ['CHROME_PATH']);
+  if (needs.includes('ffmpeg')) lists.push(...(launchFilm ? [['LAUNCH_FILM_FFMPEG'], ['LAUNCH_FILM_FFPROBE']] : [['FFMPEG_PATH']]));
+  return lists;
+}
+
+/** check_setup's line for a setting that names no program file, which the kits that read it cannot run. */
+function noProgram(name: string, value: string): string {
+  return `${name}: ${value} is no program file, so the kits that read ${name} cannot run it. Point it at the program, or take it out.`;
+}
+
+/**
+ * Why a tool cannot run here, in check_setup's words: for each program it runs, a list of
+ * settingsRead, the setting it reads that program from when that one names no program file.
+ * `env` is the environment the kits run with (kitEnvironment). Empty when it can run.
+ */
+export function settingProblems(env: Env, lists: string[][]): string[] {
+  const problems = new Set<string>();
+  for (const names of lists) {
+    const name = names.find(entry => env[entry]);
+    if (name && !programOf(env[name], env)) problems.add(noProgram(name, env[name]!));
+  }
+  return [...problems];
 }
 
 /**
@@ -221,8 +281,8 @@ export function setupReport(options: {
   }
   // A setting that names no program file, which the kits that read it cannot run; launch-film's own only while it is on.
   const unusable = (names: string[]) => names
-    .filter(name => (launchFilm || !LAUNCH_FILM_SETTINGS.has(name)) && env[name] && !namesFile(env[name]))
-    .map(name => `${name}: ${env[name]} is no program file, so the kits that read ${name} cannot run it. Point it at the program, or take it out.`);
+    .filter(name => (launchFilm || !LAUNCH_FILM_SETTINGS.has(name)) && env[name] && !programOf(env[name], env))
+    .map(name => noProgram(name, env[name]!));
   // launch-film runs its own when the user set it apart.
   const own = (name: string, found: string | undefined) => {
     const program = fromEnv(env, [name]);

@@ -276,6 +276,7 @@
       "playbook": "checks",
       "description": "Checks any video by measuring it with ffmpeg: size, frame rate, length, black, still and silent stretches, loudness, true peak, clipping, and whether the cuts land on the beat. It writes CHECK.md (pass or fail, with every check), which the result shows, check.json, sheet.png (a frame from each shot) and wave.png (the sound over time). A failed check is a normal result here. It knows no platform, and does not measure file size, codec, bitrate or the space an app's buttons cover. A launch film is {fact:launch-film.fps} frames a second and measures about {fact:launch-film.lufs} LUFS as it was rendered.",
       "args": ["check", "{film}"],
+      "needs": ["ffmpeg"],
       "out": { "flag": "--out", "name": "{dir:film}/check" },
       "check": true,
       "report": "CHECK.md",
@@ -321,6 +322,7 @@
       "description": "Lists launch-film's looks and what each one suits (topic looks), or its scene types with their main fields (topic types), for picking a look or writing film.json. The clip kinds, each type's other fields and the rules for the words on screen are in the film-json playbook.",
       "hostedDescription": "Lists launch-film's looks and what each one suits (topic looks), or its scene types with their main fields (topic types), for picking a look or reading a film.json. The clip kinds and each type's other fields are in the film-json playbook.",
       "args": ["{topic}"],
+      "needs": [],
       "readOnly": true,
       "params": {
         "topic": { "type": "enum", "required": true, "values": ["looks", "types"], "description": "looks, for each look and what it suits, or types, for the scene types and their main fields." }

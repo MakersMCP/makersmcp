@@ -172,6 +172,12 @@ export interface ToolDefinition {
   /** Flags that take another kit's script, like { "--easybrandkit": "easybrandkit" }. */
   uses?: Record<string, string>;
   /**
+   * The programs the tool runs, chrome and ffmpeg, when it runs fewer than its kit's needs,
+   * like [] for a tool that runs none: LocalBackend starts no tool whose setting for one of
+   * them names no program file, and a tool that runs none of them is never stopped for one.
+   */
+  needs?: string[];
+  /**
    * What the user asks for when this tool fits, in their words, at most 200 characters and
    * no final period: the description starts with "Use it when the user wants <asks>.", and
    * the getting-started playbook lists it.
@@ -398,6 +404,9 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
           fail(`${tool.name}.refuses: ${whole} is no file the call gives; write {<param>} for a file parameter's path as the kit gets it, or {<param>:name} for its name`);
         }
       }
+    }
+    if (tool.needs !== undefined && !(Array.isArray(tool.needs) && tool.needs.every(need => typeof need === 'string' && (definition.needs ?? []).includes(need)))) {
+      fail(`${tool.name}.needs lists the programs the tool runs, some of its kit's needs (${(definition.needs ?? []).join(', ') || 'none'})`);
     }
     if (tool.out?.runFiles !== undefined && !(Array.isArray(tool.out.runFiles) && tool.out.runFiles.length
       && tool.out.runFiles.every(file => typeof file === 'string' && staysInside(file) && !/[\\/]/.test(file)))) {

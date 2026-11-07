@@ -121,7 +121,7 @@ The job fails with the kit's reason, then `The check could not run: the kit wrot
 - `expect "<x>" should look like 1920x1080@30`, `seconds "<x>" should be a length like 30, or a range like 28-32` and `allow "<x>" should be a stretch in seconds, like 27-30`: write the value in that form.
 - `<file> could not be read as a video`: the file is not a video ffmpeg reads.
 <!-- local -->
-  It also comes when ffprobe is missing, or when LAUNCH_FILM_FFPROBE leads to no program: `check_setup` shows the ffprobe it found and a line for such a setting, and the troubleshooting topic has the fix.
+  It also comes when no ffprobe was found, as the ffprobe line of `check_setup` says, and the troubleshooting topic has the fix. A LAUNCH_FILM_FFPROBE or LAUNCH_FILM_FFMPEG that leads to no program stops the call before it starts, with the line `check_setup` gives that setting.
 <!-- end -->
 - `<cues>: "fps" must be the frames a second the numbers count in`, `"beats" is missing`, `"beats" must be a list of frame numbers` or `"beats" is empty`: the cues file is not a track's cues, or the track has no steady beat.
 - `<cuts> holds no cuts: give seconds, { "fps", "cuts" } in frames, or a launch-film timeline`: give one of those.
