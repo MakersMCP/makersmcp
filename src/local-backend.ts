@@ -213,6 +213,7 @@ export function viewJob(job: Job): JobView {
     exitCode: job.exitCode,
     elapsedSeconds: job.elapsedSeconds,
     ...(spec.folder ? { folder: spec.folder } : {}),
+    ...(spec.inputs && Object.keys(spec.inputs).length ? { inputs: spec.inputs } : {}),
     // A failed kit's last line is often the end of its usage text: the failure says what went wrong.
     ...(job.lastLine && job.status !== 'failed' ? { lastLine: job.lastLine } : {}),
   };
@@ -327,6 +328,7 @@ export class LocalBackend implements KitBackend {
         env: kitEnvironment(this.env ?? process.env),
         ...(this.launcher ? { launcher: this.launcher } : {}),
         ...(this.confine ? { within: this.baseDir } : {}),
+        inputs: command.inputs,
       }));
     } catch (error) {
       if (error instanceof FolderBusyError) {

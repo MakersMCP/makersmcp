@@ -45,6 +45,11 @@ export interface JobView {
   failure?: string;
   /** Once done: the files it saved, and the kit's notes among them. */
   files?: JobFile[];
+  /**
+   * The files the call gave the kit, by parameter, as the kit got them, like the steps file
+   * of record_demo_video, for a reason that names one (ToolDefinition.refuses).
+   */
+  inputs?: Record<string, string>;
   docs?: JobDoc[];
   /** A hosted job: when its files and links go away, in unix seconds. */
   expiresAt?: number;

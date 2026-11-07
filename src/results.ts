@@ -97,14 +97,37 @@ export function jobListed(view: JobView) {
 /** A kit's exit code for an argument it refused, before it did anything. */
 const REFUSED_EXIT = 2;
 
+/** A refuses entry's {<param>} and {<param>:name}: the file the call gave for that parameter, or its name. */
+export const REFUSED_INPUT = /\{([a-z][a-z0-9_]*)(?::(name))?\}/g;
+
+/** A refuses entry with the files the call gave filled in, or nothing when it gave none for one of them. */
+function refusalWords(words: string, view: JobView): string | undefined {
+  let missing = false;
+  const filled = words.replace(REFUSED_INPUT, (_whole: string, param: string, part: string | undefined) => {
+    const file = view.inputs?.[param];
+    if (file === undefined) {
+      missing = true;
+      return '';
+    }
+    return part === 'name' ? path.basename(file) : file;
+  });
+  return missing ? undefined : filled;
+}
+
 /**
  * Whether a failed job's kit refused the call before it touched its folder: it ended with
- * exit code 2, or its reason holds one of the tool's refuses, like "holds no earlier brand kit".
+ * exit code 2, or its reason holds one of the tool's refuses, like "holds no earlier brand kit",
+ * or one that names a file the call gave, like "could not read {steps}: ".
  */
 export function refused(view: JobView, tool?: ToolDefinition): boolean {
   if (view.status !== 'failed') return false;
   if (view.exitCode === REFUSED_EXIT) return true;
-  return Boolean(view.failure && tool?.refuses?.some(words => view.failure!.includes(words)));
+  const failure = view.failure;
+  if (!failure) return false;
+  return Boolean(tool?.refuses?.some(words => {
+    const filled = refusalWords(words, view);
+    return filled !== undefined && failure.includes(filled);
+  }));
 }
 
 /**

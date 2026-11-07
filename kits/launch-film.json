@@ -85,7 +85,7 @@
         { "file": "words.json", "site": true },
         { "file": "brand/BRAND.md", "site": true }
       ],
-      "refuses": ["is not a command or an address", "not the brand's own site", "no brand.json at"],
+      "refuses": ["is not a command or an address", "not the brand's own site", "no brand.json at", "holds no earlier brand kit"],
       "writes": [
         "film.json", "words.json", "film.mp4", "film.timeline.json",
         "frames/sheet.jpg", "frames/clip-*.jpg", "frames/still-*.jpg",
@@ -154,7 +154,7 @@
         { "file": "words.json", "site": true },
         { "file": "brand/BRAND.md", "site": true }
       ],
-      "refuses": ["give the site's address", "not the brand's own site", "no brand.json at"],
+      "refuses": ["give the site's address", "not the brand's own site", "no brand.json at", "holds no earlier brand kit"],
       "writes": [
         "film.json", "words.json",
         "brand/brand.json", "brand/BRAND.md", "brand/_brand.yml", "brand/card.png", "brand/logo-*.png", "brand/logo-*.svg", "brand/screen-*.png",

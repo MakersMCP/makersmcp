@@ -180,7 +180,10 @@ export interface ToolDefinition {
   /**
    * Words a kit's reason holds when it refused the call before it touched its folder, like
    * "holds no earlier brand kit": such a failed job, like one whose kit ended with exit code
-   * 2, gets the refused Next line, so a line about files a run deletes is never its own.
+   * 2, gets the refused Next line, so a line about files a run deletes is never its own. A
+   * file the call gave stands in them as {<param>}, its path as the kit got it, or
+   * {<param>:name}, its name, like "could not read {steps}: "; such words count only for a
+   * call that gave that file.
    */
   refuses?: string[];
   /** The files the tool writes, by name or pattern, like card.png, logo-*.png, NN-*.png (two digits) or pages/*.md, for the tests of the texts that name them. */
@@ -371,9 +374,19 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
         }
       }
     }
+    // A file the call gives may stand in them as {<param>} or {<param>:name}: the words are then counted without it.
+    const literal = (words: string) => words.replace(/\{[a-z][a-z0-9_]*(?::name)?\}/g, '');
     if (tool.refuses !== undefined && !(Array.isArray(tool.refuses) && tool.refuses.length
-      && tool.refuses.every(words => typeof words === 'string' && words.trim().length >= 8))) {
+      && tool.refuses.every(words => typeof words === 'string' && literal(words).trim().length >= 8))) {
       fail(`${tool.name}.refuses lists words of the kit's refusals, at least 8 characters each, like "holds no earlier brand kit"`);
+    }
+    for (const words of tool.refuses ?? []) {
+      for (const [whole, name] of words.matchAll(/\{([^{}:]*)(?::[^{}]*)?\}/g)) {
+        const type = tool.params[name!]?.type;
+        if (!/^\{[a-z][a-z0-9_]*(?::name)?\}$/.test(whole) || !(type === 'path' || type === 'url_or_path' || type === 'text_or_path')) {
+          fail(`${tool.name}.refuses: ${whole} is no file the call gives; write {<param>} for a file parameter's path as the kit gets it, or {<param>:name} for its name`);
+        }
+      }
     }
     if (tool.out?.ownOnly !== undefined && (typeof tool.out.ownOnly !== 'boolean' || !tool.out.flag)) {
       fail(`${tool.name}: out.ownOnly is true or false, for a tool whose folder the agent gives with out.flag`);

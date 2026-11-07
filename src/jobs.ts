@@ -36,6 +36,8 @@ export interface JobSpec {
    * whatever the kit left in its own folder (viewJob).
    */
   within?: string;
+  /** The files the call gave the kit, by parameter, for the job's view (JobView.inputs). */
+  inputs?: Record<string, string>;
 }
 
 const STDOUT_LIMIT = 256 * 1024;

@@ -13,6 +13,8 @@ export interface BuiltCommand {
   args: string[];
   /** Where the kit writes, when it is known. */
   folder?: string;
+  /** The files the call names, by parameter, as the kit gets them. */
+  inputs: Record<string, string>;
 }
 
 export interface CommandContext {
@@ -104,6 +106,7 @@ export function buildCommand(
   const values: Record<string, unknown> = {};
   // The files and folders the call names, as the kit gets them.
   const files: string[] = [];
+  const inputs: Record<string, string> = {};
   for (const [name, param] of Object.entries(tool.params)) {
     let value = input[name];
     if (value === undefined || value === null || value === '') continue;
@@ -127,6 +130,7 @@ export function buildCommand(
           throw new ArgumentError(`${name}: the kit takes ${value as string} for an address, not for a file. ${param.description}`);
         }
         files.push(value as string);
+        inputs[name] = value as string;
       }
     }
     values[name] = value;
@@ -179,7 +183,7 @@ export function buildCommand(
     if (other) args.push(flag, other.script);
   }
 
-  return { args, folder };
+  return { args, folder, inputs };
 }
 
 function nothingAt(name: string, param: ParamDefinition, full: string, text: string): string {

@@ -14,6 +14,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildCommand, createMcpServer, LocalBackend, loadKitDefinitions, resolveKit } from '../dist/server.js';
 import { kitEnvironment, setupReport } from '../dist/setup.js';
+import { flagWords, inParameterWords } from '../dist/texts.js';
 
 const kitPaths = Object.fromEntries((process.env.MAKERSMCP_KIT_PATHS ?? '').split(',').map(entry => entry.trim())
   .filter(entry => entry.includes('=')).map(entry => [entry.slice(0, entry.indexOf('=')), entry.slice(entry.indexOf('=') + 1)]));
@@ -652,7 +653,7 @@ test('with ffmpeg reachable only through FFMPEG_PATH, check_video reads the vide
   }
 });
 
-/** The kit's own words, from the code and guides of its installed package. */
+/** The kit's own words, from the code of its installed package: its guides may say what its code no longer does. */
 function kitWords(kit) {
   const installed = resolveKit(kit, kitPaths);
   assert.ok(installed.dir, `${kit.kit}: ${installed.reason}`);
@@ -662,7 +663,7 @@ function kitWords(kit) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) walk(full);
-      } else if (/\.(?:[cm]?js|md)$/.test(entry.name)) {
+      } else if (/\.[cm]?js$/.test(entry.name)) {
         words.push(readFileSync(full, 'utf8'));
       }
     }
@@ -671,15 +672,40 @@ function kitWords(kit) {
   return words.join('\n');
 }
 
-test('each refusal a kit file names is words of that kit\'s own messages, or of a kit it runs', () => {
+/** A refuses entry's own words, without the {<param>} and {<param>:name} a call's file fills. */
+const literalParts = words => words.split(/\{[a-z][a-z0-9_]*(?::name)?\}/).filter(part => part.trim());
+
+/**
+ * What each tool's kit says when it fails after it cleared its folder, in the words of its
+ * code. None of them may hold a refusal of the tool's, nor be part of one, or a run that lost
+ * an earlier one would be told nothing was deleted.
+ */
+const AFTER_THE_FOLDER = {
+  make_brand_kit: ['No Chrome, Chromium, Edge or Brave found', 'Could not open', 'answered with a bot check', 'still shows no content'],
+  make_font_kit: ['No Chrome, Chromium, Edge or Brave found', 'answered with a bot check', 'showed no text and loaded no fonts'],
+  take_screenshots: ['No Chrome, Chromium, Edge or Brave found', 'Could not open', 'answered with a bot check', 'No page could be captured', 'Could not save'],
+  record_demo_video: ['No Chrome, Chromium, Edge or Brave found', 'nothing on the page matches', 'answered with a bot check', 'time ran out while recording', 'No frame was recorded'],
+  plan_launch_film: ['No Chrome, Chromium, Edge or Brave found', 'Could not open', 'answered with a bot check', 'still shows no content'],
+  make_launch_film: ['No Chrome, Chromium, Edge or Brave found', 'Could not open', 'answered with a bot check', 'still shows no content', 'Chrome was not found', 'film.json has problems'],
+};
+
+test('each refusal a kit file names is words of that kit\'s code, or of a kit it runs, and none is part of what a kit says after it cleared its folder', () => {
   for (const kit of kits) {
     for (const tool of kit.tools) {
       // launch-film passes on easybrandkit's reason when it runs easybrandkit.
       const used = Object.values(tool.uses ?? {}).map(name => kits.find(entry => entry.kit === name)).filter(Boolean);
       const words = [kit, ...used].map(kitWords).join('\n');
       for (const refusal of tool.refuses ?? []) {
-        assert.ok(words.includes(refusal), `${tool.name}.refuses: "${refusal}" is in no file of ${[kit, ...used].map(entry => entry.package).join(' or ')}`);
+        for (const part of literalParts(refusal)) {
+          assert.ok(words.includes(part), `${tool.name}.refuses: "${part}" is in no code of ${[kit, ...used].map(entry => entry.package).join(' or ')}`);
+        }
+        for (const after of AFTER_THE_FOLDER[tool.name] ?? []) {
+          for (const part of literalParts(refusal)) {
+            assert.ok(!after.includes(part.trim()) && !part.includes(after), `${tool.name}.refuses: "${refusal}" is part of "${after}", which comes after the kit cleared its folder`);
+          }
+        }
       }
+      for (const after of AFTER_THE_FOLDER[tool.name] ?? []) assert.ok(words.includes(after), `${tool.name}: "${after}" is in no code of its kit any more`);
     }
   }
 });
@@ -714,55 +740,122 @@ const EARLIER = {
     'steps.json': JSON.stringify({ kind: 'demo', tool: 'easyscreenshotkit 0.1.1', steps: [] }),
     'demo.mp4': 'mp4', 'demo.gif': 'gif', 'poster.png': 'png', 'demo.yaml': 'steps:\n  - wait: 1\n',
   },
+  film: { 'film.json': '{ "version": 1 }\n', 'words.json': '{}\n', 'film.mp4': 'mp4', 'film.timeline.json': '{}\n' },
 };
+
+// Each refusal a kit file lists, as a call its kit refuses with those words: [tool, refuses entry, arguments, the
+// files of the folder it saves in, which hold an earlier run, and the ffmpeg it gets]. @/ is a path in that folder.
+const SITE = 'https://acme.example.com/';
+const BAD_STEPS = 'steps:\n  - click: { target: "#x", zoom: 9 }\n';
+const REFUSALS = [
+  ['make_brand_kit', "not the brand's own site", { url: 'https://x.com/acme' }, EARLIER.brand],
+  ['make_brand_kit', 'holds no earlier brand kit', { url: SITE }, { 'notes.txt': 'mine' }],
+  ['make_brand_kit', 'Not a web address', { url: 'https://[bad]/' }, EARLIER.brand],
+  ['make_font_kit', 'holds no earlier font kit', { url: SITE }, { 'notes.txt': 'mine' }],
+  ['make_font_kit', 'Not a web address', { url: 'https://[bad]/' }, EARLIER.fonts],
+  ['take_screenshots', 'Unknown size: ', { url: SITE, sizes: ['huge'] }, EARLIER.shots],
+  ['take_screenshots', 'a scale goes from', { url: SITE, sizes: ['desktop@9'] }, EARLIER.shots],
+  ['take_screenshots', 'width and height go from', { url: SITE, sizes: ['100x100'] }, EARLIER.shots],
+  ['take_screenshots', 'is given twice in --sizes', { url: SITE, sizes: ['desktop', 'desktop'] }, EARLIER.shots],
+  ['take_screenshots', 'needs at least one size', { url: SITE, sizes: [' '] }, EARLIER.shots],
+  ['take_screenshots', 'is not a page of', { url: SITE, page: ['https://other.example.com/x'] }, EARLIER.shots],
+  ['take_screenshots', 'holds no earlier easyscreenshotkit run', { url: SITE }, { 'notes.txt': 'mine' }],
+  ['take_screenshots', 'Not a web address', { url: 'https://[bad]/' }, EARLIER.shots],
+  ['record_demo_video', 'needs ffmpeg, and none was found', { url: SITE }, EARLIER.demo, 'none'],
+  ['record_demo_video', 'has no H.264 encoder', { url: SITE }, EARLIER.demo, 'no H.264'],
+  ['record_demo_video', 'holds no earlier easyscreenshotkit demo', { url: SITE }, { 'notes.txt': 'mine' }, 'H.264'],
+  ['record_demo_video', 'Not a web address', { url: 'https://[bad]/' }, EARLIER.demo],
+  ['record_demo_video', 'easyscreenshotkit demo: {steps:name}: ', { url: SITE, steps: '@/bad.yaml' }, { ...EARLIER.demo, 'bad.yaml': BAD_STEPS }],
+  ['record_demo_video', 'could not read {steps}: ', { url: SITE, steps: '@/sub' }, { ...EARLIER.demo, 'sub/notes.txt': 'mine' }],
+  ['make_launch_film', 'is not a command or an address', { url: 'http://localhost:9/' }, EARLIER.film],
+  ['make_launch_film', "not the brand's own site", { url: 'https://x.com/acme' }, EARLIER.film],
+  ['make_launch_film', 'no brand.json at', { url: SITE, brand: 'kitless' }, EARLIER.film],
+  ['make_launch_film', 'holds no earlier brand kit', { url: SITE }, { ...EARLIER.film, 'brand/notes.txt': 'mine' }],
+  ['plan_launch_film', "give the site's address", { url: 'http://localhost:9/' }, EARLIER.film],
+  ['plan_launch_film', "not the brand's own site", { url: 'https://x.com/acme' }, EARLIER.film],
+  ['plan_launch_film', 'no brand.json at', { url: SITE, brand: 'kitless' }, EARLIER.film],
+  ['plan_launch_film', 'holds no earlier brand kit', { url: SITE }, { ...EARLIER.film, 'brand/notes.txt': 'mine' }],
+];
+
+test('every refusal a kit file lists has a call here that the kit refuses with it', () => {
+  const tools = new Map(kits.flatMap(kit => kit.tools.map(tool => [tool.name, tool])));
+  for (const [name, tool] of tools) {
+    for (const words of tool.refuses ?? []) {
+      assert.ok(REFUSALS.some(([which, entry]) => which === name && entry === words), `${name}.refuses: "${words}" has no call in REFUSALS of tests/kits.test.mjs`);
+    }
+  }
+  for (const [name, words] of REFUSALS) assert.ok(tools.get(name)?.refuses?.includes(words), `REFUSALS: "${words}" is not in ${name}.refuses`);
+});
 
 test('a call a kit refuses before it touches its folder leaves an earlier run there, and its Next line says nothing was deleted; one that fails after says what is gone', async () => {
   const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-refused-'));
   // No browser: each kit that gets past its own checks fails as it starts one.
-  const backend = new LocalBackend({ baseDir, kitPaths, env: { ...process.env, CHROME_PATH: path.join(baseDir, 'no-chrome'), LAUNCH_FILM_CHROME: path.join(baseDir, 'no-chrome') } });
-  const server = createMcpServer({ backend });
-  const client = new Client({ name: 'test-client', version: '1.0.0' });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
-  let n = 0;
-  const run = async (tool, args, earlier, more = {}) => {
-    const out = `case-${++n}`;
-    mkdirSync(path.join(baseDir, out), { recursive: true });
-    for (const [file, body] of Object.entries(earlier)) writeFileSync(path.join(baseDir, out, file), body);
-    const before = filesIn(path.join(baseDir, out));
-    const result = await client.callTool({ name: tool, arguments: { ...args, out_dir: out, wait_seconds: 60, ...more } });
-    return { result, before, after: filesIn(path.join(baseDir, out)), next: result.structuredContent?.next ?? '' };
+  const env = { ...process.env, CHROME_PATH: path.join(baseDir, 'no-chrome'), LAUNCH_FILM_CHROME: path.join(baseDir, 'no-chrome') };
+  delete env.FFMPEG_PATH;
+  delete env.LAUNCH_FILM_FFMPEG;
+  // An ffmpeg that lists its encoders, with H.264 or without, for the checks the demo makes before its folder.
+  const fake = (name, encoders) => {
+    const file = path.join(baseDir, name);
+    writeFileSync(file, `#!/bin/sh\nprintf '%s\\n' '${encoders}'\n`);
+    chmodSync(file, 0o755);
+    return file;
   };
-  const site = 'https://acme.example.com/';
+  const ffmpegs = process.platform === 'win32' ? {} : {
+    none: path.join(baseDir, 'no-ffmpeg'),
+    'no H.264': fake('ffmpeg-without-h264', ' V....D mjpeg  Motion JPEG'),
+    'H.264': fake('ffmpeg-with-h264', ' V....D libx264  libx264 H.264'),
+  };
+  mkdirSync(path.join(baseDir, 'kitless'));
+  writeFileSync(path.join(baseDir, 'kitless', 'notes.txt'), 'no brand.json here');
+  const sessions = new Map();
+  const clientFor = async ffmpeg => {
+    if (!sessions.has(ffmpeg)) {
+      const backend = new LocalBackend({ baseDir, kitPaths, env: ffmpeg ? { ...env, FFMPEG_PATH: ffmpegs[ffmpeg] } : env });
+      const server = createMcpServer({ backend });
+      const client = new Client({ name: 'test-client', version: '1.0.0' });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+      sessions.set(ffmpeg, { client, server });
+    }
+    return sessions.get(ffmpeg).client;
+  };
+  let n = 0;
+  const run = async (tool, args, earlier, ffmpeg) => {
+    const out = `case-${++n}`;
+    for (const [file, body] of Object.entries(earlier)) {
+      mkdirSync(path.dirname(path.join(baseDir, out, file)), { recursive: true });
+      writeFileSync(path.join(baseDir, out, file), body);
+    }
+    mkdirSync(path.join(baseDir, out), { recursive: true });
+    const call = Object.fromEntries(Object.entries(args).map(([key, value]) => [key, typeof value === 'string' && value.startsWith('@/') ? `${out}/${value.slice(2)}` : value]));
+    const before = filesIn(path.join(baseDir, out));
+    const client = await clientFor(ffmpeg);
+    const result = await client.callTool({ name: tool, arguments: { ...call, out_dir: out, wait_seconds: 60 } });
+    return { result, call, before, after: filesIn(path.join(baseDir, out)), next: result.structuredContent?.next ?? '' };
+  };
   try {
-    const refusals = [
-      ['make_brand_kit', { url: 'https://x.com/acme' }, EARLIER.brand],
-      ['make_brand_kit', { url: site }, { 'notes.txt': 'mine' }],
-      ['make_font_kit', { url: site }, { 'notes.txt': 'mine' }],
-      ['take_screenshots', { url: site, sizes: ['huge'] }, EARLIER.shots],
-      ['take_screenshots', { url: site, page: ['https://other.example.com/x'] }, EARLIER.shots],
-      ['take_screenshots', { url: site, lang: 'english please' }, EARLIER.shots],
-      ['record_demo_video', { url: site, lang: 'english please' }, EARLIER.demo],
-      ['plan_launch_film', { url: 'http://localhost:9/' }, EARLIER.brand],
-      ['make_launch_film', { url: 'http://localhost:9/' }, EARLIER.brand],
-    ];
-    if (hasFfmpeg) refusals.push(['record_demo_video', { url: site }, { 'notes.txt': 'mine' }]);
-    for (const [tool, args, earlier] of refusals) {
-      const { result, before, after, next } = await run(tool, args, earlier);
+    for (const [tool, words, args, earlier, ffmpeg] of REFUSALS) {
+      if (ffmpeg && !ffmpegs[ffmpeg]) continue;
+      const { result, call, before, after, next } = await run(tool, args, earlier, ffmpeg);
       const label = `${tool} ${JSON.stringify(args)}`;
       assert.equal(result.structuredContent?.status, 'failed', `${label}: ${text(result)}`);
+      // The words as the kit wrote them, with the file the call gave in their place, and its flags as the result writes them.
+      const kit = kits.find(entry => entry.tools.some(item => item.name === tool));
+      const filled = words.replace(/\{([a-z_]+)(:name)?\}/g, (_, param, name) => (name ? path.basename(call[param]) : path.join(baseDir, call[param])));
+      const shown = inParameterWords(filled, flagWords(kit, kit.tools.find(item => item.name === tool)));
+      assert.ok(text(result).includes(shown), `${label} is not refused with "${shown}": ${text(result)}`);
       assert.deepEqual(after, before, `${label} left the folder as it was`);
       assert.doesNotMatch(next, /gone|deleted|emptied/, label);
       assert.match(next, /lists this tool's errors and their fixes\.$/, label);
     }
 
     const failures = [
-      ['make_brand_kit', { url: site }, EARLIER.brand],
-      ['make_font_kit', { url: site }, EARLIER.fonts],
-      ['take_screenshots', { url: site }, EARLIER.shots],
+      ['make_brand_kit', { url: SITE }, EARLIER.brand],
+      ['make_font_kit', { url: SITE }, EARLIER.fonts],
+      ['take_screenshots', { url: SITE }, EARLIER.shots],
     ];
-    if (hasFfmpeg) failures.push(['record_demo_video', { url: site, pages: 1 }, EARLIER.demo]);
+    if (hasFfmpeg) failures.push(['record_demo_video', { url: SITE, pages: 1 }, EARLIER.demo]);
     for (const [tool, args, earlier] of failures) {
       const { result, after, next } = await run(tool, args, earlier);
       const label = `${tool} ${JSON.stringify(args)}`;
@@ -772,8 +865,10 @@ test('a call a kit refuses before it touches its folder leaves an earlier run th
       assert.match(next, / (?:is|are) gone: this run deleted (?:it|them) before it failed/, label);
     }
   } finally {
-    await client.close();
-    await server.close();
+    for (const { client, server } of sessions.values()) {
+      await client.close();
+      await server.close();
+    }
     rmSync(baseDir, { recursive: true, force: true });
   }
 });

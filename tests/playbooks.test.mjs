@@ -1606,6 +1606,29 @@ test('a job whose kit refused the call, by exit code 2 or by a reason in its ref
   assert.deepEqual(nextSentences(view(2, 'x'), { text: ctx({ definitions: kits }), topics: new Set(), kit: kits[0], tool: { ...paint, next: {} } }), []);
 });
 
+test('a refusal can name a file the call gave, and counts only for a call that gave it', () => {
+  const kits = fixtureKits();
+  const paint = kits[0].tools.find(tool => tool.name === 'paint_picture');
+  paint.next.failed.push('It deleted the picture an earlier run left in {folder}.');
+  paint.refuses = ['could not read {sketch}: ', 'paintkit: {sketch:name}: '];
+  validateKitDefinition(kits[0]);
+  const view = (failure, inputs) => ({
+    id: 'job_6', kit: 'paintkit', tool: 'paint_picture', title: 'Paint a picture', status: 'failed', exitCode: 1, elapsedSeconds: 1, folder: `${LOCAL_DIR}/paint`, failure,
+    ...(inputs ? { inputs } : {}),
+  });
+  const next = v => nextSentences(v, { text: ctx({ definitions: kits }), topics: new Set(['painting']), kit: kits[0], tool: paint });
+  const topicLine = FAILED_NEXT.replace('{topic}', 'painting');
+  const sketch = `${LOCAL_DIR}/in/sketch.yaml`;
+  assert.deepEqual(next(view(`paintkit: could not read ${sketch}: EISDIR`, { sketch })), [topicLine]);
+  assert.deepEqual(next(view('paintkit: sketch.yaml: line 2 is not a stroke', { sketch })), [topicLine]);
+  // Another file, or a call that gave none, is no refusal of it.
+  assert.equal(next(view(`paintkit: could not read ${LOCAL_DIR}/other.yaml: EISDIR`, { sketch })).length, 2);
+  assert.equal(next(view('paintkit: sketch.yaml: line 2 is not a stroke')).length, 2);
+  // A placeholder names a file parameter of the tool.
+  paint.refuses = ['could not read {hue}: '];
+  assert.throws(() => validateKitDefinition(kits[0]), /paint_picture\.refuses: \{hue\} is no file the call gives/);
+});
+
 test('hosted, a Next line from next leaves out a sentence with {folder}', async () => {
   const kits = fixtureKits();
   delete kits[0].tools.find(tool => tool.name === 'paint_picture').hostedNext;
