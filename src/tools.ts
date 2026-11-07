@@ -6,7 +6,7 @@ import { textPattern } from './args.js';
 import { NotStartedError, type AvailableKit, type JobView, type KitBackend } from './backend.js';
 import type { ParamDefinition, ToolDefinition } from './kits.js';
 import { PLAYBOOK_TOOL } from './playbooks.js';
-import { errorResult, jobListed, jobOutputSchema, jobResult, type ResultContext } from './results.js';
+import { checkNextLines, errorResult, jobListed, jobOutputSchema, jobResult, type ResultContext } from './results.js';
 import { BASE_DIR_IN_WORDS, fillText, inWords, templateInWords, TextError, WAIT_SECONDS, withoutUnlisted, type TextContext } from './texts.js';
 
 /** A kit tool this server lists, with the kit it is of. */
@@ -266,6 +266,8 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
   const numbers = Object.entries(tool.params).filter(([, param]) => takesNumber(param)).map(([name]) => name);
   const entry = { kit, tool };
   context.tools.set(tool.name, entry);
+  // A Next sentence that cannot be filled stops the server, as a description does.
+  checkNextLines(tool, resultContext(context, entry));
 
   server.registerTool(
     tool.name,

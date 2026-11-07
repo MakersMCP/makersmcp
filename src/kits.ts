@@ -183,7 +183,7 @@ export interface ToolDefinition {
    * 2, gets the refused Next line, so a line about files a run deletes is never its own.
    */
   refuses?: string[];
-  /** The files the tool writes, by name or pattern, like card.png, logo-*.png or pages/*.md, for the tests of the texts that name them. */
+  /** The files the tool writes, by name or pattern, like card.png, logo-*.png, NN-*.png (two digits) or pages/*.md, for the tests of the texts that name them. */
   writes?: string[];
   /**
    * What the tool makes, as short phrases like "a check of any video", for the server's

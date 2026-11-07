@@ -118,9 +118,12 @@ export function nextState(view: JobView, tool?: ToolDefinition): keyof NextLines
   return view.exitCode === 0 ? 'passed' : 'check_failed';
 }
 
-/** A writes entry, like logo-*.png or stills/STILLS.md, as a pattern for a listed path that is it or ends in /<it>. */
-function writesPattern(entry: string): RegExp {
-  const glob = entry.split('*').map(part => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*');
+/**
+ * A writes entry, like logo-*.png, NN-*.png or stills/STILLS.md, as a pattern for a listed path
+ * that is it or ends in /<it>: * is any part of a name, and NN two digits.
+ */
+export function writesPattern(entry: string): RegExp {
+  const glob = entry.split('*').map(part => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/NN/g, '\\d{2}')).join('[^/]*');
   return new RegExp(`^(?:.*/)?${glob}$`);
 }
 
@@ -224,6 +227,33 @@ export function nextSentences(view: JobView, context: ResultContext): string[] {
     if (!missing && !absent.some(pattern => pattern.test(text))) kept.push(text.trim());
   }
   return kept;
+}
+
+/** What a job's own values stand in for when the Next lines are checked: any name will do. */
+const STAND_INS = new Set(['job_id', 'folder', 'topic', 'file', 'name']);
+
+/**
+ * Fills each Next sentence a tool can show on this side, with stand-ins for a job's own
+ * values, and throws on one that cannot be filled, like {fact:...} of a fact its kit lacks.
+ * A result leaves such a sentence out, so without this a typo would take that step out of
+ * every result without a word; a description with one stops the server, and so does this.
+ */
+export function checkNextLines(tool: ToolDefinition, context: ResultContext): void {
+  const hosted = context.text.where === 'hosted';
+  for (const field of hosted ? (['hostedNext', 'next'] as const) : (['next'] as const)) {
+    for (const [state, sentences] of Object.entries(tool[field] ?? {}) as Array<[keyof NextLines, string[] | undefined]>) {
+      // A hosted server reads next only for a state hostedNext does not give.
+      if (field === 'next' && hosted && tool.hostedNext?.[state]) continue;
+      for (const sentence of sentences ?? []) {
+        try {
+          fillText(sentence, context.text, { kind: 'next', extra: placeholder => (STAND_INS.has(placeholder.name) ? 'x' : undefined) });
+        } catch (error) {
+          if (error instanceof TextError) throw new Error(`${tool.name}.${field}.${state}: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+  }
 }
 
 /** The Next line's text, or nothing when no sentence of it is left. */

@@ -168,10 +168,10 @@ const hasWord = (haystack, word) => new RegExp(`(?<![\\w-])${word.replace(/[.*+?
 const FILE_EXTENSIONS = 'md|json|png|jpg|jpeg|svg|webp|gif|mp4|mov|wav|mp3|m4a|aac|yaml|yml|css|txt|srt|vtt|ass|html|woff2|woff|ttf|otf|pdf';
 const LOOKS_LIKE_FILE = new RegExp(`^[\\w<>*.-]+(?:/[\\w<>*.-]+)*\\.(?:${FILE_EXTENSIONS})$`, 'i');
 
-/** A file name the way a topic writes one, with <variable> parts and NN, as a sample to match. */
-const sample = name => name.replace(/<[^>]+>/g, 'x1').replace(/NN/g, '01').replace(/\*/g, 'x1');
-/** A writes entry, with * for any part of a name, as a regular expression. */
-const globOf = pattern => new RegExp(`^${pattern.split('*').map(part => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')}$`);
+/** A file name the way a topic writes one, with <variable> parts and NN or <nn> for two digits, as a sample to match. */
+const sample = name => name.replace(/<nn>/gi, '01').replace(/<[^>]+>/g, 'x1').replace(/NN/g, '01').replace(/\*/g, 'x1');
+/** A writes entry, with * for any part of a name and NN for two digits, as a regular expression. */
+const globOf = pattern => new RegExp(`^${pattern.split('*').map(part => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/NN/g, '\\d{2}')).join('[^/]*')}$`);
 function written(name, writes) {
   const wanted = sample(name);
   return writes.some(pattern => {
@@ -1186,6 +1186,15 @@ test('a kit file whose texts name a fact it lacks, or a topic there is not, stop
   const lost = fixtureKits();
   lost[1].tools[0].playbook = 'singing';
   assert.throws(() => createMcpServer({ definitions: lost, playbooks: path.join(FIXTURES, 'topics'), backend: new FakeBackend() }), /mix_sound's playbook is singing, which is not a topic/);
+  // A Next sentence the server could not fill would be left out of every result: it stops the server on the side that shows it.
+  const next = fixtureKits();
+  next[0].tools[0].hostedNext.done.push('It is {fact:paintkit.widest} wide.');
+  assert.throws(() => createMcpServer({ definitions: next, playbooks: path.join(FIXTURES, 'topics'), backend: new FakeBackend({ where: 'hosted' }) }), /paint_picture\.hostedNext\.done: \{fact:paintkit\.widest\}: paintkit has no fact widest/);
+  assert.ok(createMcpServer({ definitions: next, playbooks: path.join(FIXTURES, 'topics'), backend: new FakeBackend() }), 'a local server shows next, not hostedNext');
+  next[0].tools[0].next.failed.push('Wait {version:soundkit}.');
+  assert.ok(createMcpServer({ definitions: next, playbooks: path.join(FIXTURES, 'topics'), backend: new FakeBackend() }));
+  next[0].tools[0].next.failed.push('It is {bounds:paint_picture.hue} or {default:paint_picture.size}.');
+  assert.throws(() => createMcpServer({ definitions: next, playbooks: path.join(FIXTURES, 'topics'), backend: new FakeBackend() }), /paint_picture\.next\.failed: \{default:paint_picture\.size\}: paint_picture has no parameter size/);
 });
 
 test('a kit file\'s new fields are checked when it is read', () => {

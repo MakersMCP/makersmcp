@@ -42,7 +42,7 @@
       },
       "docs": [{ "file": "SCREENSHOTS.md", "site": true }],
       "refuses": ["Unknown size: ", "a scale goes from", "width and height go from", "is given twice in --sizes", "needs at least one size", "is not a page of", "holds no earlier easyscreenshotkit run", "Not a web address"],
-      "writes": ["SCREENSHOTS.md", "manifest.json", "sheet.png", "*-*.png", "pwa/manifest-screenshots.json", "pwa/screenshots/wide-*.png", "pwa/screenshots/narrow-*.png"],
+      "writes": ["SCREENSHOTS.md", "manifest.json", "sheet.png", "NN-*.png", "pwa/manifest-screenshots.json", "pwa/screenshots/wide-*.png", "pwa/screenshots/narrow-*.png"],
       "next": {
         "done": [
           "Show {file:sheet.png} to the user and check that every page needed is there.",
