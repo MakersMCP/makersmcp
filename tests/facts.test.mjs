@@ -1,15 +1,15 @@
 // The kits' facts (`facts` in kits/<kit>.json), which the playbooks and the descriptions
 // show through {fact:<kit>.<key>}, against the kits themselves, so a kit release that
-// changes a number fails here before a text says the old one. Every number needs a way to
-// be read from the installed kit in READERS below, from its code or from its own guide where
-// only that says it, and a number without one fails the test; a short text, like "20 to 90",
-// may instead be written word for word in the kit's files. Facts measured on real films and
+// changes a number fails here before a text says the old one. Every fact needs a way to be
+// read from the installed kit in READERS below, from its code or from the sentence of its own
+// guide that says it, and a fact without one fails the test: a number or a phrase like
+// "20 to 90" shows up somewhere in a kit's files by chance. Facts measured on real films and
 // tours are in MEASURED. With MAKERSMCP_SLOW=1 a second part renders a two clip film and
 // records a five second demo with the real kits, Chrome and ffmpeg, and measures them with
 // check_video.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -35,6 +35,13 @@ function stated(text, pattern, file) {
   const match = pattern.exec(text);
   assert.ok(match, `${file} no longer has ${pattern}: see where the kit keeps this number now`);
   return match.length > 2 ? `${match[1]}x${match[2]}` : Number(match[1]);
+}
+
+/** A phrase the kit's guide says, like "20 to 90" in "A run takes 20 to 90 seconds.", by a pattern with one group. */
+function phrase(text, pattern, file) {
+  const match = pattern.exec(text);
+  assert.ok(match, `${file} no longer has ${pattern}: see where the kit says this now`);
+  return match[1];
 }
 
 const size = (width, height, scale = 1) => `${Math.round(width * scale)}x${Math.round(height * scale)}`;
@@ -213,6 +220,12 @@ const READERS = [
     return match[2] === 'a second and a half' ? 1.5 : Number.parseFloat(match[2]);
   }],
   ['musicfit', /^true_peak$/, ({ read }) => stated(read('skills/musicfit/scripts/lib/render.js'), /async function normalize\(audio, \{ lufs, peak = (-?[\d.]+) \}\)/, 'render.js')],
+  // How long a run takes, as each kit's guide says it.
+  ['easybrandkit', /^run_seconds$/, ({ read }) => phrase(read('skills/easybrandkit/SKILL.md'), /A run takes (\d+ to \d+) seconds\./, 'SKILL.md')],
+  ['easybrandkit', /^facts_run_minutes$/, ({ read }) => phrase(read('skills/easybrandkit/SKILL.md'), /robots\.txt allows, and takes ([a-z]+ to [a-z]+) minutes\./, 'SKILL.md')],
+  ['easyfontkit', /^run_seconds$/, ({ read }) => phrase(read('skills/easyfontkit/SKILL.md'), /A run takes (\d+ to \d+) seconds\./, 'SKILL.md')],
+  ['launch-film', /^plan_seconds$/, ({ read }) => phrase(read('skills/launch-film/SKILL.md'), /This takes (\d+ to \d+) seconds\. It runs easybrandkit/, 'SKILL.md')],
+  ['launch-film', /^render_minutes$/, ({ read }) => phrase(read('skills/launch-film/SKILL.md'), /a 30 second film takes ([a-z]+ to [a-z]+ minutes)\./, 'SKILL.md')],
   ['musicfit', /^analyze_fps$/, ({ read }) => stated(read('skills/musicfit/scripts/musicfit.js'), /raw\.fps !== undefined \? parseFps\(raw\.fps\) : (\d+)/, 'musicfit.js')],
 ];
 
@@ -223,28 +236,6 @@ const MEASURED = [
   // How long a tour's pages take, from the steps.json of tours of real sites.
   ['easyscreenshotkit', /^tour\.(?:page_seconds|four_pages_seconds|short_page_seconds)$/],
 ];
-
-/** The installed kit's text files, for a fact no reader takes: its code, README.md and SKILL.md. */
-function kitTexts(dir, into = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) kitTexts(full, into);
-    } else if (/\.(?:[cm]?js|md)$/.test(entry.name)) {
-      into.push(readFileSync(full, 'utf8'));
-    }
-  }
-  return into;
-}
-
-/** Whether a fact's value is written in the kit's own files, as a number or a phrase on its own. */
-function writtenIn(texts, value) {
-  const shown = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`(?<![\\w.-])${shown}(?![\\w-]|\\.\\d)`, typeof value === 'string' ? 'i' : '');
-  const grouped = typeof value === 'number' && Number.isInteger(value) && Math.abs(value) >= 1000
-    ? new RegExp(`(?<![\\w.])${String(value).replace(/\B(?=(\d{3})+(?!\d))/g, '[_,]')}(?![\\w])`) : undefined;
-  return texts.some(text => pattern.test(text) || grouped?.test(text));
-}
 
 /** The reader of a fact, and what it gets to read with. */
 function readerOf(kit, key) {
@@ -260,8 +251,6 @@ for (const kit of kits) {
   test(`${kit.kit}: each fact in its kit file is what the installed kit says`, t => {
     const facts = leaves(kit.facts);
     if (!facts.length) return;
-    let texts;
-    const loose = [];
     const wrong = [];
     for (const [key, value] of facts) {
       if (MEASURED.some(([owner, pattern]) => owner === kit.kit && pattern.test(key))) {
@@ -274,16 +263,9 @@ for (const kit of kits) {
         if (String(value) !== String(expected)) wrong.push(`${kit.kit}.${key} is ${value}, and ${kit.package} ${installed.version} says ${expected}`);
         continue;
       }
-      // A number shows up somewhere in any kit's files, so only a reader checks one.
-      if (typeof value === 'number') {
-        wrong.push(`${kit.kit}.${key} is ${value}, a number no reader in tests/facts.test.mjs takes: add a reader for it`);
-        continue;
-      }
-      texts ??= kitTexts(installed.dir);
-      if (writtenIn(texts, value)) loose.push(key);
-      else wrong.push(`${kit.kit}.${key} is ${value}, which no reader in tests/facts.test.mjs takes and no file of ${kit.package} ${installed.version} says: add a reader, or fix the fact`);
+      // A number or a phrase shows up somewhere in any kit's files, so only a reader checks a fact.
+      wrong.push(`${kit.kit}.${key} is ${value}, which no reader in tests/facts.test.mjs takes: add a reader for it`);
     }
-    if (loose.length) t.diagnostic(`${kit.kit}: texts written in the kit's files, with no reader of their own: ${loose.join(', ')}`);
     assert.deepEqual(wrong, []);
   });
 }
@@ -294,12 +276,12 @@ test('the readers find what they look for in the installed kits', () => {
   const samples = [
     ['launch-film', ['fps', 'size_16_9', 'size_9_16', 'sample_rate', 'lufs_target', 'true_peak', 'look_bpm.pop', 'bar_seconds.pop', 'clip_bars_default', 'clip_seconds_min',
       'clip_seconds_max', 'film_seconds_max', 'length_min', 'length_max', 'still_size.ph_thumbnail', 'check_most', 'check_end.still', 'scene_max.feature_title', 'scene_max.title',
-      'ph_frames_max', 'music_volume', 'lufs_social', 'read_extra_seconds']],
+      'ph_frames_max', 'music_volume', 'lufs_social', 'read_extra_seconds', 'plan_seconds', 'render_minutes']],
     ['easyscreenshotkit', ['size.iphone', 'scale.full', 'pwa.wide', 'demo.size', 'demo.fps', 'demo.gif_max_mb', 'full_page_max', 'custom.side_min', 'custom.side_max',
       'custom.scale_min', 'custom.scale_max', 'custom.phone_below', 'slow_timeout', 'pwa.max', 'demo.window', 'demo.time_left', 'tour.pick_seconds', 'steps.zoom_max']],
     ['musicfit', ['sample_rate', 'channels', 'length_min', 'length_max', 'hit_tail', 'true_peak', 'analyze_fps']],
-    ['easybrandkit', ['screen_size', 'card_size', 'logo_min_side', 'facts_timeout', 'slow_timeout']],
-    ['easyfontkit', ['late_timeout', 'free_matches']],
+    ['easybrandkit', ['screen_size', 'card_size', 'logo_min_side', 'facts_timeout', 'slow_timeout', 'run_seconds', 'facts_run_minutes']],
+    ['easyfontkit', ['late_timeout', 'free_matches', 'run_seconds']],
   ];
   const reached = new Set();
   const value = (owner, key) => {
@@ -340,11 +322,10 @@ test('the readers find what they look for in the installed kits', () => {
   assert.equal(value('easyscreenshotkit', 'demo.time_left'), 60);
   assert.equal(value('musicfit', 'analyze_fps'), 30);
   assert.equal(value('musicfit', 'true_peak'), -1);
-  // A fact no reader takes is checked against the kit's own words.
-  assert.ok(writtenIn(['It takes 20 to 90 seconds.'], '20 to 90'));
-  assert.ok(writtenIn(['const MAX = 15_000;'], 15000));
-  assert.ok(!writtenIn(['It takes 20 to 900 seconds.'], '20 to 90'));
-  assert.ok(!writtenIn(['a scale of 2.5'], 2));
+  // The phrases the guides say, word for word.
+  assert.equal(value('easybrandkit', 'run_seconds'), '20 to 90');
+  assert.equal(value('launch-film', 'plan_seconds'), '30 to 90');
+  assert.equal(value('launch-film', 'render_minutes'), 'one to three minutes');
 });
 
 // The slow part: real renders, measured.
