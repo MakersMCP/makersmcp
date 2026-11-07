@@ -101,9 +101,22 @@ record_demo_video {"url": "https://linear.app", "wait_seconds": 0}
 <!-- with easyscreenshotkit -->
 2. Show `sheet.png`, and check that every page the places need is there.
 <!-- end -->
-3. Plan the film with `plan_launch_film`, so its words can be read before it renders. Give the `look` (`launch_film_guide` with topic looks says what each suits), `seconds` from {fact:launch-film.length_min} to {fact:launch-film.length_max} and the `aspect`, and `music` false when the user's track goes under the film. The length lands on whole bars, so it can come out a few seconds off what was asked. For the other shape, plan again with `words` set to the first plan's words.json and the other `aspect`, so both films say the same.
+3. Plan the film with `plan_launch_film`, so its words can be read before it renders. Give the `look` (`launch_film_guide` with topic looks says what each suits), `seconds` from {fact:launch-film.length_min} to {fact:launch-film.length_max} and the `aspect`, and `music` false when the user's track goes under the film. The plan never stretches a clip, so the film can come out several seconds short, most when the page has little to show; the render's film.timeline.json has its length. For the other shape, plan again with `words` set to the first plan's words.json and the other `aspect`, so both films say the same.
 <!-- without easybrandkit -->
    The plan reads the brand itself: check the name, logo and colors in its brand/BRAND.md before the render.
+<!-- local -->
+```call
+plan_launch_film {"url": "https://linear.app", "aspect": "16:9", "out_dir": "launch/film-16x9"}
+plan_launch_film {"url": "https://linear.app", "words": "launch/film-16x9/words.json", "aspect": "9:16", "out_dir": "launch/film-9x16"}
+```
+<!-- end -->
+<!-- hosted -->
+```call
+plan_launch_film {"url": "https://linear.app", "aspect": "16:9"}
+plan_launch_film {"url": "https://linear.app", "words": "job:<job_id>/words.json", "aspect": "9:16"}
+```
+   words.json is the first plan's.
+<!-- end -->
 <!-- end -->
 <!-- with easybrandkit -->
    Give `brand` the brand kit of step 1.
@@ -185,11 +198,16 @@ fit_music {"track": "https://example.com/track.mp3", "length": "24", "hit": "18.
    - `check_video` on the demo, with `expect` {fact:easyscreenshotkit.demo.size}@{default:record_demo_video.fps}.
 <!-- end -->
 <!-- end -->
+<!-- with check_video -->
 <!-- local -->
    - Look at every check's sheet.png and at every picture, for words cut off, text on text and a wrong logo. When you cannot open a picture, give the user its path with what to look for.
 <!-- end -->
 <!-- hosted -->
    - Give the user the links to the pictures, the checks' sheet.png among them, with what to look for: words cut off, text on text and a wrong logo. Nothing here shows you a picture.
+<!-- end -->
+<!-- end -->
+<!-- without check_video -->
+   - Give the user each picture and each film with what to look for: words cut off, text on text and a wrong logo. Nothing here checks a film or shows you a picture, so say the films were not checked.
 <!-- end -->
 <!-- with check_video -->
    - A film planned with `music` false fails the silence check of `check_video` until a track is under it; its size, frame rate and cuts are still measured right.

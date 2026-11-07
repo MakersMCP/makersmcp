@@ -10,7 +10,7 @@ order: 90
 ---
 # When a tool fails
 
-Read the result before anything else: its first line says what happened, and the text under it says why, mostly with the fix. Never send a failed call again unchanged, since it fails the same way.
+Read the result before anything else: its first line says what happened, and the text under it says why, mostly with the fix. Never send a failed call again unchanged, since it fails the same way, unless the reason says to wait or to try again later.
 
 ## What the first line says
 

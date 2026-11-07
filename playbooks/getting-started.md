@@ -5,7 +5,7 @@ index: which tool fits which request, how jobs, waits and files work, and what t
 description: Explains what MakersMCP's kits make from a website or a file and what they never make, which tool answers which request, how a job runs and how to wait for it, where the files go, the rules for using what the kits made, and what to tell the user at the end. Use it when a request names no tool, when it is unclear whether these kits can do it, or before a first job.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video]
 order: 10
 ---
 # Getting started with MakersMCP
@@ -69,8 +69,13 @@ jobs-and-files has the rest.
 <!-- with easyfontkit -->
 - Give each font's license as `FONTS.md` states it, with the closest free font, and let the user choose.
 <!-- end -->
-<!-- with launch-film -->
+<!-- with check_video -->
 - Have a film's contact sheet looked at before handing it over: a measurement cannot read words.
+<!-- end -->
+<!-- with launch-film -->
+<!-- without check_video -->
+- Nothing here checks a film, and a render draws no stills of it: give the user the film to watch with what to look for, and say it was not checked. Of a film from `make_launch_film`, `frames/sheet.jpg` shows two stills a clip.
+<!-- end -->
 <!-- end -->
 <!-- with musicfit -->
 - Never call a track cleared for use: nothing here checks its rights.
@@ -78,7 +83,7 @@ jobs-and-files has the rest.
 
 ## When something fails
 
-Read the reason in a failed result and change the call before trying again, since the same call fails the same way. troubleshooting has the errors and their fixes, and `check_setup` shows the kits that are on.
+Read the reason in a failed result and change the call before trying again, since the same call fails the same way, unless the reason says to wait or to try again later. troubleshooting has the errors and their fixes, and `check_setup` shows the kits that are on.
 
 ## Hand over
 

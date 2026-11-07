@@ -33,7 +33,7 @@
       "next": {
         "done": [
           "Tell the user each role's font and its license from the table below, with the closest free font beside any commercial or unknown one, and let them choose.",
-          "Check that the page named in {file:FONTS.md} is the one the user meant: an error page or a login page gives its own fonts."
+          "Check that the page {name:FONTS.md} below names is the one the user meant: an error page or a login page gives its own fonts."
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",

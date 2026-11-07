@@ -98,6 +98,9 @@ render_launch_film {"film": "job:<job_id>/film.json", "wait_seconds": 0}
 check_video {"film": "job:<job_id>/film.mp4", "expect": "{fact:launch-film.size_16_9}@{fact:launch-film.fps}", "seconds": "{fact:launch-film.length_min}-{fact:launch-film.length_max}"}
 ```
 <!-- end -->
+<!-- without check_video -->
+4. Nothing here checks the film or draws stills of a render, so give the user the `film.mp4` link the render's result lists, to watch before it goes out.
+<!-- end -->
 5. Make the pictures from the same plan when the user wants them:
 ```call
 make_launch_stills {"source": "job:<job_id>/film.json", "for": ["ph", "og"]}
@@ -183,10 +186,16 @@ To change a picture's words, change `film.json` and make the pictures again.
 ## Hand over
 
 <!-- local -->
-- The film: the path of its `film.mp4`, its length from `film.timeline.json`, its look and aspect, the check's verdict, and one line on each clip.
+- The film: the path of its `film.mp4`, its length from `film.timeline.json`, its look and aspect, and one line on each clip.
 <!-- end -->
 <!-- hosted -->
-- The film: the link to its `film.mp4`, which works for {limit:keep_days} for anyone who holds it, its length from `film.timeline.json`, its look and aspect, the check's verdict, and one line on each clip.
+- The film: the link to its `film.mp4`, which works for {limit:keep_days} for anyone who holds it, its length from `film.timeline.json`, its look and aspect, and one line on each clip.
+<!-- end -->
+<!-- with check_video -->
+- The check's verdict, with each failed check and what it measured.
+<!-- end -->
+<!-- without check_video -->
+- That nothing here checked the film, so the user watches it before it goes out.
 <!-- end -->
 - The pictures by place, with their sizes.
 - What is left to the user: a track of their own under the film, and the upload to each place.
