@@ -57,10 +57,21 @@ export function launcherProblem(launcher: unknown): string | undefined {
   return 'A launcher is the command that starts the supervisor and its arguments, like ["sudo", "-n", "-u", "<kit user>", "--", "<wrapper>", "run"]';
 }
 
-/** Another job is writing to the same folder. */
+/** Whether `inner` is `outer` or a folder inside it, as both are written. */
+function within(outer: string, inner: string): boolean {
+  const relative = path.relative(outer, inner);
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+/**
+ * Another job is writing to the same folder, to one that holds `folder`, or to one inside it:
+ * either job would list the other's files as its own, and one may clear what the other writes.
+ */
 export class FolderBusyError extends Error {
-  constructor(readonly job: Job) {
-    super(`${job.id} (${job.spec.tool}) is still writing to ${job.spec.folder}`);
+  constructor(readonly job: Job, folder: string = job.spec.folder!) {
+    const running = job.spec.folder!;
+    const how = running === folder ? '' : within(running, folder) ? `, which holds ${folder}` : `, inside ${folder}`;
+    super(`${job.id} (${job.spec.tool}) is still writing to ${running}${how}`);
   }
 }
 
@@ -270,9 +281,12 @@ export class JobManager {
   private readonly jobs = new Map<string, Job>();
 
   start(spec: JobSpec): Job {
-    if (spec.folder) {
-      const busy = this.list().find(job => job.status === 'running' && job.spec.folder === spec.folder);
-      if (busy) throw new FolderBusyError(busy);
+    const { folder } = spec;
+    if (folder) {
+      // Two jobs never write into one folder, nor one into a folder inside the other's.
+      const busy = this.list().find(job => job.status === 'running' && job.spec.folder !== undefined
+        && (within(job.spec.folder, folder) || within(folder, job.spec.folder)));
+      if (busy) throw new FolderBusyError(busy, folder);
     }
     const job = new Job(`job_${randomBytes(4).toString('hex')}`, spec);
     this.jobs.set(job.id, job);

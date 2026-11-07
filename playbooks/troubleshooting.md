@@ -25,7 +25,7 @@ Read the result before anything else: its first line says what happened, and the
 
 <!-- local -->
 - "<param>: there is nothing at <path>": no file is there. A relative path is read from {base_dir}, so give the path the earlier result listed, or an absolute one. An address needs its https://.
-- "<job_id> (<tool>) is still writing to <folder>", then "Wait for it with wait_for_job (job_id <job_id>), or give another out_dir.": wait for that job, or give this one another folder.
+- "<job_id> (<tool>) is still writing to <folder>", then "Wait for it with wait_for_job (job_id <job_id>), or give another out_dir.": wait for that job, or give this one another folder. With ", which holds <folder>" or ", inside <folder>" after it, this job's folder is inside that job's or holds it: run them one after the other.
 - "<setting>: <value> is no program file, so the kits that read <setting> cannot run it. Point it at the program, or take it out.": a setting this tool reads a program from names none, and the setup below has the fix.
 - "Cannot make <folder>, the folder the kits save in: <reason>. Set --out or MAKERSMCP_OUT to a folder you can write to.": every kit runs in that folder, so `out_dir` does not help. The --out it names is makersmcp's own option, set in the client's settings like MAKERSMCP_OUT, and the setup below has the fix.
 <!-- with launch-film -->

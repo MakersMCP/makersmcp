@@ -36,7 +36,7 @@ A whole launch is the launch-kit topic.
 1. A call starts one job and waits `wait_seconds` for it, {default:wait_for_job.wait_seconds} unless given; a job still running comes back with its `job_id` and a `next_action`.
 2. Call `wait_for_job` with that `job_id` until the job ends. Never call the first tool again for the same thing: that starts a second job.
 3. After a call that ended with no result, call `list_jobs` and wait for the job it shows before trying again.
-4. `cancel_job` stops a job. Jobs that save into different folders run side by side: start each with `wait_seconds` 0, then wait for each.
+4. `cancel_job` stops a job. Jobs that save into separate folders, none inside another, run side by side: start each with `wait_seconds` 0, then wait for each.
 <!-- hosted -->
    Here at most {limit:jobs_at_once} run or wait at once, and a start past that is refused: start the next one when one ends.
 <!-- end -->

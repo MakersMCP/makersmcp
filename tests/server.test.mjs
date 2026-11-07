@@ -179,6 +179,33 @@ test('a slow job returns a job_id, and wait_for_job returns its result', async (
   });
 });
 
+test('a job whose folder is inside a running job\'s folder, or holds it, is refused like one in the same folder, and one beside it runs', async () => {
+  await withClient({}, async (client, outDir) => {
+    const film = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: 'film', wait_seconds: 0 } });
+    assert.equal(film.structuredContent.status, 'running');
+    const jobId = film.structuredContent.job_id;
+    const busy = (title, how) => `## ${title}: not started\n\n${jobId} (fake_make) is still writing to ${path.join(outDir, 'film')}${how}. Wait for it with wait_for_job (job_id ${jobId}), or give another out_dir.`;
+    // A check in check/ next to the film's files: each job would list the other's files as its own.
+    const inside = await client.callTool({ name: 'fake_report', arguments: { url: 'https://example.com', out_dir: 'film/check', wait_seconds: 0 } });
+    assert.equal(inside.isError, true);
+    assert.equal(text(inside), busy('Fake report', `, which holds ${path.join(outDir, 'film', 'check')}`));
+    const around = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: '.', wait_seconds: 0 } });
+    assert.equal(text(around), busy('Fake make', `, inside ${outDir}`));
+    const same = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: 'film', wait_seconds: 0 } });
+    assert.equal(text(same), busy('Fake make', ''));
+    // A folder beside it, even one whose name starts the same, is no part of it.
+    const beside = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: 'film2', wait_seconds: 0 } });
+    assert.equal(beside.structuredContent.status, 'running', text(beside));
+    for (const id of [jobId, beside.structuredContent.job_id]) {
+      const done = await client.callTool({ name: 'wait_for_job', arguments: { job_id: id, wait_seconds: 20 } });
+      assert.equal(done.structuredContent.status, 'done', text(done));
+    }
+    // Once the film's job has ended, its check runs.
+    const check = await client.callTool({ name: 'fake_report', arguments: { url: 'https://example.com', out_dir: 'film/check', wait_seconds: 20 } });
+    assert.equal(check.structuredContent.status, 'done', text(check));
+  });
+});
+
 test('cancel_job stops a running job', async () => {
   await withClient({}, async client => {
     const started = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', wait_seconds: 0 } });
