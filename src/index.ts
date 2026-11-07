@@ -18,7 +18,7 @@ Options:
   --kit-path <k=dir>   use a kit's checkout instead of its package, like
                        musicfit=../musicfit (repeat it, or MAKERSMCP_KIT_PATHS
                        with commas)
-  --check              print the kits, Chrome, ffmpeg and the folder, and exit
+  --check              print the kits, Chrome, ffmpeg, ffprobe and the folder, and exit
   -h, --help           show this help
   -v, --version        show the version
 

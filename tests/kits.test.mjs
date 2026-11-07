@@ -4,7 +4,7 @@
 // the way the CLI takes it, like MAKERSMCP_KIT_PATHS=musicfit=../musicfit npm test.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildCommand, createMcpServer, LocalBackend, loadKitDefinitions, resolveKit } from '../dist/server.js';
+import { kitEnvironment, setupReport } from '../dist/setup.js';
 
 const kitPaths = Object.fromEntries((process.env.MAKERSMCP_KIT_PATHS ?? '').split(',').map(entry => entry.trim())
   .filter(entry => entry.includes('=')).map(entry => [entry.slice(0, entry.indexOf('=')), entry.slice(entry.indexOf('=') + 1)]));
@@ -151,9 +152,10 @@ for (const kit of kits) {
   });
 }
 
-async function withLaunchFilm(callback, options = {}) {
+async function withLaunchFilm(callback, { backendEnv, ...options } = {}) {
   const outDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-kits-'));
-  const server = createMcpServer({ kits: ['launch-film'], outDir, ...options });
+  const backend = backendEnv ? new LocalBackend({ baseDir: outDir, kitPaths, env: backendEnv }) : undefined;
+  const server = createMcpServer({ kits: ['launch-film'], outDir, ...(backend ? { backend } : {}), ...options });
   const client = new Client({ name: 'test-client', version: '1.0.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
@@ -564,6 +566,90 @@ test('check_video on a real video is a check, passed or failed, with its CHECK.m
     assert.match(text(result), /### CHECK\.md/);
     assert.ok(readFileSync(path.join(outDir, 'check', 'CHECK.md'), 'utf8').length > 0);
   });
+});
+
+/** A program on PATH, or nothing. */
+const onPath = name => (process.env.PATH ?? '').split(path.delimiter).filter(Boolean).map(dir => path.join(dir, name)).find(file => existsSync(file));
+
+/** Programs that fail as a broken build would, for a PATH where they stand in front of the real ones. */
+function brokenPrograms(names) {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-broken-'));
+  for (const name of names) {
+    writeFileSync(path.join(dir, name), '#!/bin/sh\necho "not this one" >&2\nexit 1\n');
+    chmodSync(path.join(dir, name), 0o755);
+  }
+  return dir;
+}
+
+test('each kit gets the ffmpeg and the Chrome a setting names under every name a kit reads them by, and check_setup says which ffprobe launch-film reads with', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-programs-'));
+  try {
+    const file = (...parts) => {
+      mkdirSync(path.join(dir, ...parts.slice(0, -1)), { recursive: true });
+      writeFileSync(path.join(dir, ...parts), '');
+      return path.join(dir, ...parts);
+    };
+    const ffmpeg = file('a', 'ffmpeg');
+    const ffprobe = file('a', 'ffprobe');
+    const other = file('b', 'ffmpeg');
+    const otherProbe = file('b', 'ffprobe');
+    const chrome = file('c', 'chrome');
+    const empty = path.join(dir, 'empty');
+    mkdirSync(empty);
+    const PATH = empty;
+    // FFMPEG_PATH, which check_setup tells the user to set, reaches launch-film with the ffprobe beside it.
+    assert.deepEqual(kitEnvironment({ PATH, FFMPEG_PATH: ffmpeg }), { PATH, FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFMPEG: ffmpeg, LAUNCH_FILM_FFPROBE: ffprobe });
+    // launch-film's own setting reaches the other kits, and a setting that names no file gives way.
+    assert.deepEqual(kitEnvironment({ PATH, FFMPEG_PATH: path.join(dir, 'gone'), LAUNCH_FILM_FFMPEG: other }),
+      { PATH, FFMPEG_PATH: other, LAUNCH_FILM_FFMPEG: other, LAUNCH_FILM_FFPROBE: otherProbe });
+    // Two settings that each name a file are the user's choice for each kit.
+    const both = { PATH, FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFMPEG: other };
+    assert.deepEqual(kitEnvironment(both), { ...both, LAUNCH_FILM_FFPROBE: otherProbe });
+    assert.deepEqual(kitEnvironment({ PATH, CHROME_PATH: chrome, LAUNCH_FILM_CHROME: path.join(dir, 'old-chrome') }), { PATH, CHROME_PATH: chrome, LAUNCH_FILM_CHROME: chrome });
+    assert.deepEqual(kitEnvironment({ PATH, LAUNCH_FILM_CHROME: chrome }), { PATH, CHROME_PATH: chrome, LAUNCH_FILM_CHROME: chrome });
+    // With no setting, each kit looks on PATH itself.
+    assert.deepEqual(kitEnvironment({ PATH }), { PATH });
+
+    const report = (env, enabled = new Set(['launch-film'])) => setupReport({ version: '9.9.9', baseDir: dir, kits: [], enabled, env }).split('\n');
+    // The ffmpeg line is "ffmpeg: <path>" alone, the last line that starts so: a service's check reads it.
+    assert.deepEqual(report({ PATH, FFMPEG_PATH: ffmpeg }).filter(line => /^ffmpeg|^ffprobe|ffmpeg:/.test(line)), [`ffmpeg: ${ffmpeg}`, `ffprobe: ${ffprobe}`]);
+    assert.deepEqual(report(both).filter(line => /^ffmpeg|^ffprobe|ffmpeg:/.test(line)), [`ffmpeg: ${ffmpeg}`, `launch-film's ffmpeg: ${other} (LAUNCH_FILM_FFMPEG)`, `ffprobe: ${otherProbe}`]);
+    assert.deepEqual(report({ PATH }).filter(line => /^ffmpeg|^ffprobe/.test(line)), [
+      'ffmpeg: not found on PATH. Install ffmpeg or set FFMPEG_PATH.',
+      'ffprobe: not found beside ffmpeg or on PATH. launch-film reads videos and pictures with it: install it with ffmpeg, or set LAUNCH_FILM_FFPROBE.',
+    ]);
+    // With launch-film off, nothing reads its settings or ffprobe.
+    assert.deepEqual(report(both, new Set(['musicfit'])).filter(line => /ffmpeg|ffprobe/.test(line)), [`ffmpeg: ${ffmpeg}`]);
+    // A setting that names no file, with no other one, is left for the kits to report.
+    assert.deepEqual(kitEnvironment({ PATH, CHROME_PATH: path.join(dir, 'gone') }), { PATH, CHROME_PATH: path.join(dir, 'gone') });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('with ffmpeg reachable only through FFMPEG_PATH, check_video reads the video with it and the ffprobe beside it', { skip: (!hasFfmpeg || process.platform === 'win32') && 'needs ffmpeg and ffprobe, and a shell' }, async () => {
+  const ffmpeg = onPath('ffmpeg');
+  const ffprobe = path.join(path.dirname(ffmpeg), 'ffprobe');
+  assert.ok(existsSync(ffprobe), `no ffprobe beside ${ffmpeg}`);
+  // An ffmpeg and an ffprobe that fail stand first on PATH, as when a client starts the server with another PATH.
+  const broken = brokenPrograms(['ffmpeg', 'ffprobe']);
+  const env = { ...process.env, PATH: `${broken}${path.delimiter}${process.env.PATH}`, FFMPEG_PATH: ffmpeg };
+  delete env.LAUNCH_FILM_FFMPEG;
+  delete env.LAUNCH_FILM_FFPROBE;
+  try {
+    await withLaunchFilm(async (client, outDir) => {
+      tinyVideo(outDir);
+      const setup = text(await client.callTool({ name: 'check_setup', arguments: {} }));
+      assert.match(setup, new RegExp(`^ffmpeg: ${ffmpeg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
+      assert.match(setup, new RegExp(`^ffprobe: ${ffprobe.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
+      const result = await client.callTool({ name: 'check_video', arguments: { film: 'tiny.mp4', wait_seconds: 60 } });
+      assert.equal(result.structuredContent?.status, 'done', text(result));
+      assert.equal(typeof result.structuredContent.passed, 'boolean');
+      assert.doesNotMatch(text(result), /could not be read as a video/);
+    }, { backendEnv: env });
+  } finally {
+    rmSync(broken, { recursive: true, force: true });
+  }
 });
 
 /** The kit's own words, from the code and guides of its installed package. */

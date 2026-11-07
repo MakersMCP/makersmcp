@@ -15,7 +15,7 @@ import {
 } from './backend.js';
 import { FolderBusyError, JobManager, launcherProblem, type Job } from './jobs.js';
 import { docNames, isInstalled, resolveKit, type DocEntry, type InstalledKit, type KitDefinition, type MissingKit } from './kits.js';
-import { setupReport } from './setup.js';
+import { kitEnvironment, setupReport } from './setup.js';
 
 const MAX_FILES = 200;
 // Entries looked at in one listing, so a folder that holds a whole project stays quick.
@@ -235,7 +235,11 @@ export interface LocalBackendOptions {
   baseDir: string;
   /** A kit's folder to use instead of its installed package, like { musicfit: '../musicfit' }. A leading ~ is the home folder. */
   kitPaths?: Record<string, string>;
-  /** The environment kits run with. Default: this process's. A service can keep its own secrets from them. */
+  /**
+   * The environment kits run with. Default: this process's. A service can keep its own secrets
+   * from them. Each kit gets the Chrome, ffmpeg and ffprobe a setting in it names under every
+   * name a kit reads them by (setup.ts kitEnvironment).
+   */
   env?: NodeJS.ProcessEnv;
   /**
    * Refuse every file and folder outside baseDir, like an out_dir or a file elsewhere.
@@ -319,7 +323,8 @@ export class LocalBackend implements KitBackend {
         docs: docNames(tool),
         check: tool.check,
         report: tool.report,
-        env: this.env,
+        // The Chrome and ffmpeg a setting names, under each name a kit reads them by.
+        env: kitEnvironment(this.env ?? process.env),
         ...(this.launcher ? { launcher: this.launcher } : {}),
         ...(this.confine ? { within: this.baseDir } : {}),
       }));
@@ -359,7 +364,7 @@ export class LocalBackend implements KitBackend {
   }
 
   setupReport({ version, enabled }: SetupOptions): string {
-    return setupReport({ version, baseDir: this.baseDir, kits: this.kits, enabled });
+    return setupReport({ version, baseDir: this.baseDir, kits: this.kits, enabled, ...(this.env ? { env: this.env } : {}) });
   }
 
   close(): void {

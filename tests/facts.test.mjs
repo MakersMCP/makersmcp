@@ -9,7 +9,7 @@
 // check_video.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -17,7 +17,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createMcpServer, loadKitDefinitions, resolveKit } from '../dist/server.js';
+import { createMcpServer, LocalBackend, loadKitDefinitions, resolveKit } from '../dist/server.js';
 
 const kits = loadKitDefinitions();
 const kitPaths = Object.fromEntries((process.env.MAKERSMCP_KIT_PATHS ?? '').split(',').map(entry => entry.trim())
@@ -338,9 +338,10 @@ const fact = (owner, key) => {
   return found;
 };
 
-async function withServer(callback) {
+async function withServer(callback, env) {
   const outDir = mkdtempSync(path.join(os.tmpdir(), 'mm-facts-'));
-  const server = createMcpServer({ outDir, kitPaths, kits: ['launch-film', 'easyscreenshotkit'] });
+  const backend = env ? new LocalBackend({ baseDir: outDir, kitPaths, env }) : undefined;
+  const server = createMcpServer({ outDir, kitPaths, kits: ['launch-film', 'easyscreenshotkit'], ...(backend ? { backend } : {}) });
   const client = new Client({ name: 'facts-test', version: '1.0.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
@@ -398,6 +399,40 @@ test('a two clip film renders at the size, frame rate and loudness launch-film\'
     if (lufs !== undefined) assert.ok(Math.abs(integrated - lufs) <= 1.5, `the film measures ${integrated} LUFS, and lufs says ${lufs}`);
     assert.ok(truePeak <= 0, `a true peak of ${truePeak} dBTP: the film clips`);
   });
+});
+
+// A render whose ffmpeg fails waits on it for good, so the test has a time limit of its own.
+test('with ffmpeg reachable only through FFMPEG_PATH, a film renders and its check runs', { timeout: 300_000, skip: (!SLOW || process.platform === 'win32') && 'set MAKERSMCP_SLOW=1 to render, on a system with a shell' }, async () => {
+  const ffmpeg = (process.env.PATH ?? '').split(path.delimiter).filter(Boolean).map(dir => path.join(dir, 'ffmpeg')).find(file => existsSync(file));
+  assert.ok(ffmpeg, 'the slow part needs ffmpeg');
+  // An ffmpeg and an ffprobe that fail stand first on PATH, as when a client starts the server with another PATH.
+  const broken = mkdtempSync(path.join(os.tmpdir(), 'mm-broken-'));
+  for (const name of ['ffmpeg', 'ffprobe']) {
+    writeFileSync(path.join(broken, name), '#!/bin/sh\necho "not this one" >&2\nexit 1\n');
+    chmodSync(path.join(broken, name), 0o755);
+  }
+  const env = { ...process.env, PATH: `${broken}${path.delimiter}${process.env.PATH}`, FFMPEG_PATH: ffmpeg };
+  delete env.LAUNCH_FILM_FFMPEG;
+  delete env.LAUNCH_FILM_FFPROBE;
+  try {
+    await withServer(async (client, outDir) => {
+      const film = {
+        version: 1, look: 'launch', aspect: '16:9', lang: 'en',
+        clips: [
+          { kind: 'scene', seconds: 3, scene: { type: 'opener', title: 'Acme', text: 'Widgets for every team' } },
+          { kind: 'scene', seconds: 3, scene: { type: 'headline', title: 'Setup in *one* minute' } },
+        ],
+      };
+      writeFileSync(path.join(outDir, 'film.json'), JSON.stringify(film, null, 2));
+      const rendered = await finished(client, 'render_launch_film', { film: 'film.json' });
+      assert.equal(rendered.structuredContent?.status, 'done', text(rendered));
+      const checked = await finished(client, 'check_video', { film: 'film.mp4' });
+      assert.equal(checked.structuredContent?.status, 'done', text(checked));
+      assert.equal(measured(path.join(outDir, 'film.mp4')).video.fps, fact('launch-film', 'fps') ?? 25);
+    }, env);
+  } finally {
+    rmSync(broken, { recursive: true, force: true });
+  }
 });
 
 test('a five second demo records at the size easyscreenshotkit\'s facts give', { skip: !SLOW && 'set MAKERSMCP_SLOW=1 to record and measure' }, async () => {

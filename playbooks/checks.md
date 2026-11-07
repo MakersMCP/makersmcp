@@ -100,6 +100,9 @@ The job fails with the kit's reason, then `The check could not run: the kit wrot
 
 - `expect "<x>" should look like 1920x1080@30`, `seconds "<x>" should be a length like 30, or a range like 28-32` and `allow "<x>" should be a stretch in seconds, like 27-30`: write the value in that form.
 - `<file> could not be read as a video`: the file is not a video ffmpeg reads.
+<!-- local -->
+  It also comes when ffprobe is missing: `check_setup` says whether it was found, and the troubleshooting topic has the fix.
+<!-- end -->
 - `<cues>: "fps" must be the frames a second the numbers count in`, `"beats" is missing`, `"beats" must be a list of frame numbers` or `"beats" is empty`: the cues file is not a track's cues, or the track has no steady beat.
 - `<cuts> holds no cuts: give seconds, { "fps", "cuts" } in frames, or a launch-film timeline`: give one of those.
 - `reading the sound: ffmpeg failed: <why>`: the sound track cannot be read.

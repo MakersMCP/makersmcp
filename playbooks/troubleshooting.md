@@ -60,10 +60,16 @@ Read the result before anything else: its first line says what happened, and the
 <!-- local -->
 ## The setup
 
-`check_setup` shows makersmcp's version and Node's, the folder files go to and whether it can be written, each kit with its version and state (on, "turned off by --kits", or not available and why), its tools and what it needs, and where Chrome and ffmpeg were found. Settings like CHROME_PATH, FFMPEG_PATH and MAKERSMCP_OUT go in this server's entry in the MCP client's settings, as its env, and take effect when the client starts makersmcp again. Ask the user to change them, and never guess a path.
+`check_setup` shows makersmcp's version and Node's, the folder files go to and whether it can be written, each kit with its version and state (on, "turned off by --kits", or not available and why), its tools and what it needs, and where Chrome, ffmpeg and ffprobe were found. Settings like CHROME_PATH, FFMPEG_PATH and MAKERSMCP_OUT go in this server's entry in the MCP client's settings, as its env, and take effect when the client starts makersmcp again. makersmcp gives the Chrome and the ffmpeg they name to every kit. Ask the user to change them, and never guess a path.
 
 - Chrome "not found in the usual places. Install Chrome, Chromium, Edge or Brave, or set CHROME_PATH.": the kits that open a site stop with "No Chrome, Chromium, Edge or Brave found. Install one, or point CHROME_PATH at its binary." Ask the user to install one, or to set CHROME_PATH to the browser's program.
+<!-- with launch-film -->
+  launch-film says "Chrome was not found. Install Google Chrome or Chromium, or set LAUNCH_FILM_CHROME to its path.", and CHROME_PATH reaches it too.
+<!-- end -->
 - ffmpeg "not found on PATH. Install ffmpeg or set FFMPEG_PATH.": the kits that write video or sound stop, with "musicfit needs ffmpeg", "The demo needs ffmpeg, and none was found", a crash that names spawn ffmpeg ENOENT, or "<file> could not be read as a video" from a check. Ask the user to install ffmpeg, or to set FFMPEG_PATH.
+<!-- with launch-film -->
+- ffprobe "not found beside ffmpeg or on PATH.": launch-film reads videos and pictures with it, and makersmcp gives it the ffprobe beside the ffmpeg a setting names. Without one, a check says "<file> could not be read as a video", and a render or the launch pictures "<file> could not be read as a picture". Ask the user for an ffmpeg that comes with ffprobe, or to set LAUNCH_FILM_FFPROBE to it. A line "launch-film's ffmpeg: <path>" means LAUNCH_FILM_FFMPEG names another ffmpeg than FFMPEG_PATH, and launch-film runs that one.
+<!-- end -->
 - "It cannot be written to, so no kit can save there." or "It does not exist, and it cannot be made in <folder>.", after the folder: every job fails, before it starts or with an error that names EACCES. Ask the user to set MAKERSMCP_OUT to a folder they can write to.
 - A kit "turned off by --kits" has no tools here. The user turns it on in the --kits list, or MAKERSMCP_KITS, of this server's entry.
 - When the client says makersmcp itself failed to start, its log has the reason, like "Unknown kit: <name>. The kits are <kits>, or all." for a wrong --kits list. makersmcp needs Node 22 or newer.

@@ -28,30 +28,88 @@ const CHROME_PLACES = process.platform === 'darwin'
 
 const NEED_NAMES: Record<string, string> = { chrome: 'Chrome', ffmpeg: 'ffmpeg' };
 
-function onPath(name: string): string | undefined {
+/**
+ * The settings the kits read for the programs they run, in the order check_setup reads them:
+ * CHROME_PATH and FFMPEG_PATH are makersmcp's own, and launch-film reads its own names.
+ */
+const CHROME_SETTINGS = ['CHROME_PATH', 'LAUNCH_FILM_CHROME'];
+const FFMPEG_SETTINGS = ['FFMPEG_PATH', 'LAUNCH_FILM_FFMPEG'];
+const FFPROBE_SETTINGS = ['LAUNCH_FILM_FFPROBE'];
+
+type Env = NodeJS.ProcessEnv;
+
+/** Whether a setting names a file, as a program has to be. */
+function namesFile(value: string | undefined): value is string {
+  if (!value) return false;
+  try {
+    return statSync(value).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function onPath(name: string, env: Env): string | undefined {
   const names = process.platform === 'win32' ? [`${name}.exe`, name] : [name];
-  for (const dir of (process.env['PATH'] ?? '').split(path.delimiter).filter(Boolean)) {
+  for (const dir of (env['PATH'] ?? '').split(path.delimiter).filter(Boolean)) {
     for (const candidate of names) {
       const full = path.join(dir, candidate);
-      if (existsSync(full)) return full;
+      if (namesFile(full)) return full;
     }
   }
   return undefined;
 }
 
-function fromEnv(...names: string[]): string | undefined {
-  return names.map(name => process.env[name]).find((value): value is string => Boolean(value && existsSync(value)));
+function fromEnv(env: Env, names: string[]): string | undefined {
+  return names.map(name => env[name]).find(namesFile);
 }
 
 /** A browser the kits can use, looked for the way they look. */
-export function findChrome(): string | undefined {
-  return fromEnv('CHROME_PATH', 'LAUNCH_FILM_CHROME')
-    ?? CHROME_NAMES.map(onPath).find(Boolean)
+export function findChrome(env: Env = process.env): string | undefined {
+  return fromEnv(env, CHROME_SETTINGS)
+    ?? CHROME_NAMES.map(name => onPath(name, env)).find(Boolean)
     ?? CHROME_PLACES.find(place => existsSync(place));
 }
 
-export function findFfmpeg(): string | undefined {
-  return fromEnv('FFMPEG_PATH', 'LAUNCH_FILM_FFMPEG') ?? onPath('ffmpeg');
+/** The ffmpeg a setting names, else the one on PATH: what check_setup reports. */
+export function findFfmpeg(env: Env = process.env): string | undefined {
+  return fromEnv(env, FFMPEG_SETTINGS) ?? onPath('ffmpeg', env);
+}
+
+/** The ffprobe beside an ffmpeg, as it comes with it. */
+function besideOf(ffmpeg: string | undefined): string | undefined {
+  if (!ffmpeg) return undefined;
+  const beside = path.join(path.dirname(ffmpeg), process.platform === 'win32' && /\.exe$/i.test(ffmpeg) ? 'ffprobe.exe' : 'ffprobe');
+  return namesFile(beside) ? beside : undefined;
+}
+
+/**
+ * The ffprobe launch-film reads videos and pictures with: LAUNCH_FILM_FFPROBE, else the one
+ * beside the ffmpeg a setting names for it, else the one on PATH.
+ */
+export function findFfprobe(env: Env = process.env): string | undefined {
+  return fromEnv(env, FFPROBE_SETTINGS)
+    ?? besideOf(fromEnv(env, ['LAUNCH_FILM_FFMPEG']) ?? fromEnv(env, FFMPEG_SETTINGS))
+    ?? onPath('ffprobe', env);
+}
+
+/**
+ * The environment a kit runs with: the one given, with the Chrome and the ffmpeg a setting
+ * names under each name a kit reads them by, and the ffprobe beside that ffmpeg. So
+ * FFMPEG_PATH, which check_setup tells the user to set, reaches launch-film as
+ * LAUNCH_FILM_FFMPEG, with LAUNCH_FILM_FFPROBE the ffprobe beside it, and LAUNCH_FILM_FFMPEG
+ * reaches the kits that read FFMPEG_PATH. A name that names a file is kept, and a program
+ * found on PATH is left for each kit to find itself.
+ */
+export function kitEnvironment(env: Env = process.env): Env {
+  const out: Env = { ...env };
+  const give = (names: string[], found: string | undefined) => {
+    if (found) for (const name of names) if (!namesFile(out[name])) out[name] = found;
+  };
+  give(CHROME_SETTINGS, fromEnv(env, CHROME_SETTINGS));
+  give(FFMPEG_SETTINGS, fromEnv(env, FFMPEG_SETTINGS));
+  // ffprobe comes with ffmpeg, so a setting for an ffmpeg brings the ffprobe beside it.
+  give(FFPROBE_SETTINGS, besideOf(fromEnv(out, ['LAUNCH_FILM_FFMPEG'])));
+  return out;
 }
 
 /**
@@ -96,15 +154,24 @@ export function folderProblem(dir: string): string | undefined {
     : `It does not exist, and it cannot be made in ${above}. ${fix}`;
 }
 
-/** The setup in words: kits, their state, the browser, ffmpeg and the folder. */
+/**
+ * The setup in words: kits, their state, the browser, ffmpeg and ffprobe, and the folder.
+ * `env` is the environment the kits run with, this process's by default. The ffmpeg line
+ * stays "ffmpeg: <path>" alone, which a service's check reads.
+ */
 export function setupReport(options: {
   version: string;
   baseDir: string;
   kits: Array<InstalledKit | MissingKit>;
   enabled: Set<string>;
+  env?: Env;
 }): string {
-  const chrome = findChrome();
-  const ffmpeg = findFfmpeg();
+  const env = kitEnvironment(options.env ?? process.env);
+  const chrome = findChrome(env);
+  const ffmpeg = findFfmpeg(env);
+  const ffprobe = findFfprobe(env);
+  // launch-film runs its own when the user set it apart.
+  const own = fromEnv(env, ['LAUNCH_FILM_FFMPEG']);
   const problem = folderProblem(options.baseDir);
   const lines = [
     `## makersmcp ${options.version}`,
@@ -130,5 +197,10 @@ export function setupReport(options: {
     `Chrome: ${chrome ?? 'not found in the usual places. Install Chrome, Chromium, Edge or Brave, or set CHROME_PATH.'}`,
     `ffmpeg: ${ffmpeg ?? 'not found on PATH. Install ffmpeg or set FFMPEG_PATH.'}`,
   );
+  // Only launch-film reads its own ffmpeg setting, and ffprobe.
+  if (options.enabled.has('launch-film')) {
+    if (own && ffmpeg && own !== ffmpeg) lines.push(`launch-film's ffmpeg: ${own} (LAUNCH_FILM_FFMPEG)`);
+    lines.push(`ffprobe: ${ffprobe ?? 'not found beside ffmpeg or on PATH. launch-film reads videos and pictures with it: install it with ffmpeg, or set LAUNCH_FILM_FFPROBE.'}`);
+  }
   return lines.join('\n');
 }
