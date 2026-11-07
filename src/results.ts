@@ -55,6 +55,8 @@ export interface ResultContext {
   topics: Set<string>;
   kit?: KitDefinition;
   tool?: ToolDefinition;
+  /** The kit tools the server lists. Without it, a tool is listed when its kit is on. */
+  listed?: { has(name: string): boolean };
 }
 
 function size(bytes: number): string {
@@ -115,11 +117,19 @@ function fileRef(view: JobView, file: JobFile, hosted: boolean): string {
   return view.folder ? path.join(view.folder, file.path) : file.path;
 }
 
+/** The kit tools this server does not list, as their kits are off or a service holds them back. */
+function unlisted(context: ResultContext): string[] {
+  const { definitions, enabled } = context.text;
+  return definitions.flatMap(kit => kit.tools.map(tool => tool.name)
+    .filter(name => (context.listed ? !context.listed.has(name) : !enabled.has(kit.kit))));
+}
+
 /**
  * The sentences of a job's Next line, from its tool's next (or hostedNext on a hosted
  * server) for the job's state. A sentence that names a file the job did not list, a folder
- * on a hosted server, or a topic the server does not offer is left out, so the line never
- * points at something that is not there. A placeholder that cannot be filled is an error.
+ * on a hosted server, a topic the server does not offer or a tool it does not list is left
+ * out, so the line never points at something that is not there. A placeholder that cannot
+ * be filled is an error.
  */
 export function nextSentences(view: JobView, context: ResultContext): string[] {
   const { tool } = context;
@@ -127,6 +137,7 @@ export function nextSentences(view: JobView, context: ResultContext): string[] {
   if (!tool || !state) return [];
   const hosted = context.text.where === 'hosted';
   const offered = tool.playbook !== undefined && context.topics.has(tool.playbook);
+  const absent = unlisted(context).map(name => new RegExp(`(?<![\\w-])${name}(?![\\w-])`));
   const sentences = (hosted ? tool.hostedNext?.[state] : undefined)
     ?? tool.next?.[state]
     ?? (state === 'failed' && offered ? [FAILED_NEXT] : []);
@@ -156,7 +167,7 @@ export function nextSentences(view: JobView, context: ResultContext): string[] {
         }
       },
     });
-    if (!missing) kept.push(text.trim());
+    if (!missing && !absent.some(pattern => pattern.test(text))) kept.push(text.trim());
   }
   return kept;
 }

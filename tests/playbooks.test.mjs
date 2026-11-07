@@ -1244,6 +1244,21 @@ test('hosted, a Next line names job:<job_id>/<path>, never a folder, and leaves 
   }
 });
 
+test('a Next line leaves out a sentence that names a tool of a kit that is off', async () => {
+  const definitions = fixtureKits();
+  definitions[0].tools.find(tool => tool.name === 'paint_picture').next.done.push('Give it a sound with mix_sound.');
+  for (const [kits, sound] of [[undefined, true], [['paintkit'], false]]) {
+    const session = await connect({ definitions, playbooks: path.join(FIXTURES, 'topics'), kits, view: (request, id) => painted(id) });
+    try {
+      const result = await session.client.callTool({ name: 'paint_picture', arguments: { url: 'https://example.com' } });
+      assert.match(result.structuredContent.next, /^Show /);
+      assert.equal(/mix_sound/.test(result.structuredContent.next), sound, result.structuredContent.next);
+    } finally {
+      await session.close();
+    }
+  }
+});
+
 test('a failed job points to its topic, a failed check to its report, and wait_for_job gives the same result', async () => {
   let view;
   const session = await connect({ definitions: fixtureKits(), playbooks: path.join(FIXTURES, 'topics'), view: () => view });

@@ -239,7 +239,7 @@ function filledMessage(message: string, context: ToolContext): string {
 
 /** What a result needs to say what comes next, for a job of this tool. */
 function resultContext(context: ToolContext, entry: RegisteredKitTool | undefined): ResultContext {
-  return { text: context.text, topics: context.topics, ...(entry ? { kit: entry.kit.definition, tool: entry.tool } : {}) };
+  return { text: context.text, topics: context.topics, listed: context.tools, ...(entry ? { kit: entry.kit.definition, tool: entry.tool } : {}) };
 }
 
 export function registerKitTool(server: McpServer, context: ToolContext, kit: AvailableKit, tool: ToolDefinition): void {
