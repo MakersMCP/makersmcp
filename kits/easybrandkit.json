@@ -55,8 +55,8 @@
       "hostedNext": {
         "done": [
           "Check the brand's name, logo and colors below before building on the kit, and ask the user when one is wrong.",
-          "Show the user the link to {file:card.png} from the list below: the whole kit on one picture.",
-          "Use facts from {file:FACTS.md} only as quoted there, with the page each one is on.",
+          "Show the user the {name:card.png} link from the list below: the whole kit on one picture.",
+          "Use facts from {name:FACTS.md} below only as quoted there, with the page each one is on.",
           "For a launch film, give brand {file:brand.json} to plan_launch_film or make_launch_film."
         ],
         "failed": [

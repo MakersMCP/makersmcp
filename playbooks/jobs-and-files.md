@@ -43,7 +43,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- hosted -->
 - `list_jobs` lists the user's 50 newest jobs. Jobs belong to the user and keep running when the connection closes. One waiting for a free worker shows running, with "Waiting for a free worker" as its last line.
 - `cancel_job` stops a running job, and its files are deleted.
-- {limit:jobs_at_once} jobs can run or wait at once and {limit:jobs_a_day} can start in a day. Past that a start is refused with "You have <n> jobs running or waiting. Wait for one of them to end." or "You have used today's <n> jobs.", and the time to try again.
+- At most {limit:jobs_at_once} can run or wait at once, and at most {limit:jobs_a_day} can start in a day. Past that a start is refused with "You have <n> jobs running or waiting. Wait for one of them to end." or "You have used today's <n> jobs.", and the time to try again.
 - A job is stopped after {limit:job_minutes}, counted from when a worker takes it, the downloads of its links included: "It ran longer than <time> and was stopped." A job that failed, was canceled or was stopped keeps no files.
 <!-- end -->
 
@@ -71,7 +71,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- with launch-film -->
 <!-- local -->
 - `plan_launch_film`, `make_launch_film` and `make_launch_stills` given an address save in launch-film-<host>. `render_launch_film` saves next to its film.json, `make_launch_stills` given a film.json saves in stills/ next to it, and `check_video` saves in check/ next to the video.
-- A new plan replaces film.json, words.json and brand/ in its folder, and leaves an earlier film.mp4 and stills/ there, which no longer match it. Given `brand`, these tools copy that kit into brand/, and a brand/ that holds a file of the user's stops the call before anything changes. The launch-film topic has the rest.
+- A new plan replaces film.json, words.json and brand/ in its folder, and leaves an earlier film.mp4, film.timeline.json, frames/ and stills/ there, which no longer match it. Given `brand`, these tools copy that kit into brand/, and a brand/ that holds a file of the user's stops the call before anything changes. Without `brand`, a plan that fails while reading the site may leave brand/ empty. The launch-film topic has the rest.
 <!-- end -->
 <!-- end -->
 <!-- with musicfit -->
@@ -80,7 +80,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 <!-- end -->
 <!-- local -->
-- A run clears what an earlier run of its kit left in the folder as it starts, so a run that then fails or is canceled leaves those files gone. Before a run into a folder that holds a result the user wants, give another `out_dir`.
+- The brand, font and screenshot kits clear what an earlier run left in the folder as they start, so a run of theirs that fails or is canceled loses it too. musicfit, a render and a check replace their files only when they succeed. Before a run into a folder that holds a result the user wants, give another `out_dir`.
 - A result lists the files the job saved or changed in its folder, without hidden files: 40 in the text and up to 200 in `files`. The kit's notes come after them.
 <!-- end -->
 

@@ -10,7 +10,7 @@ order: 67
 ---
 # Checking a video before it goes out
 
-`check_video` measures a video with ffmpeg and writes a report that passes or fails. Nobody here can watch the video or hear it, so measure it with this tool, then look at the contact sheet it makes, since a measurement cannot read words. It knows no platform: it checks the values it is given.
+`check_video` measures a video with ffmpeg and writes a report that passes or fails. Nobody here can watch the video or hear it, and a measurement cannot read words, so measure it with this tool, then have the contact sheet it makes looked at. It knows no platform: it checks the values it is given.
 
 ## Decide first
 
@@ -39,10 +39,10 @@ check_video {"film": "job:<job_id>/film.mp4", "expect": "{fact:launch-film.size_
 2. Read `CHECK.md` in the result. Its heading says PASS or FAIL with the checks that failed, a table gives every check with what was asked and what was found, and its Cuts section says where the cuts came from.
 3. A failed check is a normal result, with `passed` false. A failed job means the check could not run: the errors below say why.
 <!-- local -->
-4. Look at `sheet.png`, a frame from each shot once its entrance has played, with the cut's number and time, and at `wave.png`, the loudness over time with the cuts. On the sheet, look for words cut off, out of the frame or spelled wrong, text on text, a logo that is not whole, sharp and the brand's own, a cookie banner or a login page in place of the product's screen, and anything blank.
+4. Look at `sheet.png`, a frame from each shot once its entrance has played, with the cut's number and time, and at `wave.png`, the loudness over time with the cuts. On the sheet, look for words cut off, out of the frame or spelled wrong, text on text, a logo that is not whole, sharp and the brand's own, a cookie banner or a login page in place of the product's screen, and anything blank. When you cannot open a picture, give the user its path with what to look for, and never say you looked at it.
 <!-- end -->
 <!-- hosted -->
-4. Give the user the links to `sheet.png`, a frame from each shot once its entrance has played, and `wave.png`, the loudness over time with the cuts, and say what to look for on the sheet: words cut off, out of the frame or spelled wrong, text on text, a logo that is not whole, sharp and the brand's own, a cookie banner or a login page in place of the product's screen, and anything blank.
+4. Give the user the links to `sheet.png`, a frame from each shot once its entrance has played, and `wave.png`, the loudness over time with the cuts, since nothing here shows you a picture, and say what to look for on the sheet: words cut off, out of the frame or spelled wrong, text on text, a logo that is not whole, sharp and the brand's own, a cookie banner or a login page in place of the product's screen, and anything blank.
 <!-- end -->
 
 ## What each check means
@@ -65,9 +65,9 @@ A longer stretch is a warning to look at, not a failure. Black or silent stretch
 
 - `check_video` takes a launch film's cuts from the `film.timeline.json` next to it, found by the video's own name: film.mp4 takes film.timeline.json.
 <!-- local -->
-- A copy under another name, like one with music laid in, finds no timeline. Give `cuts` the film's `film.timeline.json`:
+- A copy under another name, like one with music laid in, finds no timeline. Give `cuts` the film's `film.timeline.json`. A check saves in check/ next to the video, which every video in that folder shares, so give this one an `out_dir` of its own to keep the film's report:
 ```call
-check_video {"film": "launch/film-16x9/with-music.mp4", "cuts": "launch/film-16x9/film.timeline.json", "expect": "{fact:launch-film.size_16_9}@{fact:launch-film.fps}"}
+check_video {"film": "launch/film-16x9/with-music.mp4", "cuts": "launch/film-16x9/film.timeline.json", "expect": "{fact:launch-film.size_16_9}@{fact:launch-film.fps}", "out_dir": "launch/film-16x9/check-music"}
 ```
 <!-- end -->
 <!-- hosted -->

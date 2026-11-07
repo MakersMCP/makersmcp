@@ -23,10 +23,10 @@ const BY_KIND: Record<TextKind, Set<string>> = {
   topic: new Set([...EVERYWHERE, 'base_dir', 'requests', 'flags', 'makes']),
   instructions: new Set([...EVERYWHERE, 'base_dir', 'makes']),
   kit: EVERYWHERE,
-  next: new Set([...EVERYWHERE, 'job_id', 'folder', 'topic', 'file']),
+  next: new Set([...EVERYWHERE, 'job_id', 'folder', 'topic', 'file', 'name']),
 };
 /** Placeholders with an argument after a colon. */
-const WITH_ARGUMENT = new Set(['fact', 'bounds', 'default', 'version', 'limit', 'file']);
+const WITH_ARGUMENT = new Set(['fact', 'bounds', 'default', 'version', 'limit', 'file', 'name']);
 /** Placeholders a hosted text never takes, and those only a hosted one does. */
 export const LOCAL_ONLY = new Set(['base_dir', 'folder']);
 export const HOSTED_ONLY = new Set(['limit']);
@@ -35,7 +35,8 @@ export const ON_THEIR_OWN_LINE = new Set(['requests', 'flags']);
 
 /** A hosted service's limits, and the words that promise nothing when the service does not give one. */
 const LIMITS: Record<string, { key: keyof HostedLimits; unit: [string, string]; unknown: string }> = {
-  max_wait: { key: 'maxWaitSeconds', unit: ['second', 'seconds'], unknown: 'less than a minute' },
+  // Words that read right after "at most", "within" and "after".
+  max_wait: { key: 'maxWaitSeconds', unit: ['second', 'seconds'], unknown: 'a set time' },
   job_minutes: { key: 'jobMinutes', unit: ['minute', 'minutes'], unknown: 'a set time' },
   jobs_at_once: { key: 'jobsAtOnce', unit: ['job', 'jobs'], unknown: 'a few jobs' },
   jobs_a_day: { key: 'jobsPerDay', unit: ['job', 'jobs'], unknown: 'a set number of jobs' },
@@ -92,11 +93,31 @@ export function placeholderProblem(placeholder: Pick<Placeholder, 'name' | 'arg'
   }
 }
 
+/**
+ * Whether a placeholder starts a sentence of its text: at its start or a line's, after a
+ * list's mark, or after a sentence's end.
+ */
+export function startsSentence(text: string, at: number): boolean {
+  const before = text.slice(0, at);
+  return /(?:^|\n)[ \t]*(?:(?:[-*]|\d+\.)[ \t]+)?$/.test(before) || /[.!?][ \t]+$/.test(before);
+}
+
+/**
+ * What is wrong with where a placeholder stands, or nothing: a limit at the start of a
+ * sentence would start it with "a few jobs" on a service that gives none.
+ */
+export function placeProblem(placeholder: Placeholder, text: string): string | undefined {
+  if (placeholder.name === 'limit' && startsSentence(text, placeholder.at)) {
+    return `${placeholder.text} starts a sentence, which then reads "${LIMITS[placeholder.arg!]?.unknown ?? 'a few'}" on a service that gives no limits: start it with other words, like "At most"`;
+  }
+  return undefined;
+}
+
 /** The problems with the placeholders of one text, each in words. With `where`, the side the text is for. */
 export function textProblems(text: string, kind: TextKind, where?: 'local' | 'hosted'): string[] {
   const problems: string[] = [];
   for (const placeholder of placeholdersIn(text)) {
-    const problem = placeholderProblem(placeholder, kind);
+    const problem = placeholderProblem(placeholder, kind) ?? placeProblem(placeholder, text);
     if (problem) problems.push(problem);
     else if (where === 'local' && HOSTED_ONLY.has(placeholder.name)) problems.push(`${placeholder.text} is for a hosted text only`);
     else if (where === 'hosted' && LOCAL_ONLY.has(placeholder.name)) problems.push(`${placeholder.text} is for a local text only`);
@@ -129,6 +150,9 @@ export interface TextContext {
 
 /** A placeholder that cannot be filled, like a fact a kit does not have. */
 export class TextError extends Error {}
+
+/** {base_dir} for a local backend that does not say where it saves. */
+export const BASE_DIR_IN_WORDS = 'the folder the kits save in';
 
 /** The kit tools the server lists: the context's, or every tool of a kit that is on. */
 export function listedTools(context: TextContext): Set<string> {
@@ -277,8 +301,9 @@ export function fillText(text: string, context: TextContext, options: FillOption
       case 'place':
         return context.place + after;
       case 'base_dir':
-        if (context.where !== 'local' || !context.baseDir) throw new TextError('{base_dir} is for a local text only');
-        return context.baseDir + after;
+        if (context.where !== 'local') throw new TextError('{base_dir} is for a local text only');
+        // A local backend need not say where it saves.
+        return (context.baseDir ?? BASE_DIR_IN_WORDS) + after;
       case 'fact':
         return factValue(context.definitions, arg!) + after;
       case 'bounds':

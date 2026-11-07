@@ -31,7 +31,7 @@ A film.json cannot be changed here: it renders as it was planned. Read it in the
   "clips": [
     { "kind": "scene", "bars": 2, "scene": { "type": "opener", "title": "Acme Notes", "text": "Notes that think with *you*" } },
     { "kind": "screen", "bars": 2, "image": "brand/screen-01.png", "mode": "pan" },
-    { "kind": "scene", "bars": 3, "scene": { "type": "features", "items": [
+    { "kind": "scene", "bars": 4, "scene": { "type": "features", "items": [
       { "icon": "lightning", "title": "Instant search", "text": "Find any note in a blink" },
       { "icon": "shield-check", "title": "Private by design", "text": "Encrypted end to end" } ] } },
     { "kind": "logo", "bars": 2, "logo": "brand/logo-01.png", "site": "acme.com" }
@@ -93,7 +93,7 @@ These fields are optional, and the list leaves them out:
 - `title`: on strike, the answer after the struck phrases; elsewhere a heading over the scene, on spotlight, donut, gauge, rating, progress, proscons, code and every type with items but wordstack, term and search.
 - `source` on a quote, who said it; `stamp` on a term, the card's label; `active` on steps, the chip to fill, counted from 1.
 
-Each field has a length limit, which the render checks before it starts: an opener's `title` {fact:launch-film.scene_max.opener_title} characters, a headline's {fact:launch-film.scene_max.headline_title}, a bigword's {fact:launch-film.scene_max.bigword_title}, a number's `value` {fact:launch-film.scene_max.number_value}, a feature's `title` {fact:launch-film.scene_max.feature_title} and its `text` {fact:launch-film.scene_max.feature_text}, a `kicker` {fact:launch-film.scene_max.kicker}, and any other `text` {fact:launch-film.scene_max.text}. Asterisks do not count.
+Each field has a length limit, which the render checks before it starts: an opener's `title` {fact:launch-film.scene_max.opener_title} characters, a point's {fact:launch-film.scene_max.point_title}, a headline's {fact:launch-film.scene_max.headline_title}, a bigword's {fact:launch-film.scene_max.bigword_title} and any other `title` {fact:launch-film.scene_max.title}; a number's `value` {fact:launch-film.scene_max.number_value}; a feature's `title` {fact:launch-film.scene_max.feature_title} and its `text` {fact:launch-film.scene_max.feature_text}; a typewriter's `text` {fact:launch-film.scene_max.typewriter_text}, a quote's {fact:launch-film.scene_max.quote_text} and any other `text` {fact:launch-film.scene_max.text}; a `kicker` {fact:launch-film.scene_max.kicker}. Asterisks do not count.
 
 Words between asterisks take the accent color, as in `Notes that think with *you*`. Icons are Phosphor names, and no tool searches them. These work: lightning, shield-check, users-three, magnifying-glass, sparkle, chart-line-up, plugs-connected, device-mobile, cloud-arrow-up, calendar-check, chat-circle-dots, globe-hemisphere-west, code, paint-brush, credit-card, check-circle, rocket-launch, lightbulb, target, heart, bell-ringing, note-pencil, plant.
 
@@ -104,7 +104,7 @@ Words between asterisks take the accent color, as in `Notes that think with *you
 - One or two words a scene are marked, not more.
 - No em or en dash is on screen, only commas and periods. The render does not check this.
 - The film opens with an opener, closes with the logo, has a scene between any two screens, and lasts {fact:launch-film.length_min} to {fact:launch-film.length_max} seconds.
-- The brand's name shows in the opener's `title` and the logo's `site`. A plan takes it from the site's name, its title or its host: check it first.
+- The brand's name shows in the opener's `title`; the logo's `site` is the line under the logo, mostly the site's address. A plan takes the name from the site's name, its title or its host: check it first.
 <!-- local -->
 - Shorten the page's sentences freely, keeping what they say.
 <!-- end -->

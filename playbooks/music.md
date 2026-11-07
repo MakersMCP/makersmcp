@@ -111,9 +111,9 @@ Tell the user to put `fitted.wav`, or `mix.wav` with a voice, under the whole vi
 
 `check_video` with `cues` set to the fit's `cues.json` measures whether each cut lands on a beat. Its `expect` is {fact:launch-film.size_16_9}@{fact:launch-film.fps} for a launch film, {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16.
 <!-- local -->
-For `with-music.mp4`, give `cuts` the film's `film.timeline.json`, which `check_video` finds by itself only beside `film.mp4`. Without a file that has the track, check `film.mp4` with `cues` alone.
+For `with-music.mp4`, give `cuts` the film's `film.timeline.json`, which `check_video` finds by itself only beside `film.mp4`, and an `out_dir` of its own, since check/ next to it holds the film's report. Without a file that has the track, check `film.mp4` with `cues` alone.
 ```call
-check_video {"film": "launch/film-16x9/with-music.mp4", "expect": "{fact:launch-film.size_16_9}@{fact:launch-film.fps}", "cues": "launch/music/cues.json", "cuts": "launch/film-16x9/film.timeline.json"}
+check_video {"film": "launch/film-16x9/with-music.mp4", "expect": "{fact:launch-film.size_16_9}@{fact:launch-film.fps}", "cues": "launch/music/cues.json", "cuts": "launch/film-16x9/film.timeline.json", "out_dir": "launch/film-16x9/check-music"}
 ```
 <!-- end -->
 <!-- hosted -->

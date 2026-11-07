@@ -118,7 +118,7 @@ After a tour, `demo.yaml` is a complete file to start from.
   A job here stops after {limit:job_minutes} whatever this says, and a stopped job keeps no files.
 <!-- end -->
 <!-- local -->
-- `out_dir`: by default easyscreenshotkit-demo-<host> in {base_dir}. A run takes a folder only when it is empty or holds an earlier demo, whose files it deletes first, even when the new run then fails; a steps file kept there stays, and a tour replaces `demo.yaml`. Give each version its own `out_dir`.
+- `out_dir`: by default easyscreenshotkit-demo-<host> in {base_dir}. It must be empty or hold an earlier demo, which a run deletes as it starts, so one that fails loses it too; a steps file kept there stays, and a tour replaces `demo.yaml`.
 <!-- end -->
 - `zoom`, `background`, `frame`, `fps`, `theme`, `lang`, `hide`, `reduced_motion` and `gif` do what their descriptions say. `steps.json` counts its frames at `fps`, and `demo.gif` is made smaller until it is {fact:easyscreenshotkit.demo.gif_max_mb} MB at most, with a note when it cannot be.
 
@@ -143,7 +143,13 @@ After a tour, `demo.yaml` is a complete file to start from.
 
 ## Check before you hand it over
 
-Look at `poster.png` or the GIF: the right pages, no cookie banner, no login page. Then read the notes in the summary. "Left out <url>: <reason>." names a page the tour did not take, "The link for <url> led to <url>." a click that went elsewhere, and a note on slow motion means animations a script drives may run fast.
+<!-- local -->
+Look at `poster.png` or the GIF, the right pages, no cookie banner, no login page, or give the user their paths with what to look for when you cannot open a picture.
+<!-- end -->
+<!-- hosted -->
+Give the user the links to `poster.png` and the GIF with what to look for, the right pages, no cookie banner, no login page, since nothing here shows you a picture.
+<!-- end -->
+Then read the notes in the summary. "Left out <url>: <reason>." names a page the tour did not take, "The link for <url> led to <url>." a click that went elsewhere, and a note on slow motion means animations a script drives may run fast.
 
 ## When something goes wrong
 
@@ -171,10 +177,10 @@ Each error as the result shows it, then the fix.
 ## Files
 
 <!-- local -->
-`steps` is a path, absolute or relative to {base_dir}, and the file may sit in the demo's own folder. Pass `demo.mp4` and `steps.json` on by their paths.
+`steps` is a path, absolute or relative to {base_dir}, and the file may sit in the demo's own folder. Pass `demo.mp4` on by its path. No tool here takes `steps.json`: read the times from it and give them as numbers.
 <!-- end -->
 <!-- hosted -->
-Each job saves into a folder of its own, and its links work for {limit:keep_days} for anyone who has them, so give them only to the user. Pass the video on as job:<job_id>/demo.mp4 and the times as job:<job_id>/steps.json, and give job:<job_id>/demo.yaml as `steps` to record a tour again as it was.
+Each job saves into a folder of its own, and its links work for {limit:keep_days} for anyone who has them, so give them only to the user. Pass the video on as job:<job_id>/demo.mp4, and give job:<job_id>/demo.yaml as `steps` to record a tour again as it was. No tool here takes `steps.json`: read the times from it in the result and give them as numbers.
 <!-- end -->
 
 ## Hand over

@@ -117,7 +117,7 @@ make_launch_film {"url": "https://linear.app", "aspect": "9:16", "wait_seconds":
 - `make_launch_stills` takes `source`, a `film.json` or the site's address, and `for`, the places.
 <!-- local -->
 - `keep` keeps each clip's MP4 in a launch-film-work- folder in the system's temp folder, which the summary names.
-- `out_dir` is the film's folder, launch-film-<host> unless given. Give each film its own: a second plan or render there replaces `film.json`, `film.mp4` and `film.timeline.json` and leaves the old frames/ and stills/ beside them. Given a `film.json`, `make_launch_stills` saves next to it and takes no `out_dir`.
+- `out_dir` is the film's folder, launch-film-<host> unless given. Give each film its own: a second plan there replaces `film.json`, `words.json` and brand/ and leaves the old `film.mp4`, `film.timeline.json`, frames/ and stills/, which no longer match it; a render replaces `film.mp4` and `film.timeline.json`. Given a `film.json`, `make_launch_stills` saves next to it and takes no `out_dir`.
 - Given `brand`, the kit deletes brand/ in `out_dir` and copies the kit in its place, and makersmcp does not start it while that brand/ holds a file of the user's the copy would not bring back. To use the kit already in brand/, give `brand` as `out_dir` with /brand added. Without `brand`, the kit makes brand/ again where it is, replacing a kit's own files and keeping the others, except for an App Store page, which gets a new brand/.
 <!-- end -->
 
@@ -169,7 +169,7 @@ To change a picture's words, change `film.json` and make the pictures again.
 <!-- hosted -->
   Ask the user for a logo, since a plan cannot be changed here.
 <!-- end -->
-- `"<url>" is not a command or an address. Run launch-film --help.` from `make_launch_film`, and `give the site's address, e.g. launch-film plan example.com` from `plan_launch_film`: the host has no dot, like localhost.
+- `"<url>" is not a command or an address. Run launch-film --help.` from `make_launch_film`, `give the site's address, e.g. launch-film plan example.com` from `plan_launch_film`, and `"<url>" is not an address or a film.json` from `make_launch_stills`: the host has no dot, like localhost.
 - `Not on Google Fonts, so the look's own typeface stood in: <family>.` is a note, not a failure: tell the user the film uses the look's typeface for that family.
 <!-- with easybrandkit -->
 - easybrandkit's own errors, like a bot check or a social profile, mean no brand was read: the brand topic has each one.

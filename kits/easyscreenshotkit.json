@@ -55,7 +55,7 @@
       },
       "hostedNext": {
         "done": [
-          "Show the user the link to {file:sheet.png} from the list below and check that every page needed is there.",
+          "Show the user the {name:sheet.png} link from the list below and check that every page needed is there.",
           "For a page that is missing, run again with it in page: SCREENSHOTS.md lists the pages left out, with why, and others the kit could take.",
           "check_pwa_screenshots with manifest {file:pwa/manifest-screenshots.json} checks the screenshots for a web app manifest."
         ],
@@ -75,11 +75,11 @@
       "out": { "flag": "--out", "name": "easyscreenshotkit-demo-{host}", "ownOnly": true },
       "params": {
         "url": { "type": "url", "required": true, "description": "The website, like https://linear.app. It wins over the url in a steps file, and a steps file whose first step is no visit starts here." },
-        "steps": { "type": "path", "flag": "--steps", "description": "A YAML or JSON file of steps to follow instead of a tour, one action a step: visit, scroll, click, type, key, hover or wait. A target is a CSS selector or text=<words>, and a selector that starts with # goes in quotes. demo.yaml from an earlier tour is one to start from. Not with pages or page.", "hostedDescription": "A YAML or JSON file of steps to follow instead of a tour, as an https link to it, or as job:<job_id>/demo.yaml for the tour an earlier job recorded, used as it is. One action a step: visit, scroll, click, type, key, hover or wait; a target is a CSS selector or text=<words>. Not with pages or page." },
+        "steps": { "type": "path", "flag": "--steps", "description": "A YAML or JSON file of steps to follow instead of a tour, one action a step: visit, scroll, click, type, key, hover or wait. A target is a CSS selector or text=<words>, and a selector that starts with # goes in quotes. demo.yaml from an earlier tour is one to start from. Not with pages or page.", "hostedDescription": "A YAML or JSON file of steps to follow instead of a tour, used as it is, like the demo.yaml of a tour an earlier job recorded. One action a step: visit, scroll, click, type, key, hover or wait; a target is a CSS selector or text=<words>. Not with pages or page. Give an https link to the file, or job:<job_id>/<path> for a file an earlier job saved." },
         "pages": { "type": "integer", "flag": "--pages", "min": 1, "max": 8, "default": 4, "description": "Pages in the tour, the home page included (default {default:record_demo_video.pages}). A page that scrolls takes about {fact:easyscreenshotkit.tour.page_seconds} seconds and one that fits on the screen about {fact:easyscreenshotkit.tour.short_page_seconds}. The tour starts at the site's root and puts pricing last. For a tour only." },
         "page": { "type": "repeat", "flag": "--page", "description": "Pages of the same site to take in the tour, like /pricing, each taken even past pages. A #route is dropped: a view behind one needs steps. For a tour only." },
         "zoom": { "type": "number", "flag": "--zoom", "min": 1, "max": 2.5, "default": 1.5, "description": "How far a click zooms in, {bounds:record_demo_video.zoom} (default {default:record_demo_video.zoom}). 1 means no zoom. A step in a steps file can set its own." },
-        "background": { "type": "text_or_path", "flag": "--background", "pattern": "\\s*(?:#[0-9a-fA-F]{3,8}|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([\\d\\s.,%/+-]+\\)|[a-zA-Z]{3,30})(?:\\s*,\\s*(?:#[0-9a-fA-F]{3,8}|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([\\d\\s.,%/+-]+\\)|[a-zA-Z]{3,30})){0,2}\\s*", "description": "Behind the window: a colour like #0f172a, two or three colours for a gradient, or a picture file whose name ends in .png, .jpg, .jpeg, .webp, .gif, .avif or .svg. By default a gradient, dark behind a light site and light behind a dark one." },
+        "background": { "type": "text_or_path", "flag": "--background", "pattern": "\\s*(?:#[0-9a-fA-F]{3,8}|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([\\d\\s.,%/+-]+\\)|[a-zA-Z]{3,30})(?:\\s*,\\s*(?:#[0-9a-fA-F]{3,8}|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([\\d\\s.,%/+-]+\\)|[a-zA-Z]{3,30})){0,2}\\s*", "description": "Behind the window, by default a gradient, dark behind a light site and light behind a dark one: a colour like #0f172a, two or three colours for a gradient, or a .png, .jpg, .jpeg, .webp, .gif, .avif or .svg picture file." },
         "frame": { "type": "boolean", "flag": "--no-frame", "when": false, "default": true, "description": "Set to false for the page alone, filling the video, without the window and the backdrop." },
         "fps": { "type": "integer", "flag": "--fps", "min": 24, "max": 60, "default": 30, "description": "Frames a second (default {default:record_demo_video.fps}); steps.json counts its frames at this rate." },
         "theme": { "type": "enum", "flag": "--theme", "values": ["light", "dark"], "default": "light", "description": "The site's light or dark look (default {default:record_demo_video.theme})." },
@@ -107,9 +107,9 @@
       },
       "hostedNext": {
         "done": [
-          "Show the user the link to {file:poster.png} from the list below before building on the video; it has no sound.",
-          "{file:demo.gif} is the same video as a GIF, for a README or a post.",
-          "Music, a voice and captions take their times from {file:steps.json}: video.duration is the length and each click's pressedAt its moment.",
+          "Show the user the {name:poster.png} link from the list below before building on the video; it has no sound.",
+          "{name:demo.gif} is the same video as a GIF, for a README or a post.",
+          "Music, a voice and captions take their times from {name:steps.json} below: video.duration is the length and each click's pressedAt its moment.",
           "To record this tour again, give steps {file:demo.yaml}; it cannot be changed here."
         ],
         "failed": [

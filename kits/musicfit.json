@@ -49,9 +49,9 @@
       },
       "hostedNext": {
         "done": [
-          "Show the user the link to {file:seams.png} from the list below and tell them to listen at the start, the seams, the hit and the end that FIT.md lists below.",
+          "Show the user the {name:seams.png} link from the list below and tell them to listen at the start, the seams, the hit and the end that FIT.md lists below.",
           "fitted.wav is the sound only and no tool here lays it under the video: give the user its link, to put under the whole video from its first frame without trimming it.",
-          "{file:mix.wav} is the voice over the ducked music: give the user its link instead of fitted.wav's."
+          "{name:mix.wav} is the voice over the ducked music: give the user its link instead of fitted.wav's."
         ]
       }
     },

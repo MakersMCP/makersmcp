@@ -102,6 +102,29 @@ export function nextState(view: JobView): keyof NextLines | undefined {
   return view.exitCode === 0 ? 'passed' : 'check_failed';
 }
 
+/** A writes entry, like logo-*.png or stills/STILLS.md, as a pattern for a listed path that is it or ends in /<it>. */
+function writesPattern(entry: string): RegExp {
+  const glob = entry.split('*').map(part => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*');
+  return new RegExp(`^(?:.*/)?${glob}$`);
+}
+
+/**
+ * A job's files with the tool's own first, in the order of its writes, then the rest as
+ * they were listed. A hosted job lists the files it copied in from an earlier job too, so
+ * a render's film.mp4 would otherwise come after a brand kit's logos, past the 40 the
+ * text shows.
+ */
+export function orderedFiles(files: JobFile[] | undefined, tool: ToolDefinition | undefined): JobFile[] | undefined {
+  if (!files?.length || !tool?.writes?.length) return files;
+  const patterns = tool.writes.map(writesPattern);
+  const rank = (file: JobFile) => {
+    const at = file.path.replace(/\\/g, '/');
+    const found = patterns.findIndex(pattern => pattern.test(at));
+    return found < 0 ? patterns.length : found;
+  };
+  return files.map((file, i) => ({ file, i, rank: rank(file) })).sort((a, b) => a.rank - b.rank || a.i - b.i).map(entry => entry.file);
+}
+
 /** The first file listed whose path is the name, or ends in /<name>. */
 function listedFile(files: JobFile[] | undefined, name: string): JobFile | undefined {
   const wanted = name.replace(/\\/g, '/');
@@ -130,7 +153,9 @@ function unlisted(context: ResultContext): string[] {
  * server) for the job's state. A sentence that names a file the job did not list, a folder
  * on a hosted server, a topic the server does not offer or a tool it does not list is left
  * out, so the line never points at something that is not there. A placeholder that cannot
- * be filled is an error.
+ * be filled is an error. {file:<name>} is the file's path here, or
+ * job:<job_id>/<path> hosted, to give a tool; {name:<name>} is the name alone, for a file
+ * whose link the user gets from the list.
  */
 export function nextSentences(view: JobView, context: ResultContext): string[] {
   const { tool } = context;
@@ -139,6 +164,7 @@ export function nextSentences(view: JobView, context: ResultContext): string[] {
   const hosted = context.text.where === 'hosted';
   const offered = tool.playbook !== undefined && context.topics.has(tool.playbook);
   const absent = unlisted(context).map(name => new RegExp(`(?<![\\w-])${name}(?![\\w-])`));
+  const files = orderedFiles(view.files, tool);
   const sentences = (hosted ? tool.hostedNext?.[state] : undefined)
     ?? tool.next?.[state]
     ?? (state === 'failed' && offered ? [FAILED_NEXT] : []);
@@ -160,9 +186,11 @@ export function nextSentences(view: JobView, context: ResultContext): string[] {
           case 'topic':
             return offered ? tool.playbook : gone();
           case 'file': {
-            const file = listedFile(view.files, placeholder.arg!);
+            const file = listedFile(files, placeholder.arg!);
             return file ? fileRef(view, file, hosted) : gone();
           }
+          case 'name':
+            return listedFile(files, placeholder.arg!) ? placeholder.arg! : gone();
           default:
             return undefined;
         }
@@ -258,6 +286,8 @@ function docsShown(view: JobView, context: ResultContext | undefined, budget: nu
 
 /** The tool result for a job in any state, with its Next line under the heading when the context gives one. */
 export function jobResult(view: JobView, context?: ResultContext): CallToolResult {
+  // The tool's own files first, for the list the text shows, the Next line and the docs.
+  if (view.files && context?.tool) view = { ...view, files: orderedFiles(view.files, context.tool) };
   const seconds = `${view.elapsedSeconds} s`;
   const next = nextText(view, context);
   const nextLine = next ? `Next: ${next}` : '';

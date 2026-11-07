@@ -64,6 +64,11 @@ Store and gallery screenshots come from `take_screenshots`, one `sizes` entry pe
 <!-- with easyfontkit -->
    - `make_font_kit` when the user needs the fonts.
 <!-- end -->
+<!-- with easybrandkit, easyscreenshotkit, easyfontkit -->
+<!-- hosted -->
+   Here at most {limit:jobs_at_once} run or wait at once, and a start past that is refused: start them in this order, and the next one when one ends.
+<!-- end -->
+<!-- end -->
 <!-- with easybrandkit -->
 <!-- local -->
 ```call
@@ -161,7 +166,7 @@ make_launch_stills {"source": "job:<job_id>/film.json", "for": ["ph", "og", "x"]
 ```call
 fit_music {"track": "music/track.mp3", "length": "24", "hit": "18.667", "fps": {fact:launch-film.fps}, "out_dir": "launch/music"}
 ```
-   The music topic says how to lay it under the film when you can run commands. Then check the new file with `check_video`, `cues` set to the fitted track's cues.json and `cuts` to the film's film.timeline.json, which a file under another name does not find by itself.
+   The music topic says how to lay it under the film when you can run commands. Then check the new file with `check_video`, `cues` set to the fitted track's cues.json, `cuts` to the film's film.timeline.json, which a file under another name does not find by itself, and an `out_dir` of its own, since check/ next to it holds the film's report.
 <!-- end -->
 <!-- hosted -->
 ```call
@@ -180,7 +185,12 @@ fit_music {"track": "https://example.com/track.mp3", "length": "24", "hit": "18.
    - `check_video` on the demo, with `expect` {fact:easyscreenshotkit.demo.size}@{default:record_demo_video.fps}.
 <!-- end -->
 <!-- end -->
-   - Look at every check's sheet.png and at every picture, for words cut off, text on text and a wrong logo.
+<!-- local -->
+   - Look at every check's sheet.png and at every picture, for words cut off, text on text and a wrong logo. When you cannot open a picture, give the user its path with what to look for.
+<!-- end -->
+<!-- hosted -->
+   - Give the user the links to the pictures, the checks' sheet.png among them, with what to look for: words cut off, text on text and a wrong logo. Nothing here shows you a picture.
+<!-- end -->
 <!-- with check_video -->
    - A film planned with `music` false fails the silence check of `check_video` until a track is under it; its size, frame rate and cuts are still measured right.
 <!-- end -->
@@ -203,7 +213,7 @@ Give each piece its own folder under one launch folder, so no run replaces anoth
 - launch/music, the fitted track
 <!-- end -->
 
-A new plan in a folder that holds a render leaves that film.mp4 and stills/ beside the new film.json, so give a second plan or a new look a new folder.
+A new plan in a folder that holds a render leaves that film.mp4, film.timeline.json, frames/ and stills/ beside the new film.json, which no longer match it, so give a second plan or a new look a new folder.
 <!-- end -->
 
 ## Tempo

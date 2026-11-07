@@ -23,7 +23,7 @@
     "length_min": 20,
     "length_max": 40,
     "music_volume": 0.55,
-    "scene_max": { "opener_title": 60, "headline_title": 90, "bigword_title": 24, "number_value": 16, "feature_title": 34, "feature_text": 80, "kicker": 40, "text": 160 },
+    "scene_max": { "opener_title": 60, "point_title": 32, "headline_title": 90, "bigword_title": 24, "title": 70, "number_value": 16, "feature_title": 34, "feature_text": 80, "typewriter_text": 140, "quote_text": 200, "text": 160, "kicker": 40 },
     "read_letters_per_second": 15,
     "read_extra_seconds": 1.5,
     "still_size": { "ph": "1270x760", "ph_thumbnail": "240x240", "og": "1200x630", "x": "1600x900", "play": "1024x500", "chrome_small": "440x280", "chrome_marquee": "1400x560" },
@@ -93,7 +93,7 @@
       ],
       "next": {
         "done": [
-          "Check the brand's name and every word on screen in film.json below against words.json and the site, and look at {file:frames/sheet.jpg} before handing the film over.",
+          "Check the brand's name and every word on screen in film.json below against words.json and the site, and look at {file:frames/sheet.jpg}, or give the user its path, before handing the film over.",
           "Then call check_video with film {file:film.mp4} and expect {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16.",
           "To change a word, change it in {file:film.json} and call render_launch_film with film {file:film.json}."
         ],
@@ -106,7 +106,7 @@
         "done": [
           "Check the brand's name and every word on screen in film.json below against words.json and the site: a film.json cannot be changed here, so when one is wrong, tell the user instead of rendering it again.",
           "Then call check_video with film {file:film.mp4} and expect {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16.",
-          "Give the user the link to {file:frames/sheet.jpg} from the list below: two stills a clip."
+          "Give the user the {name:frames/sheet.jpg} link from the list below: two stills a clip."
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes."
@@ -161,7 +161,7 @@
       "next": {
         "done": [
           "Check the brand's name and every word on screen in film.json below against words.json and the site before the render.",
-          "Look at {file:brand/card.png} when the logo or the colors may be wrong.",
+          "Look at {file:brand/card.png}, or give the user its path, when the logo or the colors may be wrong.",
           "Fix what is wrong in {file:film.json}, then call render_launch_film with film {file:film.json}."
         ],
         "failed": [
@@ -240,7 +240,7 @@
       "destructive": true,
       "uses": { "--easybrandkit": "easybrandkit" },
       "params": {
-        "source": { "type": "url_or_path", "required": true, "filePattern": ".*\\.[jJ][sS][oO][nN]", "description": "The product's website, like https://linear.app, or a film.json you already have, so the pictures match that film. Given the website, it plans a film first with the default look, length and aspect; stills/ goes next to the film.json.", "hostedDescription": "The product's website, like https://linear.app, or the film.json an earlier job saved, as job:<job_id>/film.json, so the pictures match that film. A link is read as the website, and one that ends in .json is refused." },
+        "source": { "type": "url_or_path", "required": true, "filePattern": ".*\\.[jJ][sS][oO][nN]", "description": "The product's website, like https://linear.app, or a film.json you already have, so the pictures match that film. Given the website, it plans a film first with the default look, length and aspect; stills/ goes next to the film.json. The address needs a dot in its host, so localhost is refused.", "hostedDescription": "The product's website, like https://linear.app, or the film.json an earlier job saved, as job:<job_id>/film.json, so the pictures match that film. The address needs a dot in its host. A link is read as the website, and one that ends in .json is refused." },
         "for": { "type": "list", "flag": "--for", "values": ["ph", "og", "x", "play", "chrome"], "default": ["ph", "og", "x", "play", "chrome"], "description": "Which places to make pictures for (default all of them): ph, the Product Hunt gallery and thumbnail; og, a link preview; x, a post on X; play, the Google Play feature graphic; chrome, the Chrome Web Store tiles." }
       },
       "docs": ["stills/STILLS.md"],
@@ -252,7 +252,7 @@
       ],
       "next": {
         "done": [
-          "Look at every picture and read STILLS.md below, then tell the user which place each file is for and its size.",
+          "Read STILLS.md below and look at every picture, or give the user the paths to look at, then tell the user which place each file is for and its size.",
           "To change their words, change them in {file:film.json} and make the pictures again with source {file:film.json}."
         ]
       },
@@ -286,22 +286,22 @@
       "writes": ["CHECK.md", "check.json", "sheet.png", "wave.png"],
       "next": {
         "passed": [
-          "A measurement cannot read words: look at {file:sheet.png} for words cut off, text on text and a wrong logo before handing the video over."
+          "A measurement cannot read words: look at {file:sheet.png}, or give the user its path, for words cut off, text on text and a wrong logo before handing the video over."
         ],
         "check_failed": [
           "Read which checks failed in CHECK.md below.",
           "For a launch film, a loudness or true peak failure is how it was rendered: tell the user the measurement instead of rendering again, and a frame rate of {fact:launch-film.fps} is the film's own.",
-          "Then look at {file:sheet.png}, since a measurement cannot read words."
+          "Then look at {file:sheet.png}, or give the user its path, since a measurement cannot read words."
         ]
       },
       "hostedNext": {
         "passed": [
-          "A measurement cannot read words: give the user the link to {file:sheet.png} from the list below, to look for words cut off, text on text and a wrong logo."
+          "A measurement cannot read words: give the user the {name:sheet.png} link from the list below, to look for words cut off, text on text and a wrong logo."
         ],
         "check_failed": [
           "Read which checks failed in CHECK.md below.",
           "For a launch film, a loudness or true peak failure is how it was rendered: tell the user the measurement instead of rendering again, and a frame rate of {fact:launch-film.fps} is the film's own.",
-          "Give the user the link to {file:sheet.png} from the list below, since a measurement cannot read words."
+          "Give the user the {name:sheet.png} link from the list below, since a measurement cannot read words."
         ]
       }
     },

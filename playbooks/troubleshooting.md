@@ -26,7 +26,7 @@ Read the result before anything else: its first line says what happened, and the
 <!-- local -->
 - "<param>: there is nothing at <path>": no file is there. A relative path is read from {base_dir}, so give the path the earlier result listed, or an absolute one. An address needs its https://.
 - "<job_id> (<tool>) is still writing to <folder>", then "Wait for it with wait_for_job (job_id <job_id>), or give another out_dir.": wait for that job, or give this one another folder.
-- "Cannot make <folder>, the folder the kits save in: <reason>. Set --out or MAKERSMCP_OUT to a folder you can write to.": the setup below has the fix.
+- "Cannot make <folder>, the folder the kits save in: <reason>. Set --out or MAKERSMCP_OUT to a folder you can write to.": every kit runs in that folder, so `out_dir` does not help. The --out it names is makersmcp's own option, set in the client's settings like MAKERSMCP_OUT, and the setup below has the fix.
 <!-- with launch-film -->
 - "<param>: the kit cannot read a link. Give the text itself, or a file.", for `cuts` of `check_video`: give the seconds as text, like 3.2,7.5, or a file on this machine.
 - "<param>: the kit takes <value> for a file, not for an address, and cannot download one." and "<param>: the kit takes <value> for an address, not for a file.", for `source` of `make_launch_stills`: it reads a value that ends in .json as a film.json on this machine, and any other value as a site's address.
@@ -47,7 +47,7 @@ Read the result before anything else: its first line says what happened, and the
 
 - Read the kit's own words after the first line: they name what was wrong and, mostly, the fix. The topic of the tool that failed lists its errors.
 <!-- local -->
-- A run clears what an earlier run of its kit left in its folder as it starts, so a failed run into a folder that held a good result leaves it empty. Give the next run a folder of its own when a result there is still wanted.
+- The brand, font and screenshot kits clear what an earlier run left in their folder as they start, so a failed run of theirs into a folder that held a good result leaves it empty, while musicfit, a render and a check keep the earlier files until they succeed. Give the next run a folder of its own when a result there is still wanted.
 <!-- end -->
 <!-- hosted -->
 - "It ran longer than <time> and was stopped.": a job here stops after {limit:job_minutes}, so ask for less, like fewer pages or a shorter film. "Something went wrong on our side. Try again in a while.": tell the user. A failed job keeps no files.

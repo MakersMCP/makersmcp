@@ -66,14 +66,14 @@ take_screenshots {"url": "https://linear.app", "pages": 3, "page": ["/pricing"],
 ## Every other parameter
 
 - `theme` dark takes the site's own dark theme; a site without one looks the same, and the result says so.
-- `lang`: the site's own version opens when its home page names one; otherwise the browser asks for that language, with a note.
+- `lang`: with `pages` above 1, the site's own version opens when its home page names one, and otherwise the browser asks for that language, with a note. With `pages` 1, `url` opens with that language as the browser's, and no note.
 - `clean` also hides, on a phone, a side panel wider than about a third of the screen. Set `clean` false for an app's own screens, or tell the user what it hid.
 - `timeout_seconds`: another page is opened only while there is time to take it, and the result notes when time ran out.
 <!-- hosted -->
   A job here stops after {limit:job_minutes} whatever this says.
 <!-- end -->
 <!-- local -->
-- `out_dir`: by default easyscreenshotkit-<host> in {base_dir}. A run takes a folder only when it is empty or holds an earlier run of this tool, whose screenshots it deletes first, even when the new run then fails; any other folder stops it. Give each set its own `out_dir`, like launch/screenshots.
+- `out_dir`: by default easyscreenshotkit-<host> in {base_dir}. It must be empty or hold an earlier run of this tool, which a run deletes as it starts, so one that fails loses it too. Give each set its own `out_dir`, like launch/screenshots.
 <!-- end -->
 - `hide` and `reduced_motion` do what their descriptions say.
 
@@ -132,7 +132,12 @@ Each error as the result shows it, then the fix.
 Notes in a finished result:
 
 - "Time ran out after <pages>; give more with timeout_seconds.": run again with a larger `timeout_seconds`.
-- "still showed a loading screen after 20 s": look at that page's picture; when it shows a spinner, run again with a larger `timeout_seconds`.
+<!-- local -->
+- "still showed a loading screen after 20 s": look at that page's picture, or give the user its path when you cannot open it; when it shows a spinner, run again with a larger `timeout_seconds`.
+<!-- end -->
+<!-- hosted -->
+- "still showed a loading screen after 20 s": give the user the link to that page's picture to see whether it shows a spinner, since nothing here shows you a picture; when it does, run again with a larger `timeout_seconds`.
+<!-- end -->
 - "opened <url> and landed on <url>": the page sent the browser on; check that it is the page meant.
 - "<url> was asked for but not taken: <reason>.": a `page` that answered with an error or a bot check.
 

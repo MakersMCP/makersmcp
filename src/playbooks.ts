@@ -15,6 +15,7 @@ import {
   ON_THEIR_OWN_LINE,
   placeholderProblem,
   placeholdersIn,
+  placeProblem,
   textProblems,
   TextError,
   type Placeholder,
@@ -255,6 +256,8 @@ function parseBody(text: string, file: string, firstLine: number, kind: TextKind
         if (inCode) continue;
         fail(line, problem);
       }
+      const misplaced = placeProblem(placeholder, text);
+      if (misplaced) fail(line, misplaced);
       if (LOCAL_ONLY.has(placeholder.name) && !within('local')) fail(line, `${placeholder.text} goes inside a <!-- local --> block`);
       if (HOSTED_ONLY.has(placeholder.name) && !within('hosted')) fail(line, `${placeholder.text} goes inside a <!-- hosted --> block`);
       if (ON_THEIR_OWN_LINE.has(placeholder.name) && text.trim() !== placeholder.text) fail(line, `${placeholder.text} stands alone on its line`);
