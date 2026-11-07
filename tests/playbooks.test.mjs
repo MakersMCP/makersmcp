@@ -20,7 +20,7 @@ import {
   createMcpServer, loadKitDefinitions, loadPlaybooks, offeredTopics, PLAYBOOKS_DIR, renderTopic, resolveKit, validateKitDefinition,
 } from '../dist/server.js';
 import { DOCS_BUDGET, FAILED_NEXT, nextSentences, orderedFiles, RESULT_BUDGET, SITE_NOTE } from '../dist/results.js';
-import { BASE_DIR_IN_WORDS, flagWords, inParameterWords } from '../dist/texts.js';
+import { BASE_DIR_IN_WORDS, flagWords, inParameterWords, sentencesOf } from '../dist/texts.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const requireHere = createRequire(import.meta.url);
@@ -164,8 +164,17 @@ function callsOf(markdown) {
   return calls;
 }
 
+/** A line's sentences, cut after . ! ? : or ; and a space, never inside a code span, so `<cues>: "fps" must be` stays one span. */
+function sentencesIn(line) {
+  const spans = [];
+  const masked = line.replace(/(`+)(?:(?!\1)[\s\S])*?\1/g, span => `\u0001${spans.push(span) - 1}\u0002`);
+  return masked.split(/(?<=[.!?:;])\s+(?=\S)/).map(part => part.replace(/\u0001(\d+)\u0002/g, (_, i) => spans[Number(i)]));
+}
+
 const hasWord = (haystack, word) => new RegExp(`(?<![\\w-])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`).test(haystack);
 const FILE_EXTENSIONS = 'md|json|png|jpg|jpeg|svg|webp|gif|mp4|mov|wav|mp3|m4a|aac|yaml|yml|css|txt|srt|vtt|ass|html|woff2|woff|ttf|otf|pdf';
+// A site's own files, which a topic names and no tool writes.
+const SITE_FILES = new Set(['robots.txt']);
 const LOOKS_LIKE_FILE = new RegExp(`^[\\w<>*.-]+(?:/[\\w<>*.-]+)*\\.(?:${FILE_EXTENSIONS})$`, 'i');
 
 /** A file name the way a topic writes one, with <variable> parts and NN or <nn> for two digits, as a sample to match. */
@@ -349,16 +358,58 @@ function corpusOf(texts, definitions) {
   for (const entry of texts) {
     for (const line of entry.split('\n')) {
       if (line.length > 600 || !/\$\{|["'`]\s*\+|\+\s*["'`]/.test(line)) continue;
-      for (const pattern of sourcePatterns(line, words)) if (pattern.words.length && pattern.tokens.includes(STAR)) patterns.push(pattern);
+      for (const pattern of sourcePatterns(line, words)) if (pattern.words.length && pattern.tokens.includes(STAR)) patterns.push({ ...pattern, line: words(line) });
     }
   }
   return { texts: [...plain, ...plain.map(words)], patterns };
 }
 
+const asWord = word => new RegExp(`(?<![\\w])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`);
+
+/**
+ * Whether the quote fills each wildcard of a source message the way the source can: with a
+ * value written out, with a message of its own made elsewhere, or with one <...> part and only
+ * such words beside it as the source's line has where the wildcard is, like " (near: <names>)"
+ * for a ${...} that writes " (near: ...)". In "Tool <tool> was not found" the wildcard of
+ * `Tool ${name} not found` would have to take "was", which its line does not hold. A wildcard
+ * that starts or ends the message is not held to this: it often stands for a message of its own.
+ */
+function fillsWildcards(quote, source) {
+  // The source's literal parts, short ones like " as " too, each between two of its wildcards.
+  const parts = source.tokens.map(token => (token === STAR ? '\u0000' : token)).join('').split('\u0000').filter(Boolean);
+  // A <...> part with what is joined to it, like <folder>/brand, is the value; a word apart from it is the quote's own.
+  // A stretch with two of them or more is a message the wildcard holds, made elsewhere.
+  const fits = stretch => (stretch.match(/<[^<>]*>/g) ?? []).length !== 1
+    || (stretch.replace(/\S*<[^<>]*>\S*/g, ' ').match(/[A-Za-z][\w']*/g) ?? []).every(word => asWord(word).test(source.line));
+  let at = 0;
+  let first;
+  let last;
+  for (let i = 0; i < parts.length; i++) {
+    const found = quote.indexOf(parts[i], at);
+    if (found < 0) continue;
+    // Between two parts, and before the first one found when the quote starts inside the message, a wildcard stands.
+    if (first === undefined ? i > 0 && !fits(quote.slice(0, found)) : !fits(quote.slice(at, found))) return false;
+    first ??= i;
+    last = i;
+    at = found + parts[i].length;
+  }
+  // And after the last one found when the quote ends inside the message.
+  return last === undefined || last === parts.length - 1 || fits(quote.slice(at));
+}
+
+/** The words a quote writes right beside one of its <...> parts, a space between them, like "was" in "Tool <tool> was not found". */
+function besideVariables(quote) {
+  const found = [...quote.matchAll(/(?:^|\s)([^\s<>]+) <[^<>]*>/g), ...quote.matchAll(/<[^<>]*> ([^\s<>]+)/g)].map(match => match[1]);
+  return found.map(word => word.replace(/^[("'`]+|[)"'`.,:;!?]+$/g, '')).filter(word => /[A-Za-z]/.test(word));
+}
+
 /**
  * Whether a quoted error is one of the corpus's: as a pattern over its texts, or put together
  * from messages of the kits' source that it fits, each quoted from its start or whole, with
- * 15 of their characters in the quote between them, as a message built in two places is.
+ * 15 of their characters in the quote between them, as a message built in two places is. A
+ * source's variable may stand for a value the quote writes out, like a tool's name, but a word
+ * the quote writes beside one of its own <...> parts is a word of the lines it comes from, so
+ * a word added there, as in "Tool <tool> was not found", is no message of the kit's.
  */
 function knownError(quote, corpus) {
   const pattern = quotedPattern(quote);
@@ -370,20 +421,25 @@ function knownError(quote, corpus) {
     else for (const char of part) tokens.push(char);
   }
   const covered = new Uint8Array(quote.length);
+  // The source lines of the messages the quote is made of, for the words it writes beside its variable parts.
+  const used = [];
   // A name the quote writes where the source has a variable, like "beats" in "<key>" is missing, is not covered.
   for (const source of corpus.patterns) {
     const present = source.words.map(word => quote.includes(word));
     const share = source.words.reduce((sum, word, i) => sum + (present[i] ? word.length : 0), 0) / source.words.join('').length;
     const fromStart = present[0] && present.indexOf(false) !== 0;
-    if (!(fromStart || share >= 0.9) || !patternsMeet(tokens, source.tokens)) continue;
+    if (!(fromStart || share >= 0.9) || !patternsMeet(tokens, source.tokens) || !fillsWildcards(quote, source)) continue;
     source.words.forEach((word, i) => {
       if (!present[i] || (!fromStart && share < 0.9)) return;
       if (present.slice(0, i).includes(false) && share < 0.9) return;
+      used.push(source.line);
       for (let at = quote.indexOf(word); at >= 0; at = quote.indexOf(word, at + 1)) covered.fill(1, at, at + word.length);
     });
   }
   const literal = quote.replace(/<[^<>]*>/g, '').length;
-  return covered.reduce((sum, value) => sum + value, 0) >= Math.min(15, Math.ceil(literal * 0.6));
+  if (covered.reduce((sum, value) => sum + value, 0) < Math.min(15, Math.ceil(literal * 0.6))) return false;
+  const lines = used.join('\n');
+  return besideVariables(quote).every(word => asWord(word).test(lines));
 }
 
 /** An error as a topic quotes it, with <...> for its variable parts, as a pattern over the kits' own text. */
@@ -419,6 +475,14 @@ function doubleQuoted(line) {
     open = -1;
   }
   return found;
+}
+
+/** The topics a text points to by name, among `names`: "the brand topic", "the music playbook" or "makersmcp_playbook checks". */
+function topicsNamed(content, names) {
+  return [...names].filter(name => {
+    const word = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?<![\\w-])${word} (?:topic|playbook)s?\\b|makersmcp_playbook\`?\\s+(?:with\\s+)?\`?${word}(?![\\w-])`).test(content);
+  });
 }
 
 /** A section about what goes wrong, whose code may quote an error too. */
@@ -590,8 +654,10 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
     }
     try {
       const listed = new Map(session.tools.map(tool => [tool.name, tool]));
-      // The values a parameter's text offers, like the size names of take_screenshots' sizes.
-      const offeredWords = session.tools.flatMap(tool => Object.values(tool.inputSchema.properties ?? {}).map(property => property.description ?? '')).join('\n');
+      // The values a list's text names when the schema has no enum for them, like take_screenshots' size names: each item of the
+      // text's list that a parenthesis follows, as in "Any of desktop (3200x1800), mobile (...)". Other words of a text are no names.
+      const listedValues = new Set(definitions.flatMap(kit => kit.tools.filter(tool => listed.has(tool.name)).flatMap(tool => Object.values(tool.params)))
+        .filter(param => param.type === 'list' && !param.values).flatMap(param => [...param.description.matchAll(/(?:\bof|,|\bor) ([a-z][a-z-]*) \(/g)].map(match => match[1])));
       // A topic is offered when its kits are on and the tools it requires are listed.
       const on = name => enabled.has(name) || listed.has(name);
       const expected = playbooks.topics.filter(topic => topic.requires.every(on) && (!topic.any.length || topic.any.some(on))).map(topic => topic.name);
@@ -621,6 +687,23 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
         }
       }
 
+      // A description, a parameter's text or asks whose first sentence names a tool this server does not list: the server leaves
+      // that sentence out, so the text loses what it says first. Write the pointer to the other tool as a sentence of its own.
+      for (const kit of definitions) {
+        for (const tool of kit.tools.filter(entry => listed.has(entry.name))) {
+          const own = [[`${tool.name}'s description`, config.where === 'hosted' && tool.hostedDescription ? tool.hostedDescription : tool.description],
+            [`${tool.name}'s asks`, tool.asks ?? '']];
+          for (const [name, param] of Object.entries(tool.params)) {
+            if (config.where === 'hosted' && param.where === 'local') continue;
+            own.push([`${tool.name}.${name}`, config.where === 'hosted' && param.hostedDescription ? param.hostedDescription : param.description]);
+          }
+          for (const [what, source] of own) {
+            const first = sentencesOf(source)[0] ?? '';
+            for (const name of namesAbsent(first)) add(`${what}, ${label}`, `its first sentence names ${name}, which this server does not list, so the text loses it: "${first.slice(0, 100)}"`);
+          }
+        }
+      }
+
       const rendered = new Map();
       for (const name of offered) {
         const result = await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [name] } });
@@ -628,7 +711,14 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
         else rendered.set(name, text(result));
       }
 
+      // Each offered topic as a resource: its title and description reach the client too.
+      const { resources } = await session.client.listResources();
+      for (const resource of resources) always.push([`the resource ${resource.uri}'s title and description`, `${resource.title ?? ''}\n${resource.description ?? ''}`, false]);
+      const offeredSet = new Set(offered);
+      const notOffered = content => topicsNamed(content, topicNames).filter(name => !offeredSet.has(name));
+
       for (const [what, content] of always) {
+        for (const name of notOffered(content)) add(`${what}, ${label}`, `names the ${name} topic, which this server does not offer`);
         for (const problem of sideProblems(`${what}, ${label}`, content, config.where)) problems.push(problem);
         for (const problem of styleProblems(`${what}, ${label}`, content, { markdown: false })) problems.push(problem);
         if (/\{[a-z_]+(?::[^{}\s]+)?\}/.test(content)) add(`${what}, ${label}`, `a placeholder left: ${/\{[a-z_]+(?::[^{}\s]+)?\}/.exec(content)[0]}`);
@@ -644,6 +734,7 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
         problems.push(...sideProblems(where, markdown, config.where), ...styleProblems(where, markdown));
         // In prose or code, with backticks or without: a block for its kit or tool is where such a name goes.
         for (const tool of namesAbsent(markdown)) add(where, `names ${tool}, which this server does not list: put it in a with block`);
+        for (const topic of notOffered(markdown)) add(where, `names the ${topic} topic, which this server does not offer: put it in a block for that topic's tools`);
 
         // Example calls: valid with this side's schema, every argument one it lists.
         for (const call of callsOf(markdown)) {
@@ -677,7 +768,7 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
           const params = paramsOf([...named, ...kitTools]);
           const namedParams = paramsOf(named);
           for (const line of prose(section.text).split('\n')) {
-            for (const sentence of line.split(/(?<=[.!?:;])\s+(?=\S)/)) {
+            for (const sentence of sentencesIn(line)) {
               const spans = spansOf(sentence).map(span => span.trim());
               const tied = spans.filter(word => listed.has(word) && word !== 'makersmcp_playbook');
               // A kit flag in the sentence, like `--timeout` is `timeout_seconds`, names its parameter.
@@ -695,11 +786,11 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
                     continue;
                   }
                   if (params.has(word) || COMMON.has(word) || RESULT_FIELDS.has(word) || FORMAT_FIELDS.has(word)
-                    || values.has(word) || topicNames.has(word) || kitIds.includes(word) || extraNames.has(word) || hasWord(offeredWords, word)) continue;
+                    || values.has(word) || listedValues.has(word) || topicNames.has(word) || kitIds.includes(word) || extraNames.has(word)) continue;
                   add(where, allParams.has(word)
                     ? `\`${word}\` is a parameter only of tools that are off here or that the section does not name (section "${section.heading}")`
                     : `\`${word}\` is not a tool, a parameter, a result field or a field this test knows (section "${section.heading}"); if it is a field of a file the topic documents, add it to FORMAT_FIELDS in tests/playbooks.test.mjs`);
-                } else if (LOOKS_LIKE_FILE.test(word) && !/^https?:/.test(word)) {
+                } else if (LOOKS_LIKE_FILE.test(word) && !/^https?:/.test(word) && !SITE_FILES.has(word)) {
                   const inputs = callsOf(markdown).flatMap(call => Object.values(call.args ?? {})).filter(value => typeof value === 'string')
                     .map(value => path.posix.basename(value));
                   if (!written(word, allWrites) && !inputs.includes(path.posix.basename(word)) && !/\.(?:ya?ml)$/i.test(word)) {
@@ -711,10 +802,26 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
           }
         }
 
+        // Files named in prose, outside code, by the rule for code: a job: reference is read as the path after it.
+        const inputs = callsOf(markdown).flatMap(call => Object.values(call.args ?? {})).filter(value => typeof value === 'string').map(value => path.posix.basename(value));
+        for (const line of words(markdown).split('\n')) {
+          for (const [token] of line.replace(/\bjob:[^\s/]+\//g, '').replace(/\bhttps?:\/\/\S+/g, ' ').matchAll(/[\w<>*.-]+(?:\/[\w<>*.-]+)*/g)) {
+            const file = token.replace(/[.]+$/, '');
+            if (!LOOKS_LIKE_FILE.test(file) || /\.(?:ya?ml)$/i.test(file) || SITE_FILES.has(file)) continue;
+            if (!written(file, allWrites) && !inputs.includes(path.posix.basename(file))) add(where, `${file}, named in prose, is a file no tool writes (writes in kits/) and no call here gives`);
+          }
+        }
+
         // Errors quoted as a result shows them.
         for (const quote of quotedErrors(markdown)) {
           if (!knownError(quote, errorTexts)) add(where, `the error "${quote}" is in no kit's files, no file of makersmcp's src and not in tests/fixtures/hosted-errors.json`);
         }
+      }
+
+      // getting-started names every kit tool the server lists: for one whose own topic is not offered, it is the only topic that does.
+      const started = rendered.get('getting-started');
+      if (started !== undefined) {
+        for (const name of listed.keys()) if (toolKit.has(name) && !hasWord(started, name)) add(`getting-started.md, ${label}`, `never names ${name}, which this server lists`);
       }
 
       if (every && !config.limits) {
@@ -778,7 +885,7 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
               for (const files of [true, false]) {
                 const id = config.where === 'local' ? 'job_1a2b3c4d' : '0f5c2e9a-1b2c-4d3e-8f90-123456789abc';
                 const view = fakeView(tool, definition, state, id, config.where, { files });
-                problems.push(...await resultProblems(definitions, dir, config, tool, view, state, allWrites));
+                problems.push(...await resultProblems(definitions, dir, config, tool, view, state, topicNames));
               }
             }
           }
@@ -812,7 +919,7 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
 }
 
 /** The problems with one job's result as a client gets it. */
-async function resultProblems(definitions, dir, config, tool, view, state, allWrites) {
+async function resultProblems(definitions, dir, config, tool, view, state, topicNames) {
   const problems = [];
   const label = `${tool.name}'s result, ${state}${view.files?.length ? '' : ' with no files'}, ${config.where}`;
   const session = await connect({ definitions, playbooks: dir, where: config.where, kits: config.kits, held: config.held, view: () => structuredClone(view) });
@@ -820,6 +927,7 @@ async function resultProblems(definitions, dir, config, tool, view, state, allWr
     const listedNames = new Set(session.tools.map(entry => entry.name));
     const absent = definitions.flatMap(kit => kit.tools.map(entry => entry.name)).filter(name => !listedNames.has(name));
     const schema = session.tools.find(entry => entry.name === tool.name).inputSchema;
+    const offered = new Set(session.tools.find(entry => entry.name === 'makersmcp_playbook')?.inputSchema.properties.topics.items.enum ?? []);
     const result = await session.client.callTool({ name: tool.name, arguments: argumentsFor(schema) });
     const body = text(result);
     const parts = body.split('\n\n');
@@ -828,6 +936,7 @@ async function resultProblems(definitions, dir, config, tool, view, state, allWr
       if (parts[1] !== `Next: ${next}`) problems.push(`${label}: the Next line is not right under the heading`);
       problems.push(...sideProblems(`${label}, its Next line`, next, config.where), ...styleProblems(`${label}, its Next line`, next, { markdown: false }));
       for (const name of absent.filter(entry => hasWord(next, entry))) problems.push(`${label}: the Next line names ${name}, which this server does not list`);
+      for (const name of topicsNamed(next, topicNames).filter(entry => !offered.has(entry))) problems.push(`${label}: the Next line names the ${name} topic, which this server does not offer`);
       for (const ref of next.match(/job:[^\s/]+\/[^\s,;:)]+/g) ?? []) {
         const file = ref.replace(/^job:[^/]+\//, '').replace(/[.]$/, '');
         if (!view.files?.some(entry => entry.path === file)) problems.push(`${label}: the Next line names ${file}, which the job did not list`);
@@ -902,6 +1011,15 @@ test('the lint finds each kind of fault in a fixture broken one rule at a time',
     [{ 'sound.md': text => text.replace(/```call\nmix_sound \{"track": "https:[^\n]*\n```\n/, '') }, /soundkit, hosted, every kit on: its topics have no call of mix_sound/],
     [{ 'getting-started.md': text => text.replace('Sounds come from `mix_sound`.\n<!-- end -->', '<!-- end -->\nSounds come from `mix_sound`.') }, /`mix_sound` is a tool of soundkit, which this server does not list/],
     [{ 'jobs-and-files.md': text => text.replace('{default:wait_for_job.wait_seconds} by default and ', '') + '\n'.repeat(1) + 'x'.repeat(13000) }, /jobs-and-files\.md, .*characters, outside/],
+    // A file named in prose, outside code, is one some tool writes too.
+    [{ 'painting.md': text => text.replace('Give the user `picture.png`', 'Give the user picture2.png and `picture.png`') }, /picture2\.png, named in prose, is a file no tool writes/],
+    // A topic named in a text is one the server offers.
+    [{ 'painting.md': text => text.replace('3. No sound kit is on here, so the picture stays silent.', '3. The sound topic has the rest.') }, /painting\.md, .*paintkit alone: names the sound topic, which this server does not offer/],
+    // A topic's description reaches the client as its resource's, on both sides.
+    [{ 'painting.md': text => text.replace('description: Paints a picture', 'description: Saves in ~/paint on this machine. Paints a picture') }, /the resource makersmcp:\/\/playbooks\/painting's title and description, hosted.*on this machine/],
+    [{ 'painting.md': text => text.replace('description: Paints a picture', 'description: Mixes with mix_sound. Paints a picture') }, /the resource makersmcp:\/\/playbooks\/painting's title and description, local, paintkit alone: names mix_sound/],
+    // A word written beside a variable part is a word of the kit's own message.
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> then could not be read as a picture"') }, /the error "<file> then could not be read as a picture" is in no kit's files/],
   ];
   for (const [change, expected] of cases) {
     const dir = brokenCopy(change);
@@ -923,6 +1041,17 @@ test('the lint finds a kit without a topic, and a Next line that names a file it
   assert.ok(problems.some(problem => /mix_sound\.next: \{file:loud\.wav\} is not in mix_sound's writes/.test(problem)), problems.join('\n'));
 });
 
+test('the lint finds a text whose first sentence names a tool that is off, and a Next sentence that cannot be filled stops the server', async () => {
+  const kits = fixtureKits();
+  kits[0].tools[0].params.sketch.description = 'A sketch mix_sound made. It is the first stroke.';
+  kits[0].tools[0].next.done.push('It is {fact:paintkit.widest} wide.');
+  const problems = await lint({ definitions: kits, dir: path.join(FIXTURES, 'topics'), corpus: fixtureCorpus(), budgets: FIXTURE_BUDGETS });
+  assert.ok(problems.some(problem => /the server does not start: paint_picture\.next\.done: \{fact:paintkit\.widest\}: paintkit has no fact widest/.test(problem)), problems.join('\n'));
+  kits[0].tools[0].next.done.pop();
+  const first = await lint({ definitions: kits, dir: path.join(FIXTURES, 'topics'), corpus: fixtureCorpus(), budgets: FIXTURE_BUDGETS });
+  assert.ok(first.some(problem => /paint_picture\.sketch, local, paintkit alone: its first sentence names mix_sound, which this server does not list/.test(problem)), first.join('\n'));
+});
+
 // The package's own kits/ and playbooks/: the files the other steps write, held to the same rules.
 test('the kits in kits/ and the topics in playbooks/ pass every check of the lint', async t => {
   const definitions = loadKitDefinitions();
@@ -936,6 +1065,11 @@ test('the kits in kits/ and the topics in playbooks/ pass every check of the lin
     // The schema's refusals and an unknown tool, as the SDK and zod word them.
     ...['@modelcontextprotocol/sdk/server/mcp.js', 'zod/v4/locales/en.js'].map(name => readFileSync(requireHere.resolve(name), 'utf8')),
   ];
+  // The SDK puts a schema's refusal together from two of its files: the tool in mcp.js, each reason with its place in zod-compat.js.
+  const sdk = name => readFileSync(requireHere.resolve(`@modelcontextprotocol/sdk/server/${name}`), 'utf8');
+  assert.ok(sdk('mcp.js').includes('`Input validation error: Invalid arguments for tool ${toolName}: ${errorMessage}`'), 'the SDK words a refused call another way now');
+  assert.ok(sdk('zod-compat.js').includes('`${i.message} at ${getDotPath(i.path)}`'), 'the SDK words a refusal\'s place another way now');
+  corpus.push('Input validation error: Invalid arguments for tool <tool>: <reason> at <path>');
   // MakersMCP-Server's workers hold these back where their ffmpeg cannot run them.
   const problems = await lint({ definitions, dir: PLAYBOOKS_DIR, corpus, extraNames: launchFilmNames(), held: ['check_video', 'fit_music'] });
   // The size of each topic, so one past 8,000 characters is seen.

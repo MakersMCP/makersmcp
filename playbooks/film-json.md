@@ -2,7 +2,7 @@
 name: film-json
 title: film.json, the plan of a launch film
 index: film.json, the plan of a launch film: clips, scene types, the words on screen and their rules
-description: Explains film.json, the plan launch-film renders: its top-level fields, the clip kinds and their length in bars, the scene types with the fields launch_film_guide leaves out, the icons, and the rules for the words on screen, with the loader's errors and their fixes. Use it to read a plan before it renders, or to change one before render_launch_film renders it.
+description: Explains film.json, the plan launch-film renders: its top-level fields, the clip kinds and their length in bars, the scene types with the fields launch_film_guide leaves out, the icons, and the rules for the words on screen, with the loader's errors and their fixes. Use it to read a plan before it renders, and to change one where film.json can be written.
 kit: launch-film
 requires: [launch-film]
 optional: [easyscreenshotkit]
