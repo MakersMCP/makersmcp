@@ -17,12 +17,13 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
-  createMcpServer, loadKitDefinitions, loadPlaybooks, PLAYBOOKS_DIR, renderTopic, resolveKit, validateKitDefinition,
+  createMcpServer, loadKitDefinitions, loadPlaybooks, offeredTopics, PLAYBOOKS_DIR, renderTopic, resolveKit, validateKitDefinition,
 } from '../dist/server.js';
-import { DOCS_BUDGET, orderedFiles, RESULT_BUDGET, SITE_NOTE } from '../dist/results.js';
+import { DOCS_BUDGET, FAILED_NEXT, nextSentences, orderedFiles, RESULT_BUDGET, SITE_NOTE } from '../dist/results.js';
 import { BASE_DIR_IN_WORDS, flagWords, inParameterWords } from '../dist/texts.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const requireHere = createRequire(import.meta.url);
 const FIXTURES = path.join(here, 'fixtures', 'playbooks');
 const readJson = file => JSON.parse(readFileSync(file, 'utf8'));
 const fixtureKits = () => ['paintkit.json', 'soundkit.json'].map(file => readJson(path.join(FIXTURES, 'kits', file)));
@@ -175,8 +176,11 @@ function written(name, writes) {
   const wanted = sample(name);
   return writes.some(pattern => {
     const glob = globOf(pattern);
+    // A name without its folder matches a pattern's last part, unless that part is only a
+    // wildcard, like *.md of pages/*.md, which would take any name.
+    const last = path.posix.basename(pattern);
     return glob.test(wanted) || (!pattern.includes('/') && glob.test(path.posix.basename(wanted)))
-      || (!wanted.includes('/') && globOf(path.posix.basename(pattern)).test(wanted));
+      || (!wanted.includes('/') && !/^\*(?:\.\w+)?$/.test(last) && globOf(last).test(wanted));
   });
 }
 
@@ -366,6 +370,7 @@ function knownError(quote, corpus) {
     else for (const char of part) tokens.push(char);
   }
   const covered = new Uint8Array(quote.length);
+  // A name the quote writes where the source has a variable, like "beats" in "<key>" is missing, is not covered.
   for (const source of corpus.patterns) {
     const present = source.words.map(word => quote.includes(word));
     const share = source.words.reduce((sum, word, i) => sum + (present[i] ? word.length : 0), 0) / source.words.join('').length;
@@ -378,29 +383,60 @@ function knownError(quote, corpus) {
     });
   }
   const literal = quote.replace(/<[^<>]*>/g, '').length;
-  return covered.reduce((sum, value) => sum + value, 0) >= Math.min(15, literal);
+  return covered.reduce((sum, value) => sum + value, 0) >= Math.min(15, Math.ceil(literal * 0.6));
 }
 
 /** An error as a topic quotes it, with <...> for its variable parts, as a pattern over the kits' own text. */
 function quotedPattern(quote) {
-  // A variable part at either end says nothing about where the text is.
-  const trimmed = quote.replace(/^(?:<[^<>]*>\s*)+/, '').replace(/(?:\s*<[^<>]*>)+$/, '');
+  // A variable part at either end, with the punctuation that joins it, says nothing about where the text is.
+  const trimmed = quote.replace(/^(?:<[^<>]*>[\s:;,]*)+/, '').replace(/(?:[\s:;,]*<[^<>]*>)+$/, '');
   const parts = trimmed.split(/<[^<>]*>/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   return new RegExp(parts.join('[\\s\\S]{0,240}?'));
 }
 
 /**
- * The errors a topic quotes, in its sections about what goes wrong: each in double quotes,
- * or as code with words in it.
+ * A line's texts in double quotes, each quote closed by the next one, so the words between
+ * two quotes are never taken for one. A quote that opens after ( or =, as in
+ * ("<title>") or rel="manifest", is a quote inside the text, not its end.
+ */
+function doubleQuoted(line) {
+  const found = [];
+  let open = -1;
+  for (let at = 0; at < line.length; at++) {
+    if (line[at] !== '"') continue;
+    if (open < 0) {
+      open = at;
+      continue;
+    }
+    if (line[at - 1] === '(' || line[at - 1] === '=') {
+      const inner = line.indexOf('"', at + 1);
+      if (inner > 0) {
+        at = inner;
+        continue;
+      }
+    }
+    found.push(line.slice(open + 1, at));
+    open = -1;
+  }
+  return found;
+}
+
+/** A section about what goes wrong, whose code may quote an error too. */
+const ERROR_SECTION = /wrong|error|fail|trouble|fix|refus|cannot|not started/i;
+
+/**
+ * The errors and other texts a topic quotes as a result shows them: in any section each one
+ * in double quotes, and in a section about what goes wrong also code with words in it, since
+ * elsewhere code holds examples, like a step of a steps file.
  */
 function quotedErrors(markdown) {
   const found = [];
   for (const section of sections(markdown)) {
-    if (!/wrong|error|fail|trouble|fix|refus/i.test(section.heading)) continue;
+    const errors = ERROR_SECTION.test(section.heading);
     for (const line of prose(section.text).split('\n')) {
-      for (const span of spansOf(line)) if (span.length >= 12 && /\s/.test(span.trim())) found.push(span.trim());
+      if (errors) for (const span of spansOf(line)) if (span.length >= 12 && /\s/.test(span.trim())) found.push(span.trim());
       const rest = line.replace(/(`+)(?:(?!\1)[\s\S])*?\1/g, ' ');
-      for (const match of rest.matchAll(/"([^"\n]{12,})"/g)) if (/\s/.test(match[1])) found.push(match[1]);
+      for (const quote of doubleQuoted(rest)) if (quote.length >= 12 && /\s/.test(quote)) found.push(quote);
     }
   }
   return found;
@@ -528,6 +564,7 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
     for (const name of [...topic.requires, ...topic.any, ...topic.optional]) {
       if (!kitIds.includes(name) && !toolKit.has(name)) add(`${topic.name}.md`, `names ${name}, which is no kit in kits/ and no tool of one`);
     }
+    for (const field of ['title', 'index', 'description']) problems.push(...styleProblems(`${topic.name}.md's ${field}`, topic[field], { markdown: false }));
     if (topic.kit !== 'makersmcp' && !kitIds.includes(topic.kit)) add(`${topic.name}.md`, `its kit ${topic.kit} has no file in kits/`);
   }
 
@@ -551,8 +588,6 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
     }
     try {
       const listed = new Map(session.tools.map(tool => [tool.name, tool]));
-      // A parameter of any tool that is on may be named anywhere; the tests do not ask for its tool in the same section.
-      const listedParams = new Set(session.tools.flatMap(tool => Object.keys(tool.inputSchema.properties ?? {})));
       // The values a parameter's text offers, like the size names of take_screenshots' sizes.
       const offeredWords = session.tools.flatMap(tool => Object.values(tool.inputSchema.properties ?? {}).map(property => property.description ?? '')).join('\n');
       // A topic is offered when its kits are on and the tools it requires are listed.
@@ -561,6 +596,14 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
       const playbookTool = listed.get('makersmcp_playbook');
       const offered = playbookTool?.inputSchema.properties.topics.items.enum ?? [];
       if (JSON.stringify(offered) !== JSON.stringify(expected)) add(label, `makersmcp_playbook offers [${offered}], and the topics whose kits are on are [${expected}]`);
+      // Each flag of a listed tool, with the parameters it stands for.
+      const flagParams = new Map();
+      for (const kit of definitions) {
+        for (const tool of kit.tools.filter(entry => listed.has(entry.name))) {
+          const pairs = [...(tool.out?.flag ? [[tool.out.flag, 'out_dir']] : []), ...Object.entries(tool.params).filter(([, param]) => param.flag).map(([param, { flag }]) => [flag, param])];
+          for (const [flag, param] of pairs) flagParams.set(flag, [...(flagParams.get(flag) ?? []), param]);
+        }
+      }
       // The kit tools this server does not list, as their kits are off or a service holds them back: no text may name one.
       const absent = [...toolKit.keys()].filter(name => !listed.has(name));
       const namesAbsent = content => absent.filter(name => hasWord(content, name));
@@ -619,30 +662,47 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
           if (result.isError && /Input validation error/.test(text(result))) add(at, text(result).replace(/^MCP error -32602: /, ''));
         }
 
-        // Names in code: tools that are on, parameters of a tool the section names, fields, files.
+        // Names in code: tools that are on, parameters of a tool the sentence or the section
+        // names (a kit's topic is about its own tools too), fields, files. A sentence that names
+        // tools in code ties the parameters in it to those and the section's, so `fps` beside
+        // `take_screenshots` in the screenshots topic, where no tool has one, is a fault.
+        const paramsOf = tools => new Set(tools.flatMap(tool => Object.keys(listed.get(tool)?.inputSchema.properties ?? {})));
+        const topic = playbooks.topics.find(entry => entry.name === name);
+        const kitTools = definitions.filter(kit => kit.kit === topic?.kit).flatMap(kit => kit.tools.map(tool => tool.name)).filter(tool => listed.has(tool));
         for (const section of sections(markdown)) {
           const sectionWords = section.text;
           const named = [...listed.keys()].filter(tool => hasWord(sectionWords, tool));
-          const params = new Set(named.flatMap(tool => Object.keys(listed.get(tool).inputSchema.properties ?? {})));
+          const params = paramsOf([...named, ...kitTools]);
+          const namedParams = paramsOf(named);
           for (const line of prose(section.text).split('\n')) {
-            for (const span of spansOf(line)) {
-              const word = span.trim();
-              if (/^[a-z][a-z0-9_]*$/.test(word)) {
-                if (listed.has(word)) continue;
-                if (toolKit.has(word)) {
-                  add(where, `\`${word}\` is a tool of ${toolKit.get(word).kit}, which this server does not list: put it in a with block`);
-                  continue;
-                }
-                if (params.has(word) || listedParams.has(word) || COMMON.has(word) || RESULT_FIELDS.has(word) || FORMAT_FIELDS.has(word)
-                  || values.has(word) || topicNames.has(word) || kitIds.includes(word) || extraNames.has(word) || hasWord(offeredWords, word)) continue;
-                add(where, allParams.has(word)
-                  ? `\`${word}\` is a parameter only of tools that are off here (section "${section.heading}"): put it in a with block`
-                  : `\`${word}\` is not a tool, a parameter, a result field or a field this test knows (section "${section.heading}"); if it is a field of a file the topic documents, add it to FORMAT_FIELDS in tests/playbooks.test.mjs`);
-              } else if (LOOKS_LIKE_FILE.test(word) && !/^https?:/.test(word)) {
-                const inputs = callsOf(markdown).flatMap(call => Object.values(call.args ?? {})).filter(value => typeof value === 'string')
-                  .map(value => path.posix.basename(value));
-                if (!written(word, allWrites) && !inputs.includes(path.posix.basename(word)) && !/\.(?:ya?ml)$/i.test(word)) {
-                  add(where, `\`${word}\` is a file no tool writes (writes in kits/) and no call here gives`);
+            for (const sentence of line.split(/(?<=[.!?:;])\s+(?=\S)/)) {
+              const spans = spansOf(sentence).map(span => span.trim());
+              const tied = spans.filter(word => listed.has(word) && word !== 'makersmcp_playbook');
+              // A kit flag in the sentence, like `--timeout` is `timeout_seconds`, names its parameter.
+              const flagged = new Set(spans.filter(word => /^--[a-z]/.test(word)).flatMap(flag => flagParams.get(flag) ?? []));
+              for (const word of spans) {
+                if (/^[a-z][a-z0-9_]*$/.test(word)) {
+                  if (listed.has(word)) continue;
+                  if (toolKit.has(word)) {
+                    add(where, `\`${word}\` is a tool of ${toolKit.get(word).kit}, which this server does not list: put it in a with block`);
+                    continue;
+                  }
+                  if (flagged.has(word)) continue;
+                  if (tied.length && allParams.has(word) && !namedParams.has(word) && !paramsOf(tied).has(word) && !COMMON.has(word) && !RESULT_FIELDS.has(word)) {
+                    add(where, `\`${word}\` is no parameter of ${tied.map(tool => `\`${tool}\``).join(' or ')}, which its sentence names, nor of a tool of its section: "${sentence.trim().slice(0, 100)}"`);
+                    continue;
+                  }
+                  if (params.has(word) || COMMON.has(word) || RESULT_FIELDS.has(word) || FORMAT_FIELDS.has(word)
+                    || values.has(word) || topicNames.has(word) || kitIds.includes(word) || extraNames.has(word) || hasWord(offeredWords, word)) continue;
+                  add(where, allParams.has(word)
+                    ? `\`${word}\` is a parameter only of tools that are off here or that the section does not name (section "${section.heading}")`
+                    : `\`${word}\` is not a tool, a parameter, a result field or a field this test knows (section "${section.heading}"); if it is a field of a file the topic documents, add it to FORMAT_FIELDS in tests/playbooks.test.mjs`);
+                } else if (LOOKS_LIKE_FILE.test(word) && !/^https?:/.test(word)) {
+                  const inputs = callsOf(markdown).flatMap(call => Object.values(call.args ?? {})).filter(value => typeof value === 'string')
+                    .map(value => path.posix.basename(value));
+                  if (!written(word, allWrites) && !inputs.includes(path.posix.basename(word)) && !/\.(?:ya?ml)$/i.test(word)) {
+                    add(where, `\`${word}\` is a file no tool writes (writes in kits/) and no call here gives`);
+                  }
                 }
               }
             }
@@ -664,7 +724,8 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
             if (!hasWord(own, tool.name)) add(`${definition.kit}, ${label}`, `its topics never name ${tool.name}`);
             for (const param of Object.keys(listed.get(tool.name).inputSchema.properties ?? {})) {
               if (param === 'wait_seconds') continue;
-              if (!hasWord(own, param)) add(`${definition.kit}, ${label}`, `its topics never name ${param}, a parameter of ${tool.name}`);
+              // As a name, in code or as an argument of a call, not as the word it may also be, like for or end.
+              if (!own.includes(`\`${param}\``) && !own.includes(`"${param}":`)) add(`${definition.kit}, ${label}`, `its topics never name ${param}, a parameter of ${tool.name}, as \`${param}\` or in a call`);
             }
             if (!callsOf(own).some(call => call.tool === tool.name)) add(`${definition.kit}, ${label}`, `its topics have no call of ${tool.name}`);
             if (tool.playbook && !(rendered.get(tool.playbook) && hasWord(rendered.get(tool.playbook), tool.name))) {
@@ -734,6 +795,11 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
           for (const sentence of sentences) {
             for (const [, kind, name] of sentence.matchAll(/\{(file|name):([^}]+)\}/g)) {
               if (!written(name, tool.writes ?? [])) add(`${tool.name}.${field}`, `{${kind}:${name}} is not in ${tool.name}'s writes`);
+            }
+            // A file named without a placeholder, like "FIT.md below", is one some tool writes too.
+            for (const [word] of sentence.replace(/\{[^{}]*\}/g, ' ').matchAll(/[\w<>*.-]+(?:\/[\w<>*.-]+)*/g)) {
+              const file = word.replace(/[.]+$/, '');
+              if (LOOKS_LIKE_FILE.test(file) && !written(file, allWrites)) add(`${tool.name}.${field}`, `names ${file}, which no tool writes`);
             }
           }
         }
@@ -865,6 +931,8 @@ test('the kits in kits/ and the topics in playbooks/ pass every check of the lin
     }),
     ...textFiles(path.join(here, '..', 'src')),
     ...readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors.map(entry => entry.text),
+    // The schema's refusals and an unknown tool, as the SDK and zod word them.
+    ...['@modelcontextprotocol/sdk/server/mcp.js', 'zod/v4/locales/en.js'].map(name => readFileSync(requireHere.resolve(name), 'utf8')),
   ];
   // MakersMCP-Server's workers hold these back where their ffmpeg cannot run them.
   const problems = await lint({ definitions, dir: PLAYBOOKS_DIR, corpus, extraNames: launchFilmNames(), held: ['check_video', 'fit_music'] });
@@ -1353,6 +1421,73 @@ async function withTopicsAsync(files, callback) {
     rmSync(dir, { recursive: true, force: true });
   }
 }
+
+test('a failed job of a tool with no failed line points to its topic, and a Next sentence that cannot be filled goes alone', async () => {
+  // mix_sound gives no failed line, so its topic's is used.
+  const failure = { id: 'job_9', kit: 'soundkit', tool: 'mix_sound', title: 'Mix a sound', status: 'failed', exitCode: 1, elapsedSeconds: 1, failure: 'It broke.' };
+  const session = await connect({ definitions: fixtureKits(), playbooks: path.join(FIXTURES, 'topics'), view: () => failure });
+  try {
+    const result = await session.client.callTool({ name: 'mix_sound', arguments: { track: 'a.wav' } });
+    assert.equal(result.structuredContent.next, FAILED_NEXT.replace('{topic}', 'sound'));
+    assert.match(text(result), /^## Mix a sound: failed after 1 s \(exit code 1\)\n\nNext: The sound playbook \(makersmcp_playbook\) lists/);
+  } finally {
+    await session.close();
+  }
+  // A fact the kit does not have takes its own sentence out, and only that one.
+  const kits = fixtureKits();
+  const paint = kits[0].tools.find(tool => tool.name === 'paint_picture');
+  paint.next.done = ['Show {file:picture.png} to the user.', 'It is {fact:paintkit.widest} wide.', 'Everything is in {folder}.'];
+  const folder = `${LOCAL_DIR}/paintkit-example.com`;
+  assert.deepEqual(nextSentences(painted('job_8'), { text: ctx({ definitions: kits }), topics: new Set(['painting']), kit: kits[0], tool: paint }),
+    [`Show ${folder}/picture.png to the user.`, `Everything is in ${folder}.`]);
+});
+
+test('hosted, a Next line from next leaves out a sentence with {folder}', async () => {
+  const kits = fixtureKits();
+  delete kits[0].tools.find(tool => tool.name === 'paint_picture').hostedNext;
+  const id = '0f5c2e9a-1b2c-4d3e-8f90-123456789abc';
+  const session = await connect({
+    definitions: kits, playbooks: path.join(FIXTURES, 'topics'), where: 'hosted',
+    view: () => painted(id, { folder: `paint_picture ${id}`, files: [{ path: 'picture.png', bytes: 10, url: 'https://files.example.com/p.png?s=1' }], expiresAt: 1800000000 }),
+  });
+  try {
+    const result = await session.client.callTool({ name: 'paint_picture', arguments: { url: 'https://example.com' } });
+    assert.equal(result.structuredContent.next, `Show job:${id}/picture.png to the user.`);
+  } finally {
+    await session.close();
+  }
+});
+
+test('a topic with any is offered while one of its kits is on, and not when none is', () => {
+  const playbooks = loadPlaybooks(path.join(FIXTURES, 'topics'));
+  const names = on => offeredTopics(playbooks, new Set(on)).map(entry => entry.name);
+  assert.ok(names(['paintkit']).includes('together'));
+  assert.ok(names(['soundkit']).includes('together'));
+  assert.ok(!names(['otherkit']).includes('together'));
+});
+
+test('one process renders a hosted topic with and without limits, each with its own words', () => {
+  withTopics({ 'a.md': topic('a', '<!-- hosted -->\nLinks work for {limit:keep_days}.\n<!-- end -->') }, dir => {
+    const playbooks = loadPlaybooks(dir);
+    const hosted = overrides => renderTopic(playbooks, 'a', ctx({ where: 'hosted', place: 'on makersmcp.com', baseDir: undefined, ...overrides }));
+    assert.match(hosted({ limits: { keepDays: 4 } }), /Links work for 4 days\./);
+    assert.match(hosted({}), /Links work for a few days\./);
+    assert.match(hosted({ limits: { keepDays: 9 } }), /Links work for 9 days\./);
+  });
+});
+
+test('the instructions say to call list_jobs after a call that ended with no result, on both sides', async () => {
+  for (const where of ['local', 'hosted']) {
+    const session = await connect({ definitions: loadKitDefinitions(), where });
+    try {
+      const sentence = 'A call that ended with no result may still have started one: call list_jobs before trying again.';
+      assert.ok(session.instructions.includes(sentence), session.instructions);
+      assert.ok(session.instructions.indexOf(sentence) + sentence.length <= 512, 'inside the first 512 characters');
+    } finally {
+      await session.close();
+    }
+  }
+});
 
 test('a tool MakersMCP-Server holds back is not listed and no text names it, while its defaults still fill', async () => {
   // As MakersMCP-Server passes them: the package's kits without the tools its workers cannot run (runnableDefinitions).

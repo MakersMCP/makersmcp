@@ -1,13 +1,17 @@
 // The kits' facts (`facts` in kits/<kit>.json), which the playbooks and the descriptions
 // show through {fact:<kit>.<key>}, against the kits themselves, so a kit release that
-// changes a number fails here before a text says the old one. Every fact needs a way to be
-// read from the installed kit in READERS below; a fact without one fails the test. With
-// MAKERSMCP_SLOW=1 a second part renders a two clip film and records a five second demo
-// with the real kits, Chrome and ffmpeg, and measures them with check_video.
+// changes a number fails here before a text says the old one. Every number needs a way to
+// be read from the installed kit in READERS below, from its code or from its own guide where
+// only that says it, and a number without one fails the test; a short text, like "20 to 90",
+// may instead be written word for word in the kit's files. Facts measured on real films and
+// tours are in MEASURED. With MAKERSMCP_SLOW=1 a second part renders a two clip film and
+// records a five second demo with the real kits, Chrome and ffmpeg, and measures them with
+// check_video.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -43,6 +47,34 @@ function checkRules(read) {
 }
 
 const tempo = (read, look) => stated(read('src/audio.js'), new RegExp(`^\\s*${look}: \\{ bpm: (\\d+)`, 'm'), 'src/audio.js');
+
+/** Milliseconds as the kits write them, like 60_000, in seconds. */
+const millis = (text, pattern, file) => {
+  const match = pattern.exec(text);
+  assert.ok(match, `${file} no longer has ${pattern}: see where the kit keeps this number now`);
+  return Number(match[1].replace(/_/g, '')) / 1000;
+};
+
+/**
+ * The longest a scene's field may be, from launch-film's src/scene.js: <type>_<field> is a
+ * type's own limit (need, or an item's field, feature for features), and a field alone the
+ * limit of every other type, as words() in its scene() gives it.
+ */
+function sceneMax(dir, read, key) {
+  const { TYPES } = createRequire(path.join(dir, 'package.json'))('./src/scene.js');
+  const split = /^(\w+?)_(\w+)$/.exec(key);
+  const type = split && (TYPES[split[1]] ? split[1] : TYPES[`${split[1]}s`] ? `${split[1]}s` : undefined);
+  if (type) {
+    const def = TYPES[type];
+    const field = split[2];
+    const value = def.need?.[field] ?? (Array.isArray(def.item?.[field]) ? def.item[field][0] : undefined);
+    assert.ok(typeof value === 'number', `src/scene.js gives ${type} no limit for ${field}`);
+    return value;
+  }
+  return stated(read('src/scene.js'), new RegExp(`${key}: words\\(spec\\.${key}, '"${key}"', (?:need\\.${key} \\|\\| )?(\\d+)`), 'src/scene.js');
+}
+
+const SHOTS = 'skills/easyscreenshotkit/scripts/lib';
 
 /** A device of easyscreenshotkit, by name, in a file of it: [width, height, scale]. */
 function device(read, file, name) {
@@ -137,6 +169,51 @@ const READERS = [
     return size(Number(match[1]), Number(match[2]), Number(match[3]));
   }],
   ['easybrandkit', /^logo_min(?:_side|_px)?$/, ({ read }) => stated(read('skills/easybrandkit/scripts/lib/logos.js'), /Math\.max\(2, (\d+) \/ height/, 'logos.js')],
+  ['easybrandkit', /^facts_timeout$/, ({ read }) => stated(read('skills/easybrandkit/scripts/easybrandkit.js'), /options\.timeout = options\.facts \? (\d+) : \d+;/, 'easybrandkit.js')],
+  // Advice the kit's own guide gives, which no code holds.
+  ['easybrandkit', /^slow_timeout$/, ({ read }) => stated(read('skills/easybrandkit/SKILL.md'), /Slow sites can take `--timeout (\d+)`/, 'SKILL.md')],
+  ['easyfontkit', /^late_timeout$/, ({ read }) => stated(read('skills/easyfontkit/SKILL.md'), /load its fonts late\. Try `--timeout (\d+)`/, 'SKILL.md')],
+  ['easyfontkit', /^free_matches$/, ({ read }) => stated(read('skills/easyfontkit/scripts/lib/match.js'), /function freeMatches\(\{[^}]*\bcount = (\d+)/, 'match.js')],
+  ['easyscreenshotkit', /^slow_timeout$/, ({ read }) => stated(read('skills/easyscreenshotkit/SKILL.md'), /Slow sites can take `--timeout (\d+)`/, 'SKILL.md')],
+  // Chrome's rules for manifest screenshots, as pwa.js checks them.
+  ['easyscreenshotkit', /^pwa\.(?:max|side_min|side_max|ratio_max|phone_max|description_chars)$/, ({ read, key }) => {
+    const name = { max: 'LOOKED_AT', side_min: 'MIN_SIDE', side_max: 'MAX_SIDE', ratio_max: 'MAX_RATIO', phone_max: 'PHONE_SHOWS', description_chars: 'DESCRIPTION_SHOWN' }[key.split('.')[1]];
+    return stated(read(`${SHOTS}/pwa.js`), new RegExp(`const ${name} = ([\\d.]+);`), 'pwa.js');
+  }],
+  ['easyscreenshotkit', /^demo\.window$/, ({ read }) => stated(read(`${SHOTS}/demo.js`), /const viewport = \{ width: (\d+), height: (\d+) \}/, 'demo.js')],
+  ['easyscreenshotkit', /^demo\.time_left$/, ({ read }) => millis(read(`${SHOTS}/demo.js`), /timeLeft\(\) < ([\d_]+)\) throw new Error\("time ran out while recording/, 'demo.js')],
+  ['easyscreenshotkit', /^tour\.pick_seconds$/, ({ read }) => millis(read(`${SHOTS}/tour.js`), /visits < wanted \* 3 && timeLeft\(\) > ([\d_]+)\)/, 'tour.js')],
+  // A steps file's limits, as steps.js reads one, and how long a step waits for its target.
+  ['easyscreenshotkit', /^steps\.\w+$/, ({ read, key }) => {
+    const steps = read(`${SHOTS}/steps.js`);
+    const pattern = {
+      max: /top\.steps\.length > (\d+)/,
+      type_max: /spec\.text\.length > (\d+)\) fail\(here, "type takes at most/,
+      wait_max: /seconds\(value, here, "wait", \{ max: (\d+) \}\)/,
+      timeout: /timeout === undefined \? (\d+) : seconds\(timeout/,
+      timeout_max: /seconds\(timeout, here, "timeout", \{ min: \d+, max: (\d+) \}\)/,
+      pause_max: /seconds\(raw\.pause, here, "pause", \{ max: (\d+) \}\)/,
+      duration_min: /seconds\(duration, here, "duration", \{ min: ([\d.]+), max: \d+ \}\)/,
+      duration_max: /seconds\(duration, here, "duration", \{ min: [\d.]+, max: (\d+) \}\)/,
+      zoom_max: /value >= 1 && value <= (\d+)\) return value;/,
+    }[key.split('.')[1]];
+    if (key === 'steps.find_seconds') return stated(read(`${SHOTS}/record.js`), /async locate\(target, \{ timeout = (\d+)/, 'record.js');
+    assert.ok(pattern, `no reader for ${key}: add its pattern here`);
+    return stated(steps, pattern, 'steps.js');
+  }],
+  ['launch-film', /^scene_max\.\w+$/, ({ read, key, dir }) => sceneMax(dir, read, key.split('.')[1])],
+  ['launch-film', /^ph_frames_max$/, ({ read }) => stated(read('src/stills.js'), /while \(list\.length > (\d+)\)/, 'src/stills.js')],
+  ['launch-film', /^music_volume$/, ({ read }) => stated(read('src/film.js'), /film\.music\.volume\) : ([\d.]+)/, 'src/film.js')],
+  // launch-film's guide: the level to check a film against for social apps, and how long a scene takes to read.
+  ['launch-film', /^lufs_social$/, ({ read }) => stated(read('skills/launch-film/SKILL.md'), /launch-film@latest check [^\n]*--lufs (-\d+)/, 'SKILL.md')],
+  ['launch-film', /^read_(?:letters_per_second|extra_seconds)$/, ({ read, key }) => {
+    const match = /about (\d+) letters a second plus (a second and a half|[\d.]+ seconds)/.exec(read('skills/launch-film/SKILL.md'));
+    assert.ok(match, 'SKILL.md no longer says how long a scene takes to read');
+    if (key === 'read_letters_per_second') return Number(match[1]);
+    return match[2] === 'a second and a half' ? 1.5 : Number.parseFloat(match[2]);
+  }],
+  ['musicfit', /^true_peak$/, ({ read }) => stated(read('skills/musicfit/scripts/lib/render.js'), /async function normalize\(audio, \{ lufs, peak = (-?[\d.]+) \}\)/, 'render.js')],
+  ['musicfit', /^analyze_fps$/, ({ read }) => stated(read('skills/musicfit/scripts/musicfit.js'), /raw\.fps !== undefined \? parseFps\(raw\.fps\) : (\d+)/, 'musicfit.js')],
 ];
 
 /** Facts no file of a kit states, since they are measured: by the slow part, or by hand with real sites. */
@@ -176,7 +253,7 @@ function readerOf(kit, key) {
   const reader = READERS.find(([owner, pattern]) => owner === kit.kit && pattern.test(key));
   const read = file => readFileSync(path.join(installed.dir, file), 'utf8');
   const params = name => kit.tools.find(tool => tool.name === name).params;
-  return { installed, read: reader && (() => reader[2]({ read, params, key })) };
+  return { installed, read: reader && (() => reader[2]({ read, params, key, dir: installed.dir })) };
 }
 
 for (const kit of kits) {
@@ -197,11 +274,16 @@ for (const kit of kits) {
         if (String(value) !== String(expected)) wrong.push(`${kit.kit}.${key} is ${value}, and ${kit.package} ${installed.version} says ${expected}`);
         continue;
       }
+      // A number shows up somewhere in any kit's files, so only a reader checks one.
+      if (typeof value === 'number') {
+        wrong.push(`${kit.kit}.${key} is ${value}, a number no reader in tests/facts.test.mjs takes: add a reader for it`);
+        continue;
+      }
       texts ??= kitTexts(installed.dir);
       if (writtenIn(texts, value)) loose.push(key);
       else wrong.push(`${kit.kit}.${key} is ${value}, which no reader in tests/facts.test.mjs takes and no file of ${kit.package} ${installed.version} says: add a reader, or fix the fact`);
     }
-    if (loose.length) t.diagnostic(`${kit.kit}: written in the kit's files, with no reader of their own: ${loose.join(', ')}`);
+    if (loose.length) t.diagnostic(`${kit.kit}: texts written in the kit's files, with no reader of their own: ${loose.join(', ')}`);
     assert.deepEqual(wrong, []);
   });
 }
@@ -211,11 +293,13 @@ test('the readers find what they look for in the installed kits', () => {
   // kit release that moves a number shows here.
   const samples = [
     ['launch-film', ['fps', 'size_16_9', 'size_9_16', 'sample_rate', 'lufs_target', 'true_peak', 'look_bpm.pop', 'bar_seconds.pop', 'clip_bars_default', 'clip_seconds_min',
-      'clip_seconds_max', 'film_seconds_max', 'length_min', 'length_max', 'still_size.ph_thumbnail', 'check_most', 'check_end.still']],
+      'clip_seconds_max', 'film_seconds_max', 'length_min', 'length_max', 'still_size.ph_thumbnail', 'check_most', 'check_end.still', 'scene_max.feature_title', 'scene_max.title',
+      'ph_frames_max', 'music_volume', 'lufs_social', 'read_extra_seconds']],
     ['easyscreenshotkit', ['size.iphone', 'scale.full', 'pwa.wide', 'demo.size', 'demo.fps', 'demo.gif_max_mb', 'full_page_max', 'custom.side_min', 'custom.side_max',
-      'custom.scale_min', 'custom.scale_max', 'custom.phone_below']],
-    ['musicfit', ['sample_rate', 'channels', 'length_min', 'length_max', 'hit_tail']],
-    ['easybrandkit', ['screen_size', 'card_size', 'logo_min_side']],
+      'custom.scale_min', 'custom.scale_max', 'custom.phone_below', 'slow_timeout', 'pwa.max', 'demo.window', 'demo.time_left', 'tour.pick_seconds', 'steps.zoom_max']],
+    ['musicfit', ['sample_rate', 'channels', 'length_min', 'length_max', 'hit_tail', 'true_peak', 'analyze_fps']],
+    ['easybrandkit', ['screen_size', 'card_size', 'logo_min_side', 'facts_timeout', 'slow_timeout']],
+    ['easyfontkit', ['late_timeout', 'free_matches']],
   ];
   const reached = new Set();
   const value = (owner, key) => {
@@ -246,6 +330,16 @@ test('the readers find what they look for in the installed kits', () => {
   assert.equal(value('musicfit', 'sample_rate'), 48000);
   assert.equal(value('musicfit', 'channels'), 'stereo');
   assert.equal(value('easybrandkit', 'screen_size'), '3200x1800');
+  assert.equal(value('launch-film', 'scene_max.feature_title'), 34);
+  assert.equal(value('launch-film', 'scene_max.title'), 70);
+  assert.equal(value('launch-film', 'scene_max.typewriter_text'), 140);
+  assert.equal(value('launch-film', 'ph_frames_max'), 5);
+  assert.equal(value('launch-film', 'read_extra_seconds'), 1.5);
+  assert.equal(value('easyscreenshotkit', 'steps.zoom_max'), 3);
+  assert.equal(value('easyscreenshotkit', 'steps.duration_min'), 0.2);
+  assert.equal(value('easyscreenshotkit', 'demo.time_left'), 60);
+  assert.equal(value('musicfit', 'analyze_fps'), 30);
+  assert.equal(value('musicfit', 'true_peak'), -1);
   // A fact no reader takes is checked against the kit's own words.
   assert.ok(writtenIn(['It takes 20 to 90 seconds.'], '20 to 90'));
   assert.ok(writtenIn(['const MAX = 15_000;'], 15000));
@@ -337,8 +431,10 @@ test('a five second demo records at the size easyscreenshotkit\'s facts give', {
       writeFileSync(path.join(outDir, 'demo.yaml'), `url: "${url}"\nsteps:\n  - visit: "${url}"\n  - wait: 2\n  - scroll: 600\n  - wait: 2\n`);
       const recorded = await finished(client, 'record_demo_video', { url, steps: 'demo.yaml', gif: false, out_dir: 'demo' });
       assert.equal(recorded.structuredContent?.status, 'done', text(recorded));
-      const size = fact('easyscreenshotkit', 'demo_size') ?? '1920x1080';
-      const fps = fact('easyscreenshotkit', 'demo_fps') ?? 30;
+      // The kit file's size, and the frame rate record_demo_video records at without fps.
+      const size = fact('easyscreenshotkit', 'demo.size');
+      const fps = kits.find(entry => entry.kit === 'easyscreenshotkit').tools.find(tool => tool.name === 'record_demo_video').params.fps.default;
+      assert.ok(size && fps, 'kits/easyscreenshotkit.json gives demo.size and record_demo_video.fps\'s default');
       const checked = await finished(client, 'check_video', { film: 'demo/demo.mp4', expect: `${size}@${fps}` });
       assert.equal(checked.structuredContent?.status, 'done', text(checked));
       const report = measured(path.join(outDir, 'demo', 'demo.mp4'));

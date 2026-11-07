@@ -66,6 +66,9 @@
     { "text": "It ran longer than <n> minutes and was stopped.", "from": "MakersMCP-Api helpers/kits/worker-job.js, 15 minutes in production" },
     { "text": "The check could not run on this input.", "from": "MakersMCP-Api helpers/kits/worker-job.js" },
     { "text": "The kit stopped without saying why.", "from": "MakersMCP-Api helpers/kits/worker-job.js" },
-    { "text": "Something went wrong on our side. Try again in a while.", "from": "MakersMCP-Api helpers/kits/worker-job.js" }
+    { "text": "Something went wrong on our side. Try again in a while.", "from": "MakersMCP-Api helpers/kits/worker-job.js" },
+    { "text": "The kits are not available right now. Try again later.", "from": "MakersMCP-Api controllers/kits/api-kits.js, a 503 from Kits/Start while the job store is down (194f743)" },
+    { "text": "Waiting for a free worker", "from": "MakersMCP-Api helpers/kits/kit-service.js, the last line of a queued job (194f743)" },
+    { "text": "Held back: <tool> (<why>).", "from": "MakersMCP-Server src/api-backend.ts setupReport, a tool the catalog holds back (8527d59)" }
   ]
 }

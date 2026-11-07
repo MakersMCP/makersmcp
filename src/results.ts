@@ -152,8 +152,8 @@ function unlisted(context: ResultContext): string[] {
  * The sentences of a job's Next line, from its tool's next (or hostedNext on a hosted
  * server) for the job's state. A sentence that names a file the job did not list, a folder
  * on a hosted server, a topic the server does not offer or a tool it does not list is left
- * out, so the line never points at something that is not there. A placeholder that cannot
- * be filled is an error. {file:<name>} is the file's path here, or
+ * out, so the line never points at something that is not there, and so is one with a
+ * placeholder that cannot be filled. {file:<name>} is the file's path here, or
  * job:<job_id>/<path> hosted, to give a tool; {name:<name>} is the name alone, for a file
  * whose link the user gets from the list.
  */
@@ -175,42 +175,44 @@ export function nextSentences(view: JobView, context: ResultContext): string[] {
       missing = true;
       return '';
     };
-    const text = fillText(sentence, context.text, {
-      kind: 'next',
-      extra: (placeholder: Placeholder) => {
-        switch (placeholder.name) {
-          case 'job_id':
-            return view.id;
-          case 'folder':
-            return hosted || !view.folder ? gone() : view.folder;
-          case 'topic':
-            return offered ? tool.playbook : gone();
-          case 'file': {
-            const file = listedFile(files, placeholder.arg!);
-            return file ? fileRef(view, file, hosted) : gone();
+    let text: string;
+    try {
+      text = fillText(sentence, context.text, {
+        kind: 'next',
+        extra: (placeholder: Placeholder) => {
+          switch (placeholder.name) {
+            case 'job_id':
+              return view.id;
+            case 'folder':
+              return hosted || !view.folder ? gone() : view.folder;
+            case 'topic':
+              return offered ? tool.playbook : gone();
+            case 'file': {
+              const file = listedFile(files, placeholder.arg!);
+              return file ? fileRef(view, file, hosted) : gone();
+            }
+            case 'name':
+              return listedFile(files, placeholder.arg!) ? placeholder.arg! : gone();
+            default:
+              return undefined;
           }
-          case 'name':
-            return listedFile(files, placeholder.arg!) ? placeholder.arg! : gone();
-          default:
-            return undefined;
-        }
-      },
-    });
+        },
+      });
+    } catch (error) {
+      // A sentence that cannot be filled is left out; the others still say what comes next.
+      if (error instanceof TextError) continue;
+      throw error;
+    }
     if (!missing && !absent.some(pattern => pattern.test(text))) kept.push(text.trim());
   }
   return kept;
 }
 
-/** The Next line's text, or nothing: a sentence that cannot be filled is left out here, never the result. */
+/** The Next line's text, or nothing when no sentence of it is left. */
 function nextText(view: JobView, context: ResultContext | undefined): string | undefined {
   if (!context) return undefined;
-  try {
-    const sentences = nextSentences(view, context);
-    return sentences.length ? sentences.join(' ') : undefined;
-  } catch (error) {
-    if (error instanceof TextError) return undefined;
-    throw error;
-  }
+  const sentences = nextSentences(view, context);
+  return sentences.length ? sentences.join(' ') : undefined;
 }
 
 /** Text cut to at most `room` characters, at the end of a line when one ends near there. */
