@@ -1739,6 +1739,11 @@ test('hosted, a job done with no file listed, as one past the days its files are
       assert.equal((await session.client.callTool({ name: 'wait_for_job', arguments: { job_id: id } })).structuredContent.next, FILES_GONE_NEXT);
       session.backend.wait = async () => ({ ...expired, files: [{ path: 'card.png', bytes: 10, url: 'https://x/card.png' }], expiresAt: 1800000000 });
       assert.match((await session.client.callTool({ name: 'wait_for_job', arguments: { job_id: id } })).structuredContent.next, /^Check the brand's name/);
+      // A tool that writes no file, like the guide or the manifest check, has its whole result in its text: its own line stays.
+      session.backend.wait = async () => ({ ...expired, tool: 'launch_film_guide', kit: 'launch-film', title: 'Launch film looks and scene types', folder: undefined });
+      assert.match((await session.client.callTool({ name: 'wait_for_job', arguments: { job_id: id } })).structuredContent.next, /^Give a look to plan_launch_film/);
+      session.backend.wait = async () => ({ ...expired, tool: 'check_pwa_screenshots', kit: 'easyscreenshotkit', title: 'Check manifest screenshots', check: true, folder: undefined });
+      assert.match((await session.client.callTool({ name: 'wait_for_job', arguments: { job_id: id } })).structuredContent.next, /^Tell the user which screenshots/);
     } finally {
       await session.close();
     }
