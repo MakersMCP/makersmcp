@@ -335,14 +335,18 @@ export function offeredTopics(playbooks: Playbooks, enabled: Set<string>): Topic
     && (topic.any.length === 0 || topic.any.some(kit => enabled.has(kit))));
 }
 
-/** Each kit tool that is on, with what the user asks for and its topic, for getting-started. */
+/**
+ * Each kit tool that is on, with its topic and what the user wants when it fits (its asks),
+ * for getting-started: a line like "- `make_brand_kit` (brand): a site's logo, ...". The
+ * line is short, since every tool of every kit is on this list.
+ */
 function requestsText(playbooks: Playbooks, context: TextContext): string {
   const offered = new Set(offeredTopics(playbooks, context.enabled).map(topic => topic.name));
   const lines: string[] = [];
   for (const kit of context.definitions.filter(entry => context.enabled.has(entry.kit))) {
     for (const tool of kit.tools) {
-      const topic = tool.playbook && offered.has(tool.playbook) ? ` (topic ${tool.playbook})` : '';
-      const asks = tool.asks ? `when the user wants ${fillText(tool.asks, context, { kind: 'kit' })}` : tool.title;
+      const topic = tool.playbook && offered.has(tool.playbook) ? ` (${tool.playbook})` : '';
+      const asks = tool.asks ? fillText(tool.asks, context, { kind: 'kit' }) : tool.title;
       lines.push(`- \`${tool.name}\`${topic}: ${asks}.`);
     }
   }

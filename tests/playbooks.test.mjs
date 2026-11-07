@@ -1003,7 +1003,7 @@ test('makersmcp_playbook lists the offered topics in its description, reads up t
     const read = await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['painting', 'getting-started', 'painting'] } });
     assert.equal(read.content.length, 2);
     assert.match(read.content[0].text, /^# Pictures painted from a site\n/);
-    assert.match(read.content[1].text, /^# Getting started with the fixture kits\n[\s\S]*- `paint_picture` \(topic painting\): when the user wants a picture of a site, a cover, or art for a post about it\.\n- `check_picture` \(topic painting\)/);
+    assert.match(read.content[1].text, /^# Getting started with the fixture kits\n[\s\S]*- `paint_picture` \(painting\): a picture of a site, a cover, or art for a post about it\.\n- `check_picture` \(painting\)/);
     assert.match(read.content[1].text, /There is no sound kit here/);
     const unknown = await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['sound'] } });
     assert.equal(unknown.isError, true);

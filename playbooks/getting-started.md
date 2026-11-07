@@ -14,7 +14,7 @@ MakersMCP runs open source kits {place}. Each tool makes files from a website or
 
 ## Which tool fits
 
-Each tool here, with the requests it answers and its topic:
+Each tool here, with its topic and what the user wants when it fits:
 
 {requests}
 
