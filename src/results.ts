@@ -416,10 +416,12 @@ export function jobResult(view: JobView, context?: ResultContext): CallToolResul
     const listed = view.files.slice(0, MAX_LISTED)
       .map(file => `- ${file.path} (${size(file.bytes)})${file.url ? `: ${file.url}` : ''}`);
     if (view.files.length > MAX_LISTED) listed.push(`- and ${view.files.length - MAX_LISTED} more`);
-    const where = view.files.some(file => file.url)
-      ? `Files${view.expiresAt ? `, to download until ${until(view.expiresAt)}` : ''}:`
-      : `Folder: ${view.folder}`;
-    filesPart = `${where}\n\n${listed.join('\n') || 'No files.'}`;
+    // Links on a hosted server, even when there are none left; a folder here, when the job has one.
+    const links = context?.text.where === 'hosted' || view.files.some(file => file.url);
+    const where = links
+      ? `Files${view.expiresAt && view.files.length ? `, to download until ${until(view.expiresAt)}` : ''}:`
+      : view.folder ? `Folder: ${view.folder}` : '';
+    filesPart = [where, listed.join('\n') || 'No files.'].filter(Boolean).join('\n\n');
   }
 
   // What is left of the budget after the heading, the Next line and the files goes to the

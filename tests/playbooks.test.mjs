@@ -1633,6 +1633,46 @@ test('a refusal can name a file the call gave, and counts only for a call that g
   assert.throws(() => validateKitDefinition(kits[0]), /paint_picture\.refuses: \{hue\} is no file the call gives/);
 });
 
+test('a result lists take_screenshots\' own pages, NN-<page>-<size>.png in its writes, before its manifest screenshots', () => {
+  const tool = loadKitDefinitions().flatMap(kit => kit.tools).find(entry => entry.name === 'take_screenshots');
+  const files = ['pwa/manifest-screenshots.json', 'pwa/screenshots/wide-01.png', '01-home-desktop.png', 'SCREENSHOTS.md', '02-pricing-mobile.png', 'manifest.json', 'sheet.png']
+    .map(name => ({ path: name, bytes: 1 }));
+  assert.deepEqual(orderedFiles(files, tool).map(file => file.path),
+    ['SCREENSHOTS.md', 'manifest.json', 'sheet.png', '01-home-desktop.png', '02-pricing-mobile.png', 'pwa/manifest-screenshots.json', 'pwa/screenshots/wide-01.png']);
+});
+
+test('hosted, a doc cut short points to its link above, and a job with no folder has no folder line', async () => {
+  const big = { name: 'PAINT.md', text: `# Painted\n\n${'A line of the kit\'s notes.\n'.repeat(4000)}` };
+  const session = await connect({
+    definitions: fixtureKits(), playbooks: path.join(FIXTURES, 'topics'), where: 'hosted', limits: LIMITS,
+    view: (request, id) => painted(id, {
+      folder: 'paintkit-example.com', docs: [big],
+      files: [{ path: 'PAINT.md', bytes: 10, url: 'https://files.example.com/x/PAINT.md?s=1' }, { path: 'picture.png', bytes: 2000, url: 'https://files.example.com/x/picture.png?s=1' }],
+      expiresAt: 1800000000,
+    }),
+  });
+  try {
+    const body = text(await session.client.callTool({ name: 'paint_picture', arguments: { url: 'https://example.com' } }));
+    assert.match(body, /\(cut here: read the PAINT\.md link above for the rest\)/);
+    assert.doesNotMatch(body, /job:[^\s/]+\/PAINT\.md for the rest/);
+  } finally {
+    await session.close();
+  }
+  for (const where of ['local', 'hosted']) {
+    const none = await connect({
+      definitions: fixtureKits(), playbooks: path.join(FIXTURES, 'topics'), where,
+      view: (request, id) => ({ ...painted(id, { files: [], docs: [] }), folder: undefined }),
+    });
+    try {
+      const body = text(await none.client.callTool({ name: 'paint_picture', arguments: { url: 'https://example.com' } }));
+      assert.doesNotMatch(body, /Folder: undefined|Folder:/, where);
+      assert.match(body, where === 'hosted' ? /Files:\n\nNo files\./ : /\n\nNo files\./, where);
+    } finally {
+      await none.close();
+    }
+  }
+});
+
 test('hosted, a Next line from next leaves out a sentence with {folder}', async () => {
   const kits = fixtureKits();
   delete kits[0].tools.find(tool => tool.name === 'paint_picture').hostedNext;
