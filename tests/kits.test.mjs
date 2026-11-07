@@ -1078,16 +1078,23 @@ test('a file the call gives that a demo run deletes or writes over in its folder
   };
   const call = args => client.callTool({ name: 'record_demo_video', arguments: { url: SITE, wait_seconds: 60, ...args } });
   try {
+    const earlierIn = folder => Object.fromEntries(Object.entries(EARLIER.demo).map(([name, body]) => [`${folder}/${name}`, body]));
+    // The folder the demo saves in without out_dir.
+    const own = 'easyscreenshotkit-demo-acme.example.com';
     const refused = [
       // The user's steps file, saved in the demo's folder as steps.json.
       [{ steps: 'one/steps.json', out_dir: 'one' }, { 'one/steps.json': steps }, 'steps', 'steps.json', 'one'],
       // An earlier demo's poster as the backdrop, which the run deletes before it records.
-      [{ background: 'two/poster.png', out_dir: 'two' }, Object.fromEntries(Object.entries(EARLIER.demo).map(([name, body]) => [`two/${name}`, body])), 'background', 'poster.png', 'two'],
+      [{ background: 'two/poster.png', out_dir: 'two' }, earlierIn('two'), 'background', 'poster.png', 'two'],
+      // Its GIF, a picture the backdrop takes too.
+      [{ background: 'five/demo.gif', out_dir: 'five' }, earlierIn('five'), 'background', 'demo.gif', 'five'],
+      // A steps file saved as steps.json in the folder the demo saves in by default, with no out_dir.
+      [{ steps: `${own}/steps.json` }, { [`${own}/steps.json`]: steps }, 'steps', 'steps.json', own],
     ];
     if (posix) refused.push([{ steps: 'mine.json', out_dir: 'three' }, { 'mine.json': steps }, 'steps', 'steps.json', 'three']);
     for (const [args, files, param, name, folder] of refused) {
       for (const [file, body] of Object.entries(files)) write(file, body);
-      // The third: the folder's steps.json is a link to the steps file the call gives by its own path.
+      // The fifth: the folder's steps.json is a link to the steps file the call gives by its own path.
       if (folder === 'three') {
         mkdirSync(path.join(baseDir, 'three'));
         symlinkSync(path.join(baseDir, 'mine.json'), path.join(baseDir, 'three', 'steps.json'));
@@ -1110,6 +1117,13 @@ test('a file the call gives that a demo run deletes or writes over in its folder
       assert.match(text(started), /No Chrome, Chromium, Edge or Brave found/);
       assert.deepEqual(filesIn(path.join(baseDir, 'four')), ['app.json']);
       assert.match(started.structuredContent.next, /a steps file it read stays\.$/);
+    }
+    // A kit file whose runFiles names anything but a file in the folder itself is refused when it is read.
+    const screenshots = kits.find(kit => kit.kit === 'easyscreenshotkit');
+    for (const runFiles of [['frames/demo.mp4'], ['../demo.mp4'], []]) {
+      const broken = structuredClone(screenshots);
+      broken.tools.find(tool => tool.name === 'record_demo_video').out.runFiles = runFiles;
+      assert.throws(() => validateKitDefinition(broken), /record_demo_video: out\.runFiles names the files a run writes in its folder, like demo\.mp4/, JSON.stringify(runFiles));
     }
   } finally {
     await client.close();

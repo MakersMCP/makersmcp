@@ -1933,6 +1933,32 @@ test('a tool MakersMCP-Server holds back is not listed and no text names it, whi
   }
 });
 
+test('a sentence that holds only while a tool is held back or off is not there while it is listed, and one that needs a tool is there only with it', async () => {
+  const read = async (options, topics) => {
+    const session = await connect({ definitions: loadKitDefinitions(), ...options });
+    try {
+      return text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics } }));
+    } finally {
+      await session.close();
+    }
+  };
+  const hosted = held => ({ where: 'hosted', limits: LIMITS, ...(held ? { held } : {}) });
+  // "No tool here fits a track" is true only while fit_music is not listed.
+  for (const options of [{}, hosted(), hosted(['check_video'])]) {
+    assert.doesNotMatch(await read(options, ['getting-started', 'troubleshooting']), /No tool here fits a track/, JSON.stringify(options));
+  }
+  for (const held of [['fit_music'], ['check_video', 'fit_music']]) {
+    assert.equal((await read(hosted(held), ['getting-started', 'troubleshooting'])).match(/No tool here fits a track/g)?.length, 2, held.join());
+  }
+  // demo.mp4 goes on to check_video only while that is listed: locally with launch-film on, hosted while it is not held.
+  assert.match(await read({}, ['demo-video']), /Pass `demo\.mp4` on by its path\./);
+  assert.doesNotMatch(await read({ kits: ['easyscreenshotkit'] }, ['demo-video']), /Pass `demo\.mp4` on/);
+  for (const held of [undefined, ['fit_music']]) assert.match(await read(hosted(held), ['demo-video']), /Pass the video on as job:<job_id>\/demo\.mp4\./);
+  for (const held of [['check_video'], ['check_video', 'fit_music']]) {
+    assert.doesNotMatch(await read(hosted(held), ['demo-video']), /Pass the video on as job/, held.join());
+  }
+});
+
 test('a backend that runs only some tools of a kit lists those, and blocks, requires, descriptions and makes follow it', async () => {
   const kits = kitsWithoutTopics();
   const [paint, check] = kits[0].tools;
