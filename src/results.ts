@@ -22,6 +22,11 @@ export const FAILED_NEXT = "The {topic} playbook (makersmcp_playbook) lists this
  * analyze_music while fit_music is held back: troubleshooting lists that tool's errors then.
  */
 export const FALLBACK_TOPIC = 'troubleshooting';
+/**
+ * A hosted job's whole Next line once its files are gone: a service gives a job past the
+ * days it keeps files as done with no file listed, so nothing of it can be shown or passed on.
+ */
+export const FILES_GONE_NEXT = "This job's files are gone: run the tool again to make them anew.";
 // A doc's heading, its site note, its fence and where the rest is, at most.
 const DOC_OVERHEAD = 400;
 
@@ -181,6 +186,19 @@ function listedFile(files: JobFile[] | undefined, name: string): JobFile | undef
   });
 }
 
+/**
+ * The kit's flags in the words of its tools, from the whole kit file the texts read, so a
+ * flag of a tool a service holds back still reads as its parameter: with fit_music held,
+ * analyze_music's FIT.md says `length`, not `--length`. The result's own tool comes first.
+ */
+function resultFlagWords(context: ResultContext | undefined): Map<string, string> {
+  if (!context?.kit) return new Map();
+  const { kit, tool } = context;
+  const whole = context.text.definitions.find(entry => entry.kit === kit.kit) ?? kit;
+  const first = tool ? whole.tools.find(entry => entry.name === tool.name) ?? tool : undefined;
+  return flagWords(whole, first, context.text.where);
+}
+
 /** Where a listed file is for the agent: its full path here, or job:<job_id>/<path> on a hosted server. */
 function fileRef(view: JobView, file: JobFile, hosted: boolean): string {
   if (hosted) return `job:${view.id}/${file.path.replace(/\\/g, '/')}`;
@@ -204,13 +222,15 @@ function unlisted(context: ResultContext): string[] {
  * job:<job_id>/<path> hosted, to give a tool; {name:<name>} is the name alone, for a file
  * whose link the user gets from the list. A refused job, whose kit stopped before it touched
  * its folder, has the refused lines, or else the playbook line: never the failed ones, which
- * may say what a run that got further deleted.
+ * may say what a run that got further deleted. A hosted job done with no file listed, as one
+ * past the days its files are kept, has FILES_GONE_NEXT alone.
  */
 export function nextSentences(view: JobView, context: ResultContext): string[] {
   const { tool } = context;
   const state = nextState(view, tool);
   if (!tool || !state) return [];
   const hosted = context.text.where === 'hosted';
+  if (hosted && view.status === 'done' && view.files?.length === 0) return [FILES_GONE_NEXT];
   const offered = tool.playbook !== undefined && context.topics.has(tool.playbook);
   const absent = unlisted(context).map(name => new RegExp(`(?<![\\w-])${name}(?![\\w-])`));
   const files = orderedFiles(view.files, tool);
@@ -347,7 +367,7 @@ function docsShown(view: JobView, context: ResultContext | undefined, budget: nu
   const docs = view.docs ?? [];
   if (!docs.length) return [];
   const hosted = context?.text.where === 'hosted';
-  const words = context?.kit ? flagWords(context.kit, context.tool, context.text.where) : new Map<string, string>();
+  const words = resultFlagWords(context);
   const texts = docs.map(doc => (/\.json$/i.test(doc.name) ? doc.text.trim() : inParameterWords(doc.text.trim(), words)));
   const allowed = shares(texts.map(text => text.length), budget - DOC_OVERHEAD * docs.length);
   return docs.map((doc, i) => {
@@ -371,7 +391,7 @@ export function jobResult(view: JobView, context?: ResultContext): CallToolResul
   const seconds = `${view.elapsedSeconds} s`;
   const next = nextText(view, context);
   const nextLine = next ? `Next: ${next}` : '';
-  const words = context?.kit ? flagWords(context.kit, context.tool, context.text.where) : new Map<string, string>();
+  const words = resultFlagWords(context);
   const structured = { ...jobStructured(view), ...(next ? { next } : {}) };
 
   if (view.status === 'running') {

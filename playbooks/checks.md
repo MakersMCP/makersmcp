@@ -5,7 +5,7 @@ index: check_video: what to expect of each video, cuts on the beat, reading CHEC
 description: Measures a video's size, frame rate, length, black, still and silent stretches, loudness, true peak, clipping and cuts on the beat with launch-film's check, and says what to ask of a launch film, a demo or a copy with music laid in, how to read the report and its contact sheet, and what the check does not measure. Use it before handing over any video, or when the user asks whether a video meets a platform's limits.
 kit: launch-film
 requires: [launch-film, check_video]
-optional: [easyscreenshotkit, fit_music]
+optional: [easyscreenshotkit, fit_music, analyze_music]
 order: 67
 ---
 # Checking a video before it goes out
@@ -84,7 +84,12 @@ check_video {"film": "launch/film-16x9/with-music.mp4", "cuts": "launch/film-16x
 - `cues` of `check_video` takes the `cues.json` of the track under the video: `fit_music` writes one for the fitted track, and `analyze_music` one for a track that plays as it is from the first frame. Its frames count at the fps written in it, so it need not be the video's.
 <!-- end -->
 <!-- without fit_music -->
+<!-- with analyze_music -->
+- `cues` of `check_video` takes a `cues.json` with the track's beats as frame numbers at the fps it names: `analyze_music` writes one for a track that plays as it is from the first frame, or the user brings one:
+<!-- end -->
+<!-- without analyze_music -->
 - `cues` of `check_video` takes a `cues.json` with the track's beats as frame numbers at the fps it names, a file the user brings:
+<!-- end -->
 <!-- local -->
 ```call
 check_video {"film": "launch/film-16x9/with-music.mp4", "cues": "music/cues.json", "cuts": "launch/film-16x9/film.timeline.json", "out_dir": "launch/film-16x9/check-music"}
@@ -98,7 +103,12 @@ check_video {"film": "https://example.com/with-music.mp4", "cues": "https://exam
 <!-- end -->
 - A track with no steady beat has no beats, and the check refuses its cues.
 - A launch film cuts on the bars of its own look's music, so a track at another tempo lands some cuts off its beat. That is how it was made, and nothing here retimes the film: tell the user.
+<!-- with fit_music -->
 - A cues length warning means the cues are for another length: fit the track to the video's exact length.
+<!-- end -->
+<!-- without fit_music -->
+- A cues length warning means the track the cues are of is not as long as the video.
+<!-- end -->
 
 ## A launch film's own numbers
 

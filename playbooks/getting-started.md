@@ -5,7 +5,7 @@ index: which tool fits which request, how jobs, waits and files work, and what t
 description: Explains what MakersMCP's kits make from a website or a file and what they never make, which tool answers which request, how a job runs and how to wait for it, where the files go, the rules for using what the kits made, and what to tell the user at the end. Use it when a request names no tool, when it is unclear whether these kits can do it, or before a first job.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music, analyze_music]
 order: 10
 ---
 # Getting started with MakersMCP
@@ -17,6 +17,12 @@ MakersMCP runs open source kits {place}. Each tool makes files from a website or
 Each topic, with its tools and what the user wants when each fits:
 
 {requests}
+<!-- with analyze_music -->
+<!-- without fit_music -->
+
+No tool here fits a track to a video now: `analyze_music` only reads one, so the line of its FIT.md about fitting the track does not apply here.
+<!-- end -->
+<!-- end -->
 
 When the user asks what can be made, answer from this list, start no job, and ask which of it they want. No tool here makes an image, a video, a voice or music from a prompt, transcribes speech, uploads or posts: for such a request say so, and offer what the kits here do make.
 

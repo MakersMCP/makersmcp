@@ -177,10 +177,18 @@ Each error as the result shows it, then the fix.
 ## Files
 
 <!-- local -->
-`steps` is a path, absolute or relative to {base_dir}, and the file may sit in the demo's own folder. Pass `demo.mp4` on by its path. No tool here takes `steps.json`: read the times from it and give them as numbers.
+`steps` is a path, absolute or relative to {base_dir}, and the file may sit in the demo's own folder.
+<!-- with check_video -->
+Pass `demo.mp4` on by its path.
+<!-- end -->
+No tool here takes `steps.json`: read the times from it and give them as numbers.
 <!-- end -->
 <!-- hosted -->
-Each job saves into a folder of its own, and its links work for {limit:keep_days} for anyone who has them, so give them only to the user. Pass the video on as job:<job_id>/demo.mp4, and give job:<job_id>/demo.yaml as `steps` to record a tour again as it was. No tool here takes `steps.json`: read the times from it in the result and give them as numbers.
+Each job saves into a folder of its own, and its links work for {limit:keep_days} for anyone who has them, so give them only to the user.
+<!-- with check_video -->
+Pass the video on as job:<job_id>/demo.mp4.
+<!-- end -->
+Give job:<job_id>/demo.yaml as `steps` to record a tour again as it was. No tool here takes `steps.json`: read the times from it in the result and give them as numbers.
 <!-- end -->
 
 ## Hand over

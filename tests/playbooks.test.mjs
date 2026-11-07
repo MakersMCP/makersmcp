@@ -19,7 +19,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
   createMcpServer, loadKitDefinitions, loadPlaybooks, offeredTopics, PLAYBOOKS_DIR, renderTopic, resolveKit, validateKitDefinition,
 } from '../dist/server.js';
-import { DOCS_BUDGET, FAILED_NEXT, nextSentences, orderedFiles, RESULT_BUDGET, SITE_NOTE } from '../dist/results.js';
+import { DOCS_BUDGET, FAILED_NEXT, FILES_GONE_NEXT, nextSentences, orderedFiles, RESULT_BUDGET, SITE_NOTE } from '../dist/results.js';
 import { BASE_DIR_IN_WORDS, flagWords, inParameterWords, sentencesOf } from '../dist/texts.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -1669,6 +1669,37 @@ test('a refusal can name a file the call gave, and counts only for a call that g
   assert.throws(() => validateKitDefinition(kits[0]), /paint_picture\.refuses: \{hue\} is no file the call gives/);
 });
 
+test('hosted, a job done with no file listed, as one past the days its files are kept, says its files are gone and nothing else', async () => {
+  const id = '0f5c2e9a-1b2c-4d3e-8f90-123456789abc';
+  // As MakersMCP-Api gives a job whose files it deleted: done, with no file and no link.
+  const expired = { id, kit: 'easybrandkit', tool: 'make_brand_kit', title: 'Brand kit from a website', status: 'done', exitCode: 0, elapsedSeconds: 31,
+    folder: 'easybrandkit-example.com', summary: 'Saved the Example brand kit.\n\nIts files were deleted after 3 days.', files: [] };
+  for (const held of [[], ['check_video', 'fit_music']]) {
+    const session = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits: LIMITS, held, view: () => expired });
+    try {
+      session.backend.wait = async () => expired;
+      const result = await session.client.callTool({ name: 'wait_for_job', arguments: { job_id: id } });
+      assert.equal(result.structuredContent.next, FILES_GONE_NEXT);
+      assert.equal(text(result), `## Brand kit from a website: done in 31 s\n\nNext: ${FILES_GONE_NEXT}\n\nSaved the Example brand kit.\n\nIts files were deleted after 3 days.\n\nFiles:\n\nNo files.`);
+      // A check past its days too, and a job that lists its files keeps its own line.
+      session.backend.wait = async () => ({ ...expired, tool: 'plan_launch_film', kit: 'launch-film', title: 'Plan a launch film' });
+      assert.equal((await session.client.callTool({ name: 'wait_for_job', arguments: { job_id: id } })).structuredContent.next, FILES_GONE_NEXT);
+      session.backend.wait = async () => ({ ...expired, files: [{ path: 'card.png', bytes: 10, url: 'https://x/card.png' }], expiresAt: 1800000000 });
+      assert.match((await session.client.callTool({ name: 'wait_for_job', arguments: { job_id: id } })).structuredContent.next, /^Check the brand's name/);
+    } finally {
+      await session.close();
+    }
+  }
+  // On this machine files are not deleted after a time: a job that lists none keeps the sentences that need no file.
+  const local = await connect({ definitions: loadKitDefinitions(), view: () => ({ ...expired, folder: `${LOCAL_DIR}/easybrandkit-example.com` }) });
+  try {
+    local.backend.wait = async () => ({ ...expired, folder: `${LOCAL_DIR}/easybrandkit-example.com` });
+    assert.match((await local.client.callTool({ name: 'wait_for_job', arguments: { job_id: id } })).structuredContent.next, /^Check the brand's name/);
+  } finally {
+    await local.close();
+  }
+});
+
 test('a result lists take_screenshots\' own pages, NN-<page>-<size>.png in its writes, before its manifest screenshots', () => {
   const tool = loadKitDefinitions().flatMap(kit => kit.tools).find(entry => entry.name === 'take_screenshots');
   const files = ['pwa/manifest-screenshots.json', 'pwa/screenshots/wide-01.png', '01-home-desktop.png', 'SCREENSHOTS.md', '02-pricing-mobile.png', 'manifest.json', 'sheet.png']
@@ -1783,6 +1814,17 @@ test('a tool MakersMCP-Server holds back is not listed and no text names it, whi
     assert.equal(analyzed.structuredContent.next, "The troubleshooting playbook (makersmcp_playbook) lists this tool's errors and their fixes.");
     const troubleshooting = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['troubleshooting'] } }));
     assert.match(troubleshooting, /- `analyze_music`: "Cannot read <file>: ffmpeg does not know this format"/);
+    // FIT.md's flags of fit_music read as its parameters, from the whole kit file, and the topics say no tool fits a track now.
+    session.backend.view = (request, id) => ({ id, kit: 'musicfit', tool: 'analyze_music', title: 'Read a music track', status: 'done', exitCode: 0, elapsedSeconds: 2,
+      folder: 'musicfit-track', files: [{ path: 'FIT.md', bytes: 400, url: 'https://x/FIT.md' }], expiresAt: 1800000000,
+      docs: [{ name: 'FIT.md', text: '# track.wav\n\nFit the track with `--length`, and `--hit` to land the drop on a second.' }] });
+    const read2 = text(await session.client.callTool({ name: 'analyze_music', arguments: { track: 'https://example.com/x.mp3' } }));
+    assert.match(read2, /Fit the track with `length`, and `hit` to land the drop on a second\./);
+    assert.match(troubleshooting, /No tool here fits a track now, so the line of its FIT\.md about fitting the track does not apply here\./);
+    const started = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['getting-started'] } }));
+    // Its {requests} line, the one place a topic lists what analyze_music answers while its own topic is not offered.
+    assert.match(started, /^- `analyze_music`: a track's tempo, beats, bars, drop or ending\.$/m);
+    assert.match(started, /No tool here fits a track to a video now: `analyze_music` only reads one, so the line of its FIT\.md about fitting the track does not apply here\./);
   } finally {
     await session.close();
   }
