@@ -41,6 +41,7 @@
         "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 30, "max": 900, "default": 300, "description": "Give up after this many seconds (default {default:take_screenshots.timeout_seconds}). A run takes two or three minutes, up to five on very long pages, and a slow site can take {fact:easyscreenshotkit.slow_timeout}.", "hostedDescription": "Give up after this many seconds (default {default:take_screenshots.timeout_seconds}). A job here stops after {limit:job_minutes} whatever this says, so more does not help." }
       },
       "docs": [{ "file": "SCREENSHOTS.md", "site": true }],
+      "refuses": ["Unknown size: ", "a scale goes from", "width and height go from", "is given twice in --sizes", "needs at least one size", "is not a page of", "holds no earlier easyscreenshotkit run", "Not a web address"],
       "writes": ["SCREENSHOTS.md", "manifest.json", "sheet.png", "*-*.png", "pwa/manifest-screenshots.json", "pwa/screenshots/wide-*.png", "pwa/screenshots/narrow-*.png"],
       "next": {
         "done": [
@@ -50,7 +51,7 @@
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
-          "Unless it refused a size, a page or the folder, a failed run has also deleted the screenshots an earlier run left in {folder}."
+          "Any screenshots an earlier run left in {folder} are gone: this run deleted them before it failed."
         ]
       },
       "hostedNext": {
@@ -91,6 +92,7 @@
         "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 60, "max": 1800, "default": 900, "description": "Give up after this many seconds (default {default:record_demo_video.timeout_seconds}). A tour looks for more pages only while more than {fact:easyscreenshotkit.tour.pick_seconds} seconds are left, so a short one records the home page alone, and every step needs {fact:easyscreenshotkit.demo.time_left} seconds left.", "hostedDescription": "Give up after this many seconds (default {default:record_demo_video.timeout_seconds}). A job here stops after {limit:job_minutes} whatever this says, so more does not help. A tour looks for more pages only while more than {fact:easyscreenshotkit.tour.pick_seconds} seconds are left, so a short one records the home page alone." }
       },
       "docs": [{ "file": "steps.json", "site": true }],
+      "refuses": ["needs ffmpeg, and none was found", "has no H.264 encoder", "holds no earlier easyscreenshotkit demo", "--background: no such picture file", "--background takes a colour", "Not a web address"],
       "writes": ["demo.mp4", "demo.gif", "poster.png", "steps.json", "demo.yaml"],
       "next": {
         "done": [
@@ -102,7 +104,7 @@
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
           "A step that failed is named with its number: check its target against the page, write words as text=<words>, or wait for it first.",
-          "Unless it refused the steps file or found no ffmpeg, a failed run has also deleted the video an earlier run left in {folder}."
+          "Unless the reason names the steps file first, any video an earlier run left in {folder} is gone: this run deleted it before it failed, and demo.yaml too when it was a tour."
         ]
       },
       "hostedNext": {

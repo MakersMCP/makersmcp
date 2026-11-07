@@ -12,7 +12,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { buildCommand, createMcpServer, loadKitDefinitions, resolveKit } from '../dist/server.js';
+import { buildCommand, createMcpServer, LocalBackend, loadKitDefinitions, resolveKit } from '../dist/server.js';
 
 const kitPaths = Object.fromEntries((process.env.MAKERSMCP_KIT_PATHS ?? '').split(',').map(entry => entry.trim())
   .filter(entry => entry.includes('=')).map(entry => [entry.slice(0, entry.indexOf('=')), entry.slice(entry.indexOf('=') + 1)]));
@@ -564,4 +564,130 @@ test('check_video on a real video is a check, passed or failed, with its CHECK.m
     assert.match(text(result), /### CHECK\.md/);
     assert.ok(readFileSync(path.join(outDir, 'check', 'CHECK.md'), 'utf8').length > 0);
   });
+});
+
+/** The kit's own words, from the code and guides of its installed package. */
+function kitWords(kit) {
+  const installed = resolveKit(kit, kitPaths);
+  assert.ok(installed.dir, `${kit.kit}: ${installed.reason}`);
+  const words = [];
+  const walk = dir => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) walk(full);
+      } else if (/\.(?:[cm]?js|md)$/.test(entry.name)) {
+        words.push(readFileSync(full, 'utf8'));
+      }
+    }
+  };
+  walk(installed.dir);
+  return words.join('\n');
+}
+
+test('each refusal a kit file names is words of that kit\'s own messages, or of a kit it runs', () => {
+  for (const kit of kits) {
+    for (const tool of kit.tools) {
+      // launch-film passes on easybrandkit's reason when it runs easybrandkit.
+      const used = Object.values(tool.uses ?? {}).map(name => kits.find(entry => entry.kit === name)).filter(Boolean);
+      const words = [kit, ...used].map(kitWords).join('\n');
+      for (const refusal of tool.refuses ?? []) {
+        assert.ok(words.includes(refusal), `${tool.name}.refuses: "${refusal}" is in no file of ${[kit, ...used].map(entry => entry.package).join(' or ')}`);
+      }
+    }
+  }
+});
+
+/** Files as [path, size] pairs, for what a run left in a folder. */
+function filesIn(dir) {
+  const found = [];
+  const walk = (at, rel) => {
+    if (!existsSync(at)) return;
+    for (const entry of readdirSync(at, { withFileTypes: true })) {
+      const name = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(path.join(at, entry.name), name);
+      else found.push(name);
+    }
+  };
+  walk(dir, '');
+  return found.sort();
+}
+
+// An earlier run of each kit as its own folder check takes it, without a browser.
+const EARLIER = {
+  brand: {
+    'brand.json': JSON.stringify({ version: 1, name: 'Acme', logos: [{ file: 'logo-01.png' }], screenshots: [{ file: 'screen-01.png' }], card: { file: 'card.png' } }),
+    'BRAND.md': '# Acme\n', '_brand.yml': 'meta:\n  name: Acme\n', 'logo-01.png': 'png', 'screen-01.png': 'png', 'card.png': 'png',
+  },
+  fonts: { 'fonts.json': JSON.stringify({ version: 1, generator: 'easyfontkit 0.1.1', families: [] }), 'FONTS.md': '# Fonts\n', 'fonts.css': ':root {}\n' },
+  shots: {
+    'manifest.json': JSON.stringify({ version: 1, tool: 'easyscreenshotkit 0.1.1', pages: [] }),
+    'SCREENSHOTS.md': '# Screenshots\n', 'sheet.png': 'png', '01-home-desktop.png': 'png',
+  },
+  demo: {
+    'steps.json': JSON.stringify({ kind: 'demo', tool: 'easyscreenshotkit 0.1.1', steps: [] }),
+    'demo.mp4': 'mp4', 'demo.gif': 'gif', 'poster.png': 'png', 'demo.yaml': 'steps:\n  - wait: 1\n',
+  },
+};
+
+test('a call a kit refuses before it touches its folder leaves an earlier run there, and its Next line says nothing was deleted; one that fails after says what is gone', async () => {
+  const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-refused-'));
+  // No browser: each kit that gets past its own checks fails as it starts one.
+  const backend = new LocalBackend({ baseDir, kitPaths, env: { ...process.env, CHROME_PATH: path.join(baseDir, 'no-chrome'), LAUNCH_FILM_CHROME: path.join(baseDir, 'no-chrome') } });
+  const server = createMcpServer({ backend });
+  const client = new Client({ name: 'test-client', version: '1.0.0' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  let n = 0;
+  const run = async (tool, args, earlier, more = {}) => {
+    const out = `case-${++n}`;
+    mkdirSync(path.join(baseDir, out), { recursive: true });
+    for (const [file, body] of Object.entries(earlier)) writeFileSync(path.join(baseDir, out, file), body);
+    const before = filesIn(path.join(baseDir, out));
+    const result = await client.callTool({ name: tool, arguments: { ...args, out_dir: out, wait_seconds: 60, ...more } });
+    return { result, before, after: filesIn(path.join(baseDir, out)), next: result.structuredContent?.next ?? '' };
+  };
+  const site = 'https://acme.example.com/';
+  try {
+    const refusals = [
+      ['make_brand_kit', { url: 'https://x.com/acme' }, EARLIER.brand],
+      ['make_brand_kit', { url: site }, { 'notes.txt': 'mine' }],
+      ['make_font_kit', { url: site }, { 'notes.txt': 'mine' }],
+      ['take_screenshots', { url: site, sizes: ['huge'] }, EARLIER.shots],
+      ['take_screenshots', { url: site, page: ['https://other.example.com/x'] }, EARLIER.shots],
+      ['take_screenshots', { url: site, lang: 'english please' }, EARLIER.shots],
+      ['record_demo_video', { url: site, lang: 'english please' }, EARLIER.demo],
+      ['plan_launch_film', { url: 'http://localhost:9/' }, EARLIER.brand],
+      ['make_launch_film', { url: 'http://localhost:9/' }, EARLIER.brand],
+    ];
+    if (hasFfmpeg) refusals.push(['record_demo_video', { url: site }, { 'notes.txt': 'mine' }]);
+    for (const [tool, args, earlier] of refusals) {
+      const { result, before, after, next } = await run(tool, args, earlier);
+      const label = `${tool} ${JSON.stringify(args)}`;
+      assert.equal(result.structuredContent?.status, 'failed', `${label}: ${text(result)}`);
+      assert.deepEqual(after, before, `${label} left the folder as it was`);
+      assert.doesNotMatch(next, /gone|deleted|emptied/, label);
+      assert.match(next, /lists this tool's errors and their fixes\.$/, label);
+    }
+
+    const failures = [
+      ['make_brand_kit', { url: site }, EARLIER.brand],
+      ['make_font_kit', { url: site }, EARLIER.fonts],
+      ['take_screenshots', { url: site }, EARLIER.shots],
+    ];
+    if (hasFfmpeg) failures.push(['record_demo_video', { url: site, pages: 1 }, EARLIER.demo]);
+    for (const [tool, args, earlier] of failures) {
+      const { result, after, next } = await run(tool, args, earlier);
+      const label = `${tool} ${JSON.stringify(args)}`;
+      assert.equal(result.structuredContent?.status, 'failed', `${label}: ${text(result)}`);
+      assert.match(text(result), /No Chrome, Chromium, Edge or Brave found/, label);
+      assert.deepEqual(after, [], `${label} deleted the earlier run before it failed`);
+      assert.match(next, / (?:is|are) gone: this run deleted (?:it|them) before it failed/, label);
+    }
+  } finally {
+    await client.close();
+    await server.close();
+    rmSync(baseDir, { recursive: true, force: true });
+  }
 });

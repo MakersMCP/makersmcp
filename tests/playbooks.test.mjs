@@ -490,19 +490,21 @@ function fakeView(tool, kit, state, id, where, { files = true } = {}) {
   const names = (tool.writes ?? []).map(entry => sample(entry).replace(/x1/g, 'one'));
   const list = files ? names.map(name => ({ path: name, bytes: 10, ...(where === 'hosted' ? { url: `https://files.example.com/${id}/${name}?s=1` } : {}) })) : [];
   const flag = Object.values(tool.params).find(param => param.flag)?.flag ?? '--out';
+  const failed = state === 'failed' || state === 'refused';
   const docs = (tool.docs ?? []).map(entry => {
     const name = typeof entry === 'string' ? entry : entry.file;
     return { name, text: /\.json$/i.test(name) ? `{ "said": "${flag}" }` : `# ${name}\n\nRun again with ${flag} to change it.` };
   });
   return {
     id, kit: kit.kit, tool: tool.name, title: tool.title,
-    status: state === 'failed' ? 'failed' : 'done',
+    status: failed ? 'failed' : 'done',
     ...(tool.check ? { check: true } : {}),
-    exitCode: state === 'failed' ? 3 : state === 'check_failed' ? 1 : 0,
+    // A kit that refused an argument ends with exit code 2.
+    exitCode: state === 'refused' ? 2 : state === 'failed' ? 3 : state === 'check_failed' ? 1 : 0,
     elapsedSeconds: 4,
     folder,
-    ...(state === 'failed' ? { failure: `It broke. Try ${flag} again.` } : { summary: `Saved it. Give ${flag} another value.`, files: list, docs }),
-    ...(where === 'hosted' && state !== 'failed' ? { expiresAt: 1800000000 } : {}),
+    ...(failed ? { failure: `It broke. Try ${flag} again.` } : { summary: `Saved it. Give ${flag} another value.`, files: list, docs }),
+    ...(where === 'hosted' && !failed ? { expiresAt: 1800000000 } : {}),
   };
 }
 
@@ -771,7 +773,7 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
         for (const definition of definitions) {
           for (const tool of definition.tools) {
             if (!listed.has(tool.name)) continue;
-            const states = tool.check ? ['passed', 'check_failed', 'failed'] : ['done', 'failed'];
+            const states = tool.check ? ['passed', 'check_failed', 'failed', 'refused'] : ['done', 'failed', 'refused'];
             for (const state of states) {
               for (const files of [true, false]) {
                 const id = config.where === 'local' ? 'job_1a2b3c4d' : '0f5c2e9a-1b2c-4d3e-8f90-123456789abc';
@@ -840,7 +842,7 @@ async function resultProblems(definitions, dir, config, tool, view, state, allWr
       problems.push(`${label}: a Next line in the text, and none in the structured content`);
     }
     if (body.length > RESULT_BUDGET) problems.push(`${label}: ${body.length} characters, over ${RESULT_BUDGET}`);
-    if (state !== 'failed') {
+    if (state !== 'failed' && state !== 'refused') {
       for (const entry of tool.docs ?? []) {
         const name = typeof entry === 'string' ? entry : entry.file;
         const at = body.indexOf(`### ${name}\n\n`);
@@ -1440,6 +1442,25 @@ test('a failed job of a tool with no failed line points to its topic, and a Next
   const folder = `${LOCAL_DIR}/paintkit-example.com`;
   assert.deepEqual(nextSentences(painted('job_8'), { text: ctx({ definitions: kits }), topics: new Set(['painting']), kit: kits[0], tool: paint }),
     [`Show ${folder}/picture.png to the user.`, `Everything is in ${folder}.`]);
+});
+
+test('a job whose kit refused the call, by exit code 2 or by a reason in its refuses, gets the refused line or the playbook line, never a failed one', () => {
+  const kits = fixtureKits();
+  const paint = kits[0].tools.find(tool => tool.name === 'paint_picture');
+  paint.next.failed.push('It deleted the picture an earlier run left in {folder}.');
+  paint.refuses = ['is not a page to paint'];
+  const view = (exitCode, failure) => ({
+    id: 'job_5', kit: 'paintkit', tool: 'paint_picture', title: 'Paint a picture', status: 'failed', exitCode, elapsedSeconds: 1, folder: `${LOCAL_DIR}/paint`, failure,
+  });
+  const next = v => nextSentences(v, { text: ctx({ definitions: kits }), topics: new Set(['painting']), kit: kits[0], tool: paint });
+  const topicLine = FAILED_NEXT.replace('{topic}', 'painting');
+  assert.deepEqual(next(view(1, 'paintkit: the page did not load')), ['Read why it failed; the painting playbook has the fixes.', `It deleted the picture an earlier run left in ${LOCAL_DIR}/paint.`]);
+  assert.deepEqual(next(view(2, 'paintkit: --hue takes warm or cool')), [topicLine]);
+  assert.deepEqual(next(view(1, 'Opening...\npaintkit: https://x.com/a is not a page to paint')), [topicLine]);
+  paint.next.refused = ['Fix the argument the reason names, then call it again.'];
+  assert.deepEqual(next(view(2, 'paintkit: --hue takes warm or cool')), ['Fix the argument the reason names, then call it again.']);
+  // A tool with no playbook offered has no line for it.
+  assert.deepEqual(nextSentences(view(2, 'x'), { text: ctx({ definitions: kits }), topics: new Set(), kit: kits[0], tool: { ...paint, next: {} } }), []);
 });
 
 test('hosted, a Next line from next leaves out a sentence with {folder}', async () => {

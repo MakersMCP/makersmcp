@@ -17,7 +17,7 @@ Read the result before anything else: its first line says what happened, and the
 - "Input validation error: Invalid arguments for tool <tool>: <reason> at <param>": the arguments did not fit and nothing started. Fix that parameter: "an address starting with http:// or https://" wants the whole address, like https://linear.app, and "Too small: expected number to be >=30" wants a value inside the parameter's bounds. An argument the tool does not have is dropped without a word, so check the names.
 - "Tool <tool> not found": that tool is not on this server. `check_setup` lists the kits that are on.
 - "<title>: not started": makersmcp refused the call before a kit ran, so nothing changed. The reason follows.
-- "<title>: failed after <time> (exit code <n>)": the kit ran and stopped, and what it said follows. Exit code 2 means it refused an argument.
+- "<title>: failed after <time> (exit code <n>)": the kit ran and stopped, and what it said follows. Exit code 2 means it refused an argument before it changed anything.
 - A first line that says "failed the check": a check ran and found faults. That is a normal result, with `passed` false: read its report and fix what it lists.
 - "No job <job_id>": `wait_for_job` or `cancel_job` got an id it does not know. `list_jobs` shows the jobs there are.
 

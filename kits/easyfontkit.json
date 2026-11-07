@@ -28,6 +28,7 @@
       "docs": [
         { "file": "FONTS.md", "site": true }
       ],
+      "refuses": ["holds no earlier font kit", "Not a web address"],
       "writes": ["FONTS.md", "fonts.css", "fonts.json", "files/*"],
       "next": {
         "done": [
@@ -36,7 +37,7 @@
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
-          "Unless it refused the address or the folder, a failed run has also deleted any font kit an earlier run left in {folder}."
+          "Any font kit an earlier run left in {folder} is gone: this run deleted it before it failed."
         ]
       },
       "hostedNext": {

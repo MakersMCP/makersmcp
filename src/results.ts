@@ -94,9 +94,25 @@ export function jobListed(view: JobView) {
   return { ...rest, ...(files ? { file_count: files.length } : {}) };
 }
 
-/** The state a Next line is for: done, passed or check_failed for a check, or failed. */
-export function nextState(view: JobView): keyof NextLines | undefined {
-  if (view.status === 'failed') return 'failed';
+/** A kit's exit code for an argument it refused, before it did anything. */
+const REFUSED_EXIT = 2;
+
+/**
+ * Whether a failed job's kit refused the call before it touched its folder: it ended with
+ * exit code 2, or its reason holds one of the tool's refuses, like "holds no earlier brand kit".
+ */
+export function refused(view: JobView, tool?: ToolDefinition): boolean {
+  if (view.status !== 'failed') return false;
+  if (view.exitCode === REFUSED_EXIT) return true;
+  return Boolean(view.failure && tool?.refuses?.some(words => view.failure!.includes(words)));
+}
+
+/**
+ * The state a Next line is for: done, passed or check_failed for a check, failed, or refused
+ * for a failed job whose kit refused the call before it touched its folder.
+ */
+export function nextState(view: JobView, tool?: ToolDefinition): keyof NextLines | undefined {
+  if (view.status === 'failed') return refused(view, tool) ? 'refused' : 'failed';
   if (view.status !== 'done') return undefined;
   if (!view.check) return 'done';
   return view.exitCode === 0 ? 'passed' : 'check_failed';
@@ -155,11 +171,13 @@ function unlisted(context: ResultContext): string[] {
  * out, so the line never points at something that is not there, and so is one with a
  * placeholder that cannot be filled. {file:<name>} is the file's path here, or
  * job:<job_id>/<path> hosted, to give a tool; {name:<name>} is the name alone, for a file
- * whose link the user gets from the list.
+ * whose link the user gets from the list. A refused job, whose kit stopped before it touched
+ * its folder, has the refused lines, or else the playbook line: never the failed ones, which
+ * may say what a run that got further deleted.
  */
 export function nextSentences(view: JobView, context: ResultContext): string[] {
   const { tool } = context;
-  const state = nextState(view);
+  const state = nextState(view, tool);
   if (!tool || !state) return [];
   const hosted = context.text.where === 'hosted';
   const offered = tool.playbook !== undefined && context.topics.has(tool.playbook);
@@ -167,7 +185,7 @@ export function nextSentences(view: JobView, context: ResultContext): string[] {
   const files = orderedFiles(view.files, tool);
   const sentences = (hosted ? tool.hostedNext?.[state] : undefined)
     ?? tool.next?.[state]
-    ?? (state === 'failed' && offered ? [FAILED_NEXT] : []);
+    ?? ((state === 'failed' || state === 'refused') && offered ? [FAILED_NEXT] : []);
   const kept: string[] = [];
   for (const sentence of sentences) {
     let missing = false;

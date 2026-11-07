@@ -34,6 +34,7 @@
         { "file": "BRAND.md", "site": true },
         { "file": "FACTS.md", "site": true }
       ],
+      "refuses": ["not the brand's own site", "holds no earlier brand kit", "Not a web address"],
       "writes": [
         "BRAND.md", "brand.json", "_brand.yml", "card.png", "logo-*.png", "logo-*.svg", "screen-01.png",
         "appstore-icon.*", "appstore-shot-*", "googleplay-icon.*", "googleplay-shot-*",
@@ -49,7 +50,7 @@
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
-          "Unless it refused the address or the folder, a failed run has also deleted any kit an earlier run left in {folder}."
+          "Any kit an earlier run left in {folder} is gone: this run deleted it before it failed."
         ]
       },
       "hostedNext": {

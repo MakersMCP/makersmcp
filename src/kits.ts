@@ -177,6 +177,12 @@ export interface ToolDefinition {
   next?: NextLines;
   /** The Next line on a hosted server, where it differs: links and job:<job_id>/<path> instead of folders. */
   hostedNext?: NextLines;
+  /**
+   * Words a kit's reason holds when it refused the call before it touched its folder, like
+   * "holds no earlier brand kit": such a failed job, like one whose kit ended with exit code
+   * 2, gets the refused Next line, so a line about files a run deletes is never its own.
+   */
+  refuses?: string[];
   /** The files the tool writes, by name or pattern, like card.png, logo-*.png or pages/*.md, for the tests of the texts that name them. */
   writes?: string[];
   /**
@@ -196,13 +202,17 @@ export interface DocEntry {
 
 /**
  * The sentences of a Next line for each state of a job: done, passed and check_failed for a
- * check, and failed. A sentence that names a file the job did not write is left out.
+ * check, failed, and refused for a failed job whose kit refused the call before it touched its
+ * folder (exit code 2, or a reason in the tool's refuses). A sentence that names a file the
+ * job did not write is left out.
  */
 export interface NextLines {
   done?: string[];
   passed?: string[];
   check_failed?: string[];
   failed?: string[];
+  /** Without it, a refused job gets the tool's playbook line, never the failed lines. */
+  refused?: string[];
 }
 
 /** A kit's facts: numbers and short texts the playbooks and descriptions show, one level deep at most. */
@@ -244,7 +254,7 @@ const NAME = /^[a-z][a-z0-9_]*$/;
 /** A playbook topic's name, like launch-film. */
 export const TOPIC_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const FACT_KEY = /^[a-z][a-z0-9_]*$/;
-const NEXT_STATES = ['done', 'passed', 'check_failed', 'failed'] as const;
+const NEXT_STATES = ['done', 'passed', 'check_failed', 'failed', 'refused'] as const;
 const MAX_ASKS = 200;
 
 /** The name of each file a tool returns with its result, as its docs entries give them. */
@@ -360,6 +370,10 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
           if (field === 'next' && /\{limit:/.test(sentence)) fail(`${tool.name}.next.${state}: a limit is for hostedNext`);
         }
       }
+    }
+    if (tool.refuses !== undefined && !(Array.isArray(tool.refuses) && tool.refuses.length
+      && tool.refuses.every(words => typeof words === 'string' && words.trim().length >= 8))) {
+      fail(`${tool.name}.refuses lists words of the kit's refusals, at least 8 characters each, like "holds no earlier brand kit"`);
     }
     if (tool.out?.ownOnly !== undefined && (typeof tool.out.ownOnly !== 'boolean' || !tool.out.flag)) {
       fail(`${tool.name}: out.ownOnly is true or false, for a tool whose folder the agent gives with out.flag`);
