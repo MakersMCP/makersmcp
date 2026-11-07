@@ -38,6 +38,12 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- local -->
 - `list_jobs` shows the jobs this makersmcp started since it was launched: those still running, and the last 50 that ended. Jobs end when makersmcp ends, as when the client closes or restarts it. Their ids go with them, and `wait_for_job` then answers "No job <job_id>", but the files they saved stay in their folders.
 - `cancel_job` stops a running job and the browser or ffmpeg it started. Files it saved stay. An earlier run's files that the kit cleared when it started are gone.
+<!-- with easybrandkit -->
+  A brand kit canceled part way can leave some of its files without its brand.json, and `make_brand_kit` then refuses that folder: give the next run another `out_dir`.
+<!-- end -->
+<!-- with easyscreenshotkit -->
+  Screenshots canceled part way can leave some of the pictures without their manifest.json, and `take_screenshots` then refuses that folder: give the next run another `out_dir`.
+<!-- end -->
 - Jobs run side by side as far as the machine allows: four jobs that each opened Chrome have run at once. Two jobs never write into one folder: the second is refused with "<job_id> (<tool>) is still writing to <folder>" and "Wait for it with wait_for_job (job_id <job_id>), or give another out_dir."
 <!-- end -->
 <!-- hosted -->

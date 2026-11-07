@@ -46,7 +46,7 @@
       "next": {
         "done": [
           "Show {file:sheet.png} to the user and check that every page needed is there.",
-          "For a page that is missing, run again with it in page: SCREENSHOTS.md lists the pages left out, with why, and others the kit could take.",
+          "For a page that is missing, run again with it in page, and pages above 1: SCREENSHOTS.md lists the pages left out, with why, and others the kit could take.",
           "check_pwa_screenshots with manifest {file:pwa/manifest-screenshots.json} checks the screenshots for a web app manifest."
         ],
         "failed": [
@@ -57,7 +57,7 @@
       "hostedNext": {
         "done": [
           "Show the user the {name:sheet.png} link from the list below and check that every page needed is there.",
-          "For a page that is missing, run again with it in page: SCREENSHOTS.md lists the pages left out, with why, and others the kit could take.",
+          "For a page that is missing, run again with it in page, and pages above 1: SCREENSHOTS.md lists the pages left out, with why, and others the kit could take.",
           "check_pwa_screenshots with manifest {file:pwa/manifest-screenshots.json} checks the screenshots for a web app manifest."
         ],
         "failed": [
@@ -75,7 +75,7 @@
       "args": ["demo", "{url}"],
       "out": { "flag": "--out", "name": "easyscreenshotkit-demo-{host}", "ownOnly": true },
       "params": {
-        "url": { "type": "url", "required": true, "description": "The website, like https://linear.app. It wins over the url in a steps file, and a steps file whose first step is no visit starts here." },
+        "url": { "type": "url", "required": true, "description": "The website, like https://linear.app. It replaces a steps file's url line and starts a file whose first step is no visit; a visit to a whole address, as every visit in a tour's demo.yaml, still opens that address." },
         "steps": { "type": "path", "flag": "--steps", "description": "A YAML or JSON file of steps to follow instead of a tour, one action a step: visit, scroll, click, type, key, hover or wait. A target is a CSS selector or text=<words>, and a selector that starts with # goes in quotes. demo.yaml from an earlier tour is one to start from. Not with pages or page.", "hostedDescription": "A YAML or JSON file of steps to follow instead of a tour, used as it is, like the demo.yaml of a tour an earlier job recorded. One action a step: visit, scroll, click, type, key, hover or wait; a target is a CSS selector or text=<words>. Not with pages or page. Give an https link to the file, or job:<job_id>/<path> for a file an earlier job saved." },
         "pages": { "type": "integer", "flag": "--pages", "min": 1, "max": 8, "default": 4, "description": "Pages in the tour, the home page included (default {default:record_demo_video.pages}). A page that scrolls takes about {fact:easyscreenshotkit.tour.page_seconds} seconds and one that fits on the screen about {fact:easyscreenshotkit.tour.short_page_seconds}. The tour starts at the site's root and puts pricing last. For a tour only." },
         "page": { "type": "repeat", "flag": "--page", "description": "Pages of the same site to take in the tour, like /pricing, each taken even past pages. A #route is dropped: a view behind one needs steps. For a tour only." },

@@ -1604,6 +1604,10 @@ test('a job whose kit refused the call, by exit code 2 or by a reason in its ref
   assert.deepEqual(next(view(2, 'paintkit: --hue takes warm or cool')), ['Fix the argument the reason names, then call it again.']);
   // A tool with no playbook offered has no line for it.
   assert.deepEqual(nextSentences(view(2, 'x'), { text: ctx({ definitions: kits }), topics: new Set(), kit: kits[0], tool: { ...paint, next: {} } }), []);
+  // While its own topic is not offered, the playbook line names troubleshooting, which lists such a tool's errors then; a tool with no topic gets none.
+  const bare = { ...paint, next: {} };
+  assert.deepEqual(nextSentences(view(1, 'x'), { text: ctx({ definitions: kits }), topics: new Set(['troubleshooting']), kit: kits[0], tool: bare }), [FAILED_NEXT.replace('{topic}', 'troubleshooting')]);
+  assert.deepEqual(nextSentences(view(1, 'x'), { text: ctx({ definitions: kits }), topics: new Set(['troubleshooting']), kit: kits[0], tool: { ...bare, playbook: undefined } }), []);
 });
 
 test('a refusal can name a file the call gave, and counts only for a call that gave it', () => {
@@ -1691,11 +1695,18 @@ test('a tool MakersMCP-Server holds back is not listed and no text names it, whi
     assert.doesNotMatch(text(read), /check_video|fit_music/);
     assert.doesNotMatch(session.instructions, /a check of any video|music fitted to a video/);
     for (const tool of session.tools) assert.doesNotMatch(JSON.stringify(tool), /check_video|fit_music/, tool.name);
-    // A render's Next line has its sentences that need no check.
+    // A render's Next line has its sentences that need no check, the one that gives the user the film to watch among them.
     session.backend.view = (request, id) => ({ id, kit: 'launch-film', tool: 'render_launch_film', title: 'Render a launch film', status: 'done', exitCode: 0, elapsedSeconds: 60,
       folder: 'x', files: [{ path: 'film.mp4', bytes: 10, url: 'https://x/film.mp4' }, { path: 'film.timeline.json', bytes: 10, url: 'https://x/t' }], expiresAt: 1800000000 });
     const rendered = await session.client.callTool({ name: 'render_launch_film', arguments: { film: 'job:job0/film.json' } });
-    assert.equal(rendered.structuredContent.next, "film.timeline.json below has the film's length and each clip's start.");
+    assert.equal(rendered.structuredContent.next, "film.timeline.json below has the film's length and each clip's start. Give the user the film.mp4 link from the list below to watch before it goes out.");
+    // analyze_music, whose music topic is not offered, points at troubleshooting, which lists its errors then.
+    session.backend.view = (request, id) => ({ id, kit: 'musicfit', tool: 'analyze_music', title: 'Read a track', status: 'failed', exitCode: 1, elapsedSeconds: 2,
+      failure: 'musicfit: Cannot read in/x.mp3: ffmpeg does not know this format' });
+    const analyzed = await session.client.callTool({ name: 'analyze_music', arguments: { track: 'https://example.com/x.mp3' } });
+    assert.equal(analyzed.structuredContent.next, "The troubleshooting playbook (makersmcp_playbook) lists this tool's errors and their fixes.");
+    const troubleshooting = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['troubleshooting'] } }));
+    assert.match(troubleshooting, /- `analyze_music`: "Cannot read <file>: ffmpeg does not know this format"/);
   } finally {
     await session.close();
   }

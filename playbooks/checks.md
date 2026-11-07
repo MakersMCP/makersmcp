@@ -92,7 +92,7 @@ check_video {"film": "launch/film-16x9/with-music.mp4", "cuts": "launch/film-16x
 
 ## A launch film's own numbers
 
-Its sound is normalized to {fact:launch-film.lufs_target} LUFS under a {fact:launch-film.true_peak} dBTP ceiling before it is encoded, and the film comes out louder: about {fact:launch-film.lufs} LUFS here, with a true peak that sometimes passes {fact:launch-film.check_true_peak} dBTP. A loudness or true peak failure on a launch film is how it was rendered: tell the user the measurement, and never render it again for that, since a render gives the same.
+Its sound is normalized to {fact:launch-film.lufs_target} LUFS under a {fact:launch-film.true_peak} dBTP ceiling before it is encoded, and the film comes out louder: about {fact:launch-film.lufs} LUFS here, with a true peak that sometimes passes {fact:launch-film.check_true_peak} dBTP. A loudness or true peak failure on a launch film is how it was rendered: tell the user the measurement, and never render it again for that, since a render gives the same. A launch film planned with `music` false fails the silence check until a track is under it.
 
 ## When the check cannot run
 

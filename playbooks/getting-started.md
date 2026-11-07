@@ -83,7 +83,7 @@ jobs-and-files has the rest.
 
 ## When something fails
 
-Read the reason in a failed result and change the call before trying again, since the same call fails the same way, unless the reason says to wait or to try again later. troubleshooting has the errors and their fixes, and `check_setup` shows the kits that are on.
+Read the reason in a failed result and change the call before trying again, since the same call fails the same way, unless the reason, or the tool's topic, says to wait or to try again. troubleshooting has the errors and their fixes, and `check_setup` shows the kits that are on.
 
 ## Hand over
 

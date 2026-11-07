@@ -107,7 +107,8 @@
         "done": [
           "Check the brand's name and every word on screen in film.json below against words.json and the site: a film.json cannot be changed here, so when one is wrong, tell the user instead of rendering it again.",
           "Then call check_video with film {file:film.mp4} and expect {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16.",
-          "Give the user the {name:frames/sheet.jpg} link from the list below: two stills a clip."
+          "Give the user the {name:frames/sheet.jpg} link from the list below: two stills a clip.",
+          "Give the user the {name:film.mp4} link from the list below to watch before it goes out."
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes."
@@ -209,7 +210,8 @@
       "hostedNext": {
         "done": [
           "Call check_video with film {file:film.mp4} and expect {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16, and give the user the link to the sheet.png it makes.",
-          "film.timeline.json below has the film's length and each clip's start."
+          "film.timeline.json below has the film's length and each clip's start.",
+          "Give the user the {name:film.mp4} link from the list below to watch before it goes out."
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes."
@@ -255,7 +257,7 @@
       "next": {
         "done": [
           "Read STILLS.md below and look at every picture, or give the user the paths to look at, then tell the user which place each file is for and its size.",
-          "To change their words, change them in {file:film.json} and make the pictures again with source {file:film.json}."
+          "To change their words, change them in {file:film.json} and make the pictures again with source {file:film.json} and every place, since a run leaves the pictures of the other places as they were."
         ]
       },
       "hostedNext": {
@@ -293,6 +295,7 @@
         "check_failed": [
           "Read which checks failed in CHECK.md below.",
           "For a launch film, a loudness or true peak failure is how it was rendered: tell the user the measurement instead of rendering again, and a frame rate of {fact:launch-film.fps} is the film's own.",
+          "A launch film planned with music false fails the silence check until a track is under it.",
           "Then look at {file:sheet.png}, or give the user its path, since a measurement cannot read words."
         ]
       },
@@ -303,6 +306,7 @@
         "check_failed": [
           "Read which checks failed in CHECK.md below.",
           "For a launch film, a loudness or true peak failure is how it was rendered: tell the user the measurement instead of rendering again, and a frame rate of {fact:launch-film.fps} is the film's own.",
+          "A launch film planned with music false fails the silence check until a track is under it.",
           "Give the user the {name:sheet.png} link from the list below, since a measurement cannot read words."
         ]
       }

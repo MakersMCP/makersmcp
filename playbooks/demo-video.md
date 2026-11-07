@@ -65,7 +65,7 @@ check_video {"film": "job:<job_id>/demo.mp4", "expect": "{fact:easyscreenshotkit
 
 YAML, or JSON of the same shape; a name that ends in .json is read as JSON. Top level:
 
-- `url`: where it starts. The `url` parameter wins over it, and a file whose first step is no visit starts at `url`, a visit `steps.json` numbers 0.
+- `url`: where it starts. The `url` parameter replaces it, and a file whose first step is no visit starts at `url`, a visit `steps.json` numbers 0. A visit to a whole address still opens that address, and every visit in a tour's `demo.yaml` is one, so that file records the same site whatever `url` says: for another site, record a tour of it.
 - `steps`: the actions, one a step, at most {fact:easyscreenshotkit.steps.max}.
 - `hide`: CSS selectors to hide, on top of the `hide` parameter.
 

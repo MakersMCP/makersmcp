@@ -115,7 +115,7 @@ make_launch_film {"url": "https://linear.app", "aspect": "9:16", "wait_seconds":
 ## The other parameters
 
 - `brand`, on `make_launch_film` and `plan_launch_film`, takes a brand kit, which the kit copies into brand/ in the film's folder; without it, the kit reads the brand from the site. `words` takes a `words.json` from an earlier plan instead of reading the page again. `music` false leaves out the bed and `sfx` false the sound effects; the plan writes both into `film.json`.
-- `render_launch_film` takes `film`, the `film.json`, and writes `film.mp4` and `film.timeline.json` next to it, replacing an earlier render there.
+- `render_launch_film` takes `film`, the `film.json`, and writes `film.mp4` and `film.timeline.json` next to it.
 - `jobs` is the number of clips `make_launch_film` and `render_launch_film` render at once, {default:render_launch_film.jobs} unless given; 1 suits a slow machine.
 - `make_launch_stills` takes `source`, a `film.json` or the site's address, and `for`, the places.
 <!-- local -->
@@ -153,7 +153,7 @@ frames/ is for review and stills/ for the places, though both are called stills.
 
 The words and the look come from `film.json`, so give `source` the film's `film.json` for pictures that match it; given the site, it plans a film first with the default look, length and aspect. No picture is 9:16, and an app's store screenshots are not among them: say so when a place needs one.
 <!-- local -->
-To change a picture's words, change `film.json` and make the pictures again.
+A run writes only the places it is given, and `stills/STILLS.md` lists only those; pictures of other places stay in stills/ from the earlier run, so after a change to `film.json` give every place again. To change a picture's words, change `film.json` and make the pictures again.
 <!-- end -->
 
 ## When something goes wrong

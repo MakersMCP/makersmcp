@@ -5,12 +5,12 @@ index: setup, the errors the tools return and their fixes, the kits' flag names
 description: Explains how a MakersMCP result shows a problem, from an argument the schema refused to a job that failed or a check that did not pass, lists the errors makersmcp itself returns with their fixes, says what check_setup reports and how to fix the setup, and maps the command line flags kit messages may name to the parameters they mean. Use it when a tool returns an error, a job fails, a tool is missing, or a message names a flag.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music, analyze_music]
 order: 90
 ---
 # When a tool fails
 
-Read the result before anything else: its first line says what happened, and the text under it says why, mostly with the fix. Never send a failed call again unchanged, since it fails the same way, unless the reason says to wait or to try again later.
+Read the result before anything else: its first line says what happened, and the text under it says why, mostly with the fix. Never send a failed call again unchanged, since it fails the same way, unless the reason, or the tool's topic, says to wait or to try again.
 
 ## What the first line says
 
@@ -105,4 +105,9 @@ Kit messages can name the kit's command line flags, like --timeout or --page. A 
 <!-- end -->
 <!-- with fit_music -->
 - `fit_music` and `analyze_music`: the music topic.
+<!-- end -->
+<!-- with analyze_music -->
+<!-- without fit_music -->
+- `analyze_music`: "Cannot read <file>: ffmpeg does not know this format", "<file> has no audio stream" or "<file> has no audio" means the file is no track ffmpeg reads, so ask the user for another file. A link that fails says why, as jobs-and-files lists.
+<!-- end -->
 <!-- end -->
