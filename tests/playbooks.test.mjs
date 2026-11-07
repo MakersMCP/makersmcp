@@ -1026,7 +1026,9 @@ test('troubleshooting lists the flags of the kits that are on as their parameter
   const session = await connect({ definitions: fixtureKits(), playbooks: path.join(FIXTURES, 'topics') });
   try {
     const result = await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['troubleshooting'] } });
-    assert.match(text(result), /- `--hue` is `hue`\n/);
+    // A flag of its parameter's own name is in one sentence, not a line of its own.
+    assert.doesNotMatch(text(result), /- `--hue`/);
+    assert.match(text(result), /\n\nEvery other flag is the parameter of the same name, like `--hue` for `hue`\.$/);
     assert.match(text(result), /- `--keep` is `keep` true\n/);
     assert.match(text(result), /- `--no-clean` is `clean` false\n/);
     assert.match(text(result), /- `--out` is `out_dir`\n/);
@@ -1039,7 +1041,7 @@ test('troubleshooting lists the flags of the kits that are on as their parameter
   try {
     const result = text(await hosted.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['troubleshooting'] } }));
     assert.doesNotMatch(result, /--out|--keep/);
-    assert.match(result, /- `--hue` is `hue`\n/);
+    assert.match(result, /like `--hue` for `hue`\./);
   } finally {
     await hosted.close();
   }

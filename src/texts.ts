@@ -290,21 +290,38 @@ export function flagWords(kit: KitDefinition, first?: ToolDefinition, where: 'lo
   return words;
 }
 
-/** A line for each kit flag of the kits that are on, with the parameter it stands for. */
+/**
+ * A line for each flag of the kits that are on whose parameter has another name, like
+ * --out for out_dir or --no-music for "music false", then one sentence for the rest, each
+ * the parameter of its own name. A flag two kits read apart is listed with both.
+ */
 export function flagsText(context: TextContext): string {
   const lines = new Map<string, Set<string>>();
+  const same = new Set<string>();
+  let example: [string, string] | undefined;
+  let dashed = false;
   for (const kit of context.definitions.filter(entry => context.enabled.has(entry.kit))) {
     for (const [flag, words] of flagWords(kit, undefined, context.where)) {
       const line = `\`${flag}\` is ${words.includes(' ') ? words.replace(/^(\w+)/, '`$1`') : `\`${words}\``}`;
+      if (words === flag.slice(2).replace(/-/g, '_')) {
+        same.add(line);
+        example ??= [flag, words];
+        dashed ||= flag.slice(2).includes('-');
+      }
       if (!lines.has(line)) lines.set(line, new Set());
       lines.get(line)!.add(kit.kit);
     }
   }
-  const many = new Set([...lines.keys()].map(line => line.split(' ')[0]).filter((flag, i, all) => all.indexOf(flag) !== i));
-  return [...lines.entries()]
+  const flagOf = (line: string) => line.split(' ')[0]!;
+  const many = new Set([...lines.keys()].map(flagOf).filter((flag, i, all) => all.indexOf(flag) !== i));
+  const listed = [...lines.entries()]
+    .filter(([line]) => !same.has(line) || many.has(flagOf(line)))
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([line, kits]) => `- ${line}${many.has(line.split(' ')[0]!) ? ` (${inWords([...kits])})` : ''}`)
-    .join('\n');
+    .map(([line, kits]) => `- ${line}${many.has(flagOf(line)) ? ` (${inWords([...kits])})` : ''}`);
+  const rest = example
+    ? `${listed.length ? 'Every other' : 'Each'} flag is the parameter of the same name${dashed ? ', with _ for each -' : ''}, like \`${example[0]}\` for \`${example[1]}\`.`
+    : '';
+  return [listed.join('\n'), rest].filter(Boolean).join('\n\n');
 }
 
 /**

@@ -76,7 +76,7 @@ Nothing needs installing: the kits run on makersmcp.com. `check_setup` lists the
 
 ## The kits' own words
 
-Kit messages can name the kit's command line flags, like --timeout or --page. Each flag and the parameter it means:
+Kit messages can name the kit's command line flags, like --timeout or --page. A result writes them as the parameters they stand for, but a file a kit wrote may still hold them. Each flag whose parameter has another name:
 
 {flags}
 
