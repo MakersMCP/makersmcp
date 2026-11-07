@@ -605,6 +605,7 @@ function argumentsFor(schema) {
  * what. `corpus` holds the texts quoted errors must come from; `budgets` the lengths.
  */
 async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new Set(), held = [] }) {
+  // held: the sets of tools a service holds back, each a config of its own, like [['check_video', 'fit_music'], ['fit_music']].
   const problems = [];
   const add = (where, message) => problems.push(`${where}: ${message}`);
   const {
@@ -650,8 +651,8 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
   for (const kits of [kitIds, ...(kitIds.length > 1 ? kitIds.map(kit => [kit]) : [])]) {
     configs.push({ where: 'local', kits }, { where: 'hosted', kits }, { where: 'hosted', limits: LIMITS, kits });
   }
-  // A hosted service whose workers hold tools back, as MakersMCP-Server passes its kits then.
-  if (held.length) configs.push({ where: 'hosted', limits: LIMITS, kits: kitIds, held });
+  // A hosted service whose workers hold tools back, as MakersMCP-Server passes its kits then: each set of tools held together.
+  for (const set of held) configs.push({ where: 'hosted', limits: LIMITS, kits: kitIds, held: set });
 
   for (const config of configs) {
     const every = config.kits.length === kitIds.length && !config.held;
@@ -718,6 +719,19 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
           for (const [what, source] of own) {
             const first = sentencesOf(source)[0] ?? '';
             for (const name of namesAbsent(first)) add(`${what}, ${label}`, `its first sentence names ${name}, which this server does not list, so the text loses it: "${first.slice(0, 100)}"`);
+          }
+          // A sentence that names another tool this server lists beside one it does not is left out whole, and the pointer to the
+          // listed one goes with it: in a description, a parameter's text or a Next line, each pointer is a sentence of its own.
+          const nexts = Object.keys({ ...tool.next, ...tool.hostedNext }).map(state => [`${tool.name}'s Next line, ${state}`,
+            ((config.where === 'hosted' ? tool.hostedNext?.[state] : undefined) ?? tool.next?.[state] ?? []).join(' ')]);
+          for (const [what, source] of [...own, ...nexts]) {
+            for (const sentence of sentencesOf(source)) {
+              const gone = namesAbsent(sentence);
+              if (!gone.length) continue;
+              for (const name of [...toolKit.keys()].filter(entry => entry !== tool.name && listed.has(entry) && hasWord(sentence, entry))) {
+                add(`${what}, ${label}`, `a sentence names ${name} beside ${gone.join(' and ')}, which this server does not list, so it is left out and ${name} with it: give ${name} a sentence of its own: "${sentence.slice(0, 100)}"`);
+              }
+            }
           }
         }
       }
@@ -1116,8 +1130,9 @@ test('the kits in kits/ and the topics in playbooks/ pass every check of the lin
   assert.ok(sdk('mcp.js').includes('`Input validation error: Invalid arguments for tool ${toolName}: ${errorMessage}`'), 'the SDK words a refused call another way now');
   assert.ok(sdk('zod-compat.js').includes('`${i.message} at ${getDotPath(i.path)}`'), 'the SDK words a refusal\'s place another way now');
   corpus.push('Input validation error: Invalid arguments for tool <tool>: <reason> at <path>');
-  // MakersMCP-Server's workers hold these back where their ffmpeg cannot run them.
-  const problems = await lint({ definitions, dir: PLAYBOOKS_DIR, corpus, extraNames: launchFilmNames(), held: ['check_video', 'fit_music'] });
+  // MakersMCP-Server's workers hold these back where their ffmpeg cannot run them, both now, and each alone once one kit's release
+  // runs on that ffmpeg before the other's.
+  const problems = await lint({ definitions, dir: PLAYBOOKS_DIR, corpus, extraNames: launchFilmNames(), held: [['check_video', 'fit_music'], ['fit_music'], ['check_video']] });
   // The size of each topic, so one past 8,000 characters is seen.
   try {
     const playbooks = loadPlaybooks();
