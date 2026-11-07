@@ -355,22 +355,24 @@ export function offeredTopics(playbooks: Playbooks, on: Set<string>): Topic[] {
 }
 
 /**
- * Each kit tool the server lists, with its topic and what the user wants when it fits (its
- * asks), for getting-started: a line like "- `make_brand_kit` (brand): a site's logo, ...".
- * The line is short, since every tool of every kit is on this list.
+ * Each offered topic with the tools the server lists that it has, and what the user wants
+ * when each fits (its asks), for getting-started: a line like "- brand: `make_brand_kit`,
+ * a site's logo, ...", so a kit adds a line for its topic, not one for each tool. A tool
+ * whose topic is not offered has a line of its own.
  */
 function requestsText(playbooks: Playbooks, context: TextContext): string {
   const offered = new Set(offeredTopics(playbooks, onNames(context)).map(topic => topic.name));
   const listed = listedTools(context);
-  const lines: string[] = [];
+  const byTopic = new Map<string, string[]>();
   for (const kit of context.definitions.filter(entry => context.enabled.has(entry.kit))) {
     for (const tool of kit.tools.filter(entry => listed.has(entry.name))) {
-      const topic = tool.playbook && offered.has(tool.playbook) ? ` (${tool.playbook})` : '';
       const asks = tool.asks ? fillText(tool.asks, context, { kind: 'kit' }) : tool.title;
-      lines.push(`- \`${tool.name}\`${topic}: ${asks}.`);
+      const topic = tool.playbook && offered.has(tool.playbook) ? tool.playbook : `\`${tool.name}\``;
+      const entry = topic.startsWith('`') ? asks : `\`${tool.name}\`, ${asks}`;
+      byTopic.set(topic, [...(byTopic.get(topic) ?? []), entry]);
     }
   }
-  return lines.join('\n');
+  return [...byTopic].map(([topic, entries]) => `- ${topic}: ${entries.join('; ')}.`).join('\n');
 }
 
 function filled(text: string, code: boolean, playbooks: Playbooks, context: TextContext, kind: TextKind): string {

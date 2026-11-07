@@ -10,7 +10,7 @@ order: 50
 ---
 # Screenshots of a website
 
-`take_screenshots` opens a site in a headless browser, picks the pages worth showing, hides what floats over them and saves each page at the sizes asked for. `check_pwa_screenshots` checks the screenshots a web app manifest lists, without a browser. The order: settle the pages and the sizes, take them, show `sheet.png`, run again for a missing page, and check manifest screenshots last.
+`take_screenshots` opens a site in a headless browser, picks the pages worth showing, hides what floats over them and saves each page at the sizes asked for. `check_pwa_screenshots` checks the screenshots a web app manifest lists, without a browser.
 
 ## Decide first
 

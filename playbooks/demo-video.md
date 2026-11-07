@@ -10,7 +10,7 @@ order: 55
 ---
 # Demo video of a website
 
-`record_demo_video` records the real site in a browser window on a backdrop, with a pointer that moves the way a hand would, smooth scrolls and a zoom on each click: a tour of its pages, or the steps of a file. It saves `demo.mp4`, `demo.gif`, `poster.png` and `steps.json`, and `demo.yaml` after a tour. The video has no sound. The order: choose a tour or steps, record, show the poster, check, then hand over the video with its times.
+`record_demo_video` records the real site in a browser window on a backdrop, with a pointer, smooth scrolls and a zoom on each click: a tour of its pages, or the steps of a file. It saves `demo.mp4`, `demo.gif`, `poster.png` and `steps.json`, and `demo.yaml` after a tour. The video has no sound.
 
 ## Decide first
 
@@ -75,7 +75,7 @@ The actions:
 - `scroll`: pixels down, negative to go up; top; bottom; a target; or `{ to: <target or pixels>, duration: 2 }` with its seconds, {fact:easyscreenshotkit.steps.duration_min} to {fact:easyscreenshotkit.steps.duration_max}. A scroll to a target stops below a fixed top bar.
 - `click`: a target. The pointer moves there, presses and zooms in; `zoom: false` on the step turns that off, and a number up to {fact:easyscreenshotkit.steps.zoom_max} sets it; `type` and `hover` take `zoom` too. A link that opens a new tab stays in this window.
 - `type`: text, at most {fact:easyscreenshotkit.steps.type_max} characters, into the field in focus, or `into: <target>`, which is clicked first. A line break in it presses Enter.
-- `key`: Enter, Tab, Escape, Backspace, Delete, Space, an arrow, Home, End, PageUp, PageDown, F1 to F12 or one character, with Control, Alt, Shift or Meta before it, like `Meta+K`. It shows on screen.
+- `key`: a key like Enter, Tab, Escape, an arrow or F1 to F12, or one character, with Control, Alt, Shift or Meta before it, like `Meta+K`. It shows on screen.
 - `hover`: a target the pointer moves to and rests on.
 - `wait`: seconds, up to {fact:easyscreenshotkit.steps.wait_max}, or a target to wait for, `{ for: <target>, timeout: 30 }`, {fact:easyscreenshotkit.steps.timeout} seconds by default and {fact:easyscreenshotkit.steps.timeout_max} at most.
 - Any step can carry `label`, its name in `steps.json`; `note`, words for whoever writes the narration, kept in `steps.json`; and `pause`, seconds to hold after it, up to {fact:easyscreenshotkit.steps.pause_max}.
@@ -126,7 +126,7 @@ After a tour, `demo.yaml` is a complete file to start from.
 
 - `demo.mp4`: {fact:easyscreenshotkit.demo.size}, H.264, at `fps`; the page plays at {fact:easyscreenshotkit.demo.window} in a window with an address bar, on the backdrop.
 - `demo.gif`, the same video smaller, and `poster.png`, the first page at rest, for a cover.
-- `steps.json`, also in the result: `video` with `width`, `height`, `fps`, `frames` and `duration`; `pages`, each page shown with its `start` and `end`, where a #route change stays one page; and `steps`, each with `n`, `action`, `label`, its `target`, `text`, `key` or `note`, `start` and `end` in seconds, `startFrame` and `endFrame`, the `page` it ended on, and `opened` when it led to another page. A click, and a `type` with `into`, also has `at`, the point in the video's pixels, `pressedAt`, the second it pressed, and `pressedFrame`.
+- `steps.json`, also in the result: `video` with its `fps`, `frames` and `duration`; `pages`, each with its `start` and `end`, a #route change staying one page; and `steps`, each with its `action`, `label`, `note`, `start` and `end` in seconds, `startFrame` and `endFrame`. A click, and a `type` with `into`, also has `at`, the point in the video's pixels, `pressedAt`, the second it pressed, and `pressedFrame`.
 - `demo.yaml`, after a tour only: the tour as a steps file. A run from a steps file never touches it.
 
 ## Timing what comes after
