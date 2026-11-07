@@ -5,7 +5,8 @@ import type { JobDoc, JobFile, JobView } from './backend.js';
 import { docEntry, type KitDefinition, type NextLines, type ToolDefinition } from './kits.js';
 import { fillText, flagWords, inParameterWords, listedTools, TextError, unlistedTools, type Placeholder, type TextContext } from './texts.js';
 
-const MAX_LISTED = 40;
+/** The most files a result's text lists, the tool's own first. */
+export const MAX_LISTED = 40;
 /**
  * All the docs of one result share this many characters, and the whole result stays under
  * RESULT_BUDGET: Claude Code saves a result past 50,000 characters to a file, and a client

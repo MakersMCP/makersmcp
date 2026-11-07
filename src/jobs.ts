@@ -42,7 +42,8 @@ export interface JobSpec {
 
 const STDOUT_LIMIT = 256 * 1024;
 const STDERR_LIMIT = 64 * 1024;
-const KEEP_FINISHED = 50;
+/** How many ended jobs are kept, the newest, besides those still running. */
+export const KEEP_FINISHED = 50;
 const KILL_AFTER_MS = 5000;
 
 // Every kit runs under this script, in a process group of its own: see supervise.ts.

@@ -17,7 +17,8 @@ import { FolderBusyError, JobManager, launcherProblem, type Job } from './jobs.j
 import { docNames, isInstalled, resolveKit, type DocEntry, type InstalledKit, type KitDefinition, type MissingKit } from './kits.js';
 import { kitEnvironment, setupReport } from './setup.js';
 
-const MAX_FILES = 200;
+/** The most files a job lists in `files`. */
+export const MAX_FILES = 200;
 // Entries looked at in one listing, so a folder that holds a whole project stays quick.
 const MAX_ENTRIES = 20_000;
 // Some file systems keep the time a file changed to the second, or to two.

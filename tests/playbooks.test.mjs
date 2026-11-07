@@ -19,7 +19,9 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
   createMcpServer, loadKitDefinitions, loadPlaybooks, offeredTopics, PLAYBOOKS_DIR, renderTopic, resolveKit, validateKitDefinition,
 } from '../dist/server.js';
-import { DOCS_BUDGET, FAILED_NEXT, FILES_GONE_NEXT, nextSentences, orderedFiles, RESULT_BUDGET, SITE_NOTE } from '../dist/results.js';
+import { KEEP_FINISHED } from '../dist/jobs.js';
+import { MAX_FILES } from '../dist/local-backend.js';
+import { DOCS_BUDGET, FAILED_NEXT, FILES_GONE_NEXT, MAX_LISTED, nextSentences, orderedFiles, RESULT_BUDGET, SITE_NOTE } from '../dist/results.js';
 import { BASE_DIR_IN_WORDS, flagWords, inParameterWords, sentencesOf } from '../dist/texts.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -1749,6 +1751,15 @@ test('hosted, a job done with no file listed, as one past the days its files are
   } finally {
     await local.close();
   }
+});
+
+test('jobs-and-files gives the numbers of jobs and files makersmcp keeps and lists, as its code has them', () => {
+  const rendered = renderTopic(loadPlaybooks(), 'jobs-and-files', {
+    where: 'local', place: 'on this machine', baseDir: LOCAL_DIR, definitions: loadKitDefinitions(),
+    enabled: new Set(loadKitDefinitions().map(kit => kit.kit)), versions: new Map(loadKitDefinitions().map(kit => [kit.kit, '9.9.9'])),
+  });
+  assert.match(rendered, new RegExp(`the last ${KEEP_FINISHED} that ended\\.`));
+  assert.match(rendered, new RegExp(`${MAX_LISTED} in the text and up to ${MAX_FILES} in \`files\``));
 });
 
 test('a result lists take_screenshots\' own pages, NN-<page>-<size>.png in its writes, before its manifest screenshots', () => {
