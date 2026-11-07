@@ -84,7 +84,17 @@ check_video {"film": "launch/film-16x9/with-music.mp4", "cuts": "launch/film-16x
 - `cues` of `check_video` takes the `cues.json` of the track under the video: `fit_music` writes one for the fitted track, and `analyze_music` one for a track that plays as it is from the first frame. Its frames count at the fps written in it, so it need not be the video's.
 <!-- end -->
 <!-- without fit_music -->
-- `cues` of `check_video` takes a `cues.json` with the track's beats as frame numbers at the fps it names.
+- `cues` of `check_video` takes a `cues.json` with the track's beats as frame numbers at the fps it names, a file the user brings:
+<!-- local -->
+```call
+check_video {"film": "launch/film-16x9/with-music.mp4", "cues": "music/cues.json", "cuts": "launch/film-16x9/film.timeline.json", "out_dir": "launch/film-16x9/check-music"}
+```
+<!-- end -->
+<!-- hosted -->
+```call
+check_video {"film": "https://example.com/with-music.mp4", "cues": "https://example.com/cues.json", "cuts": "job:<job_id>/film.timeline.json"}
+```
+<!-- end -->
 <!-- end -->
 - A track with no steady beat has no beats, and the check refuses its cues.
 - A launch film cuts on the bars of its own look's music, so a track at another tempo lands some cuts off its beat. That is how it was made, and nothing here retimes the film: tell the user.

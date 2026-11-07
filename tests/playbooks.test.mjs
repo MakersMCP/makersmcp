@@ -477,11 +477,15 @@ function doubleQuoted(line) {
   return found;
 }
 
-/** The topics a text points to by name, among `names`: "the brand topic", "the music playbook" or "makersmcp_playbook checks". */
+/**
+ * The topics a text points to by name, among `names`: "the brand topic" or "the `brand` topic",
+ * "the music playbook", "makersmcp_playbook checks" or "makersmcp_playbook with topics checks",
+ * and a name in code to read, as in "Read `music`".
+ */
 function topicsNamed(content, names) {
   return [...names].filter(name => {
     const word = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp(`(?<![\\w-])${word} (?:topic|playbook)s?\\b|makersmcp_playbook\`?\\s+(?:with\\s+)?\`?${word}(?![\\w-])`).test(content);
+    return new RegExp(`(?<![\\w-])\`?${word}\`? (?:topic|playbook)s?\\b|makersmcp_playbook\`?\\s+(?:with\\s+)?(?:\`?topics?\`?\\s+)?\`?${word}(?![\\w-])|\\b[Rr]ead\\s+\`${word}\``).test(content);
   });
 }
 
@@ -675,6 +679,12 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
       // The kit tools this server does not list, as their kits are off or a service holds them back: no text may name one.
       const absent = [...toolKit.keys()].filter(name => !listed.has(name));
       const namesAbsent = content => absent.filter(name => hasWord(content, name));
+      // The files the tools this server lists write: a held or off tool's file named outside its block is as wrong as its name.
+      const listedWrites = definitions.flatMap(kit => kit.tools.filter(tool => listed.has(tool.name)).flatMap(tool => tool.writes ?? []));
+      /** The files a text names, outside code: words shaped like a file, a job: reference read as the path after it. */
+      const filesIn = content => [...content.replace(/(`+)(?:(?!\1)[\s\S])*?\1/g, span => ` ${span.replace(/`/g, '')} `).replace(/\bjob:[^\s/]+\//g, '').replace(/\bhttps?:\/\/\S+/g, ' ')
+        .matchAll(/[\w<>*.-]+(?:\/[\w<>*.-]+)*/g)].map(([token]) => token.replace(/[.]+$/, ''))
+        .filter(file => LOOKS_LIKE_FILE.test(file) && !/\.(?:ya?ml)$/i.test(file) && !SITE_FILES.has(file));
 
       // The texts every client gets, by side.
       const always = [['the instructions', session.instructions, false]];
@@ -718,6 +728,9 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
       const notOffered = content => topicsNamed(content, topicNames).filter(name => !offeredSet.has(name));
 
       for (const [what, content] of always) {
+        // A description names files a tool this server lists writes; a parameter's text may name the file it takes, which any kit makes.
+        const own = /^\S+'s description$/.test(what) ? listedWrites : allWrites;
+        for (const file of filesIn(content)) if (!written(file, own)) add(`${what}, ${label}`, `names ${file}, which no tool ${own === listedWrites ? 'this server lists ' : ''}writes`);
         for (const name of notOffered(content)) add(`${what}, ${label}`, `names the ${name} topic, which this server does not offer`);
         for (const problem of sideProblems(`${what}, ${label}`, content, config.where)) problems.push(problem);
         for (const problem of styleProblems(`${what}, ${label}`, content, { markdown: false })) problems.push(problem);
@@ -786,15 +799,15 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
                     continue;
                   }
                   if (params.has(word) || COMMON.has(word) || RESULT_FIELDS.has(word) || FORMAT_FIELDS.has(word)
-                    || values.has(word) || listedValues.has(word) || topicNames.has(word) || kitIds.includes(word) || extraNames.has(word)) continue;
+                    || values.has(word) || listedValues.has(word) || offeredSet.has(word) || kitIds.includes(word) || extraNames.has(word)) continue;
                   add(where, allParams.has(word)
                     ? `\`${word}\` is a parameter only of tools that are off here or that the section does not name (section "${section.heading}")`
                     : `\`${word}\` is not a tool, a parameter, a result field or a field this test knows (section "${section.heading}"); if it is a field of a file the topic documents, add it to FORMAT_FIELDS in tests/playbooks.test.mjs`);
                 } else if (LOOKS_LIKE_FILE.test(word) && !/^https?:/.test(word) && !SITE_FILES.has(word)) {
                   const inputs = callsOf(markdown).flatMap(call => Object.values(call.args ?? {})).filter(value => typeof value === 'string')
                     .map(value => path.posix.basename(value));
-                  if (!written(word, allWrites) && !inputs.includes(path.posix.basename(word)) && !/\.(?:ya?ml)$/i.test(word)) {
-                    add(where, `\`${word}\` is a file no tool writes (writes in kits/) and no call here gives`);
+                  if (!written(word, listedWrites) && !inputs.includes(path.posix.basename(word)) && !/\.(?:ya?ml)$/i.test(word)) {
+                    add(where, `\`${word}\` is a file no tool this server lists writes (writes in kits/) and no call here gives`);
                   }
                 }
               }
@@ -808,7 +821,7 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
           for (const [token] of line.replace(/\bjob:[^\s/]+\//g, '').replace(/\bhttps?:\/\/\S+/g, ' ').matchAll(/[\w<>*.-]+(?:\/[\w<>*.-]+)*/g)) {
             const file = token.replace(/[.]+$/, '');
             if (!LOOKS_LIKE_FILE.test(file) || /\.(?:ya?ml)$/i.test(file) || SITE_FILES.has(file)) continue;
-            if (!written(file, allWrites) && !inputs.includes(path.posix.basename(file))) add(where, `${file}, named in prose, is a file no tool writes (writes in kits/) and no call here gives`);
+            if (!written(file, listedWrites) && !inputs.includes(path.posix.basename(file))) add(where, `${file}, named in prose, is a file no tool this server lists writes (writes in kits/) and no call here gives`);
           }
         }
 
@@ -822,6 +835,14 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
       const started = rendered.get('getting-started');
       if (started !== undefined) {
         for (const name of listed.keys()) if (toolKit.has(name) && !hasWord(started, name)) add(`getting-started.md, ${label}`, `never names ${name}, which this server lists`);
+      }
+      // A failed job of a listed tool whose own topic is not offered points to troubleshooting, which has to name it then.
+      const trouble = rendered.get('troubleshooting');
+      for (const name of listed.keys()) {
+        const own = toolKit.get(name)?.tools.find(tool => tool.name === name);
+        if (own?.playbook && !offeredSet.has(own.playbook) && !(trouble && hasWord(trouble, name))) {
+          add(`troubleshooting.md, ${label}`, `never names ${name}, whose ${own.playbook} topic this server does not offer, so its failed jobs point here`);
+        }
       }
 
       if (every && !config.limits) {
@@ -932,8 +953,16 @@ async function resultProblems(definitions, dir, config, tool, view, state, topic
     const body = text(result);
     const parts = body.split('\n\n');
     const next = result.structuredContent?.next;
+    // The files the tools this server lists write.
+    const listedWrites = definitions.flatMap(kit => kit.tools.filter(entry => listedNames.has(entry.name)).flatMap(entry => entry.writes ?? []));
     if (next !== undefined) {
       if (parts[1] !== `Next: ${next}`) problems.push(`${label}: the Next line is not right under the heading`);
+      // A file it names in plain words, like "FIT.md below", is one a tool this server lists writes.
+      const plain = next.replace(/\bjob:[^\s/]+\/\S+/g, ' ').replace(new RegExp(`${LOCAL_DIR.replace(/\//g, '\\/')}\\S*`, 'g'), ' ');
+      for (const [token] of plain.matchAll(/[\w<>*.-]+(?:\/[\w<>*.-]+)*/g)) {
+        const file = token.replace(/[.]+$/, '');
+        if (LOOKS_LIKE_FILE.test(file) && !written(file, listedWrites)) problems.push(`${label}: the Next line names ${file}, which no tool this server lists writes`);
+      }
       problems.push(...sideProblems(`${label}, its Next line`, next, config.where), ...styleProblems(`${label}, its Next line`, next, { markdown: false }));
       for (const name of absent.filter(entry => hasWord(next, entry))) problems.push(`${label}: the Next line names ${name}, which this server does not list`);
       for (const name of topicsNamed(next, topicNames).filter(entry => !offered.has(entry))) problems.push(`${label}: the Next line names the ${name} topic, which this server does not offer`);
@@ -1001,7 +1030,7 @@ test('the lint finds each kind of fault in a fixture broken one rule at a time',
     [{ 'painting.md': text => text.replace('"marks": "1.5,3", "sketch"', '"marks": "1.5,3", "out_dir": "x", "sketch"') }, /paint_picture takes no out_dir here/],
     [{ 'painting.md': text => text.replace('"picture": "pictures/example/picture.png"', '"picture": "job:<job_id>/picture.png"') }, /a job: reference in a local call/],
     [{ 'painting.md': text => text.replace('`layers`, `length`', '`layerz`, `length`') }, /`layerz` is not a tool/],
-    [{ 'painting.md': text => text.replace('Read `PAINT.md`', 'Read `PAINTS.md`') }, /`PAINTS\.md` is a file no tool writes/],
+    [{ 'painting.md': text => text.replace('Read `PAINT.md`', 'Read `PAINTS.md`') }, /`PAINTS\.md` is a file no tool this server lists writes/],
     [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> could not be opened as a picture"') }, /the error "<file> could not be opened as a picture" is in no kit's files/],
     [{ 'painting.md': text => text.replace('A job stops after {limit:job_minutes} here, and', 'Save it in out_dir, and') }, /painting\.md, hosted.*out_dir, which a hosted server does not take/],
     [{ 'painting.md': text => text.replace('`keep` keeps the work files.', '`keep` keeps the work files. Give job:<job_id>/x.png.') }, /painting\.md, local.*a job: reference/],
@@ -1012,7 +1041,7 @@ test('the lint finds each kind of fault in a fixture broken one rule at a time',
     [{ 'getting-started.md': text => text.replace('Sounds come from `mix_sound`.\n<!-- end -->', '<!-- end -->\nSounds come from `mix_sound`.') }, /`mix_sound` is a tool of soundkit, which this server does not list/],
     [{ 'jobs-and-files.md': text => text.replace('{default:wait_for_job.wait_seconds} by default and ', '') + '\n'.repeat(1) + 'x'.repeat(13000) }, /jobs-and-files\.md, .*characters, outside/],
     // A file named in prose, outside code, is one some tool writes too.
-    [{ 'painting.md': text => text.replace('Give the user `picture.png`', 'Give the user picture2.png and `picture.png`') }, /picture2\.png, named in prose, is a file no tool writes/],
+    [{ 'painting.md': text => text.replace('Give the user `picture.png`', 'Give the user picture2.png and `picture.png`') }, /picture2\.png, named in prose, is a file no tool this server lists writes/],
     // A topic named in a text is one the server offers.
     [{ 'painting.md': text => text.replace('3. No sound kit is on here, so the picture stays silent.', '3. The sound topic has the rest.') }, /painting\.md, .*paintkit alone: names the sound topic, which this server does not offer/],
     // A topic's description reaches the client as its resource's, on both sides.
@@ -1020,6 +1049,11 @@ test('the lint finds each kind of fault in a fixture broken one rule at a time',
     [{ 'painting.md': text => text.replace('description: Paints a picture', 'description: Mixes with mix_sound. Paints a picture') }, /the resource makersmcp:\/\/playbooks\/painting's title and description, local, paintkit alone: names mix_sound/],
     // A word written beside a variable part is a word of the kit's own message.
     [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> then could not be read as a picture"') }, /the error "<file> then could not be read as a picture" is in no kit's files/],
+    // A topic named in code, or as one to read, is one the server offers.
+    [{ 'painting.md': text => text.replace('3. No sound kit is on here, so the picture stays silent.', '3. The `sound` topic has the rest.') }, /painting\.md, .*paintkit alone: names the sound topic, which this server does not offer/],
+    [{ 'painting.md': text => text.replace('3. No sound kit is on here, so the picture stays silent.', '3. Read `sound` for a sound.') }, /painting\.md, .*paintkit alone: names the sound topic, which this server does not offer/],
+    // A file only a tool that is off writes, named outside its block.
+    [{ 'painting.md': text => text.replace('3. No sound kit is on here, so the picture stays silent.', '3. The picture comes with mix.wav.') }, /painting\.md, .*paintkit alone: mix\.wav, named in prose, is a file no tool this server lists writes/],
   ];
   for (const [change, expected] of cases) {
     const dir = brokenCopy(change);
@@ -1032,13 +1066,15 @@ test('the lint finds each kind of fault in a fixture broken one rule at a time',
   }
 });
 
-test('the lint finds a kit without a topic, and a Next line that names a file its tool does not write', async () => {
+test('the lint finds a kit without a topic, a Next line that names a file its tool does not write, and a description that names a file no listed tool writes', async () => {
   const kits = fixtureKits();
   kits[1].kit = 'quietkit';
   kits[1].tools[0].next.done = ['Play {file:loud.wav} to the user.'];
+  kits[0].tools[0].description += ' It sounds like mix.wav.';
   const problems = await lint({ definitions: kits, dir: path.join(FIXTURES, 'topics'), corpus: fixtureCorpus(), budgets: FIXTURE_BUDGETS });
   assert.ok(problems.some(problem => /quietkit: no topic has this kit as its kit/.test(problem)), problems.join('\n'));
   assert.ok(problems.some(problem => /mix_sound\.next: \{file:loud\.wav\} is not in mix_sound's writes/.test(problem)), problems.join('\n'));
+  assert.ok(problems.some(problem => /paint_picture's description, local, paintkit alone: names mix\.wav, which no tool this server lists writes/.test(problem)), problems.join('\n'));
 });
 
 test('the lint finds a text whose first sentence names a tool that is off, and a Next sentence that cannot be filled stops the server', async () => {

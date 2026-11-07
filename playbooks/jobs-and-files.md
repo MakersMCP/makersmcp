@@ -95,7 +95,16 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 
 - Each job saves into a folder of its own, so no job replaces another's files.
 - The result lists each file with its link, and until when, in UTC, the links work: {limit:keep_days}, for anyone who holds them, so give them only to the user. After that the job shows done with no files and "Its files were deleted after <n> days."
-- A file an earlier job saved goes in as job:<job_id>/<path>, the path as that job's file list writes it, like job:<job_id>/brand.json or job:<job_id>/pwa/manifest-screenshots.json. The job's whole folder comes along, so the files a brand kit or a film.json names are there too. Only the user's own jobs that ended done count, and a makersmcp.com link to such a file counts as its job:<job_id>/<path>.
+- A file an earlier job saved goes in as job:<job_id>/<path>, the path as that job's file list writes it. The job's whole folder comes along, so the files that file names are there too. Only the user's own jobs that ended done count, and a makersmcp.com link to such a file counts as its job:<job_id>/<path>.
+<!-- with easybrandkit -->
+  A brand kit goes in as job:<job_id>/brand.json, with its logo files.
+<!-- end -->
+<!-- with launch-film -->
+  A plan goes in as job:<job_id>/film.json, with the brand and the screens it names.
+<!-- end -->
+<!-- with easyscreenshotkit -->
+  Manifest screenshots go in as job:<job_id>/pwa/manifest-screenshots.json.
+<!-- end -->
 - Other files go as https links where a parameter takes a file: a public address, at most 200 MB, sent within 5 minutes. A parameter that takes an address or a file reads a link as the address.
 - Nothing here uploads a file the assistant wrote, so a file goes in only as a link the user gives or as a file an earlier job saved, used as it is. Say so instead of offering to change one.
 - "Job <job_id> has no file <path>." means the path is not as that job's file list writes it. "There is no job <job_id> with files to use. list_jobs shows your jobs; files are kept for a few days." means the job is not the user's, did not end done, or its files are gone.
