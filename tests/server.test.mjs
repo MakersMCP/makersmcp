@@ -257,6 +257,25 @@ async function until(check, ms = 5000) {
   return check();
 }
 
+test('check_setup\'s description, --help and the README say ffprobe shows only while launch-film is on, as check_setup prints it', async () => {
+  const words = '(and ffprobe while launch-film is on)';
+  const flat = textOf => textOf.replace(/\s+/g, ' ');
+  const help = spawnSync(process.execPath, [path.join(here, '..', 'dist', 'index.js'), '--help'], { encoding: 'utf8' });
+  assert.equal(help.status, 0, help.stderr);
+  assert.ok(flat(help.stdout).includes(`--check print the kits, the Chrome and the ffmpeg found for them ${words} and the folder, and exit`), help.stdout);
+  const readme = flat(readFileSync(path.join(here, '..', 'README.md'), 'utf8'));
+  assert.equal(readme.split(`the Chrome and the ffmpeg found for them ${words}`).length - 1, 2, 'the --check sentence and the settings table');
+  assert.doesNotMatch(readme, /Chrome, ffmpeg, ffprobe and the folder/);
+  await withClient({}, async client => {
+    const { tools } = await client.listTools();
+    assert.ok(tools.find(tool => tool.name === 'check_setup').description.includes(`the Chrome and the ffmpeg found for them ${words}`));
+    // The fake kits here are not launch-film, so check_setup has no ffprobe line.
+    const setup = text(await client.callTool({ name: 'check_setup', arguments: {} }));
+    assert.match(setup, /^ffmpeg: /m);
+    assert.doesNotMatch(setup, /ffprobe/);
+  });
+});
+
 test('a folder to save in that is not there yet is made by the first job', async () => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-test-'));
   const outDir = path.join(root, 'not', 'yet');

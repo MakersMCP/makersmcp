@@ -125,7 +125,7 @@ npm install
 npm run build
 ```
 
-In any setup above, use `node` as the command and the full path of `dist/index.js` as its argument. `node dist/index.js --check` lists the kits it found, the Chrome and the ffmpeg they run (and ffprobe while launch-film is on) and the folder it saves to.
+In any setup above, use `node` as the command and the full path of `dist/index.js` as its argument. `node dist/index.js --check` lists the kits it found, the Chrome and the ffmpeg found for them (and ffprobe while launch-film is on) and the folder it saves to.
 
 ## Pick your kits
 
@@ -151,7 +151,7 @@ A long job, like rendering a film, keeps going after the tool returns. The tool 
 
 - The tools don't appear: check that `node --version` says 22 or newer, then restart the client. `npx -y makersmcp@0.1.1 --check` lists what makersmcp found.
 - A kit's tools are missing: `--check` says why. Every kit comes with makersmcp, so look at `--kits` and `--kit-path`, and from source run `npm install` again after a pull.
-- A kit can't find Chrome or ffmpeg: set `CHROME_PATH` and `FFMPEG_PATH` in the server's `env`. makersmcp gives every kit the Chrome and the ffmpeg `--check` shows, to launch-film as `LAUNCH_FILM_CHROME` and `LAUNCH_FILM_FFMPEG` too, with `LAUNCH_FILM_FFPROBE` the ffprobe beside that ffmpeg, and `--check` names a setting that leads to no program.
+- A kit can't find Chrome or ffmpeg: set `CHROME_PATH` and `FFMPEG_PATH` in the server's `env`. makersmcp gives them to every kit, to launch-film as `LAUNCH_FILM_CHROME` and `LAUNCH_FILM_FFMPEG` too, with `LAUNCH_FILM_FFPROBE` the ffprobe beside that ffmpeg. Without them, it gives each kit the Chrome and the ffmpeg `--check` shows. `--check` also names a setting that leads to no program, which the kits that read it cannot run.
 - A long job meets the client's time limit: no call waits longer than `wait_seconds`, 45 by default. A job still running then comes back with a `job_id` and `next_action: wait_for_job`, and the agent should call that, never the first tool again, which would start a second job. Where a client lets you set a tool timeout, keep it above 45 seconds.
 
 ## Settings
@@ -161,7 +161,7 @@ A long job, like rendering a film, keeps going after the tool returns. The tool 
 | `--kits <list>` | `MAKERSMCP_KITS` | turns on only these kits, like `easybrandkit,launch-film`; leave it out or give `all` for every kit |
 | `--out <dir>` | `MAKERSMCP_OUT` | where the folders go, made with the first job; `~` is your home folder |
 | `--kit-path <kit>=<dir>` | `MAKERSMCP_KIT_PATHS` | runs a kit's checkout instead of the package that comes with makersmcp; `~` is your home folder |
-| `--check` | | prints the kits, the Chrome and the ffmpeg they run (and ffprobe while launch-film is on) and the folder, and exits |
+| `--check` | | prints the kits, the Chrome and the ffmpeg found for them (and ffprobe while launch-film is on) and the folder, and exits |
 
 ## Use it in your own server
 

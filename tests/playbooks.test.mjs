@@ -537,8 +537,10 @@ function sideProblems(label, content, where) {
     if (/on this machine/i.test(plain)) problems.push(`${label}: "on this machine"`);
     if (/(?:^|[\s`'"(])~\//m.test(plain)) problems.push(`${label}: a path in ~`);
     if (/(?:^|[\s`'"(])\/(?:home|Users|tmp|var|srv|etc|opt|usr|root)\//m.test(plain) || /\b[A-Z]:\\/.test(plain)) problems.push(`${label}: an absolute path`);
-    const setting = /MAKERSMCP_OUT|CHROME_PATH|FFMPEG_PATH|--kit-path/.exec(plain);
+    const setting = /MAKERSMCP_OUT|CHROME_PATH|FFMPEG_PATH|LAUNCH_FILM_[A-Z]+|--kit-path/.exec(plain);
     if (setting) problems.push(`${label}: ${setting[0]}, a local setting`);
+    // Nothing here is installed by the user: ffprobe is a program check_setup names on this machine only.
+    if (/\bffprobe\b/.test(plain)) problems.push(`${label}: ffprobe, which only a local setup has the user install`);
     const FILES = '(?:film\\.json|demo\\.yaml|crop\\.json)';
     const changes = new RegExp(`\\b(?:edit|rewrite|modify)\\b[^.]*${FILES}|${FILES}[^.]*\\b(?:edit|rewrite|modify)|\\b(?:change|fix|update)\\s+(?:(?:the|its|their|them|it|words?|names?)\\s+){0,3}(?:in\\s+(?:the\\s+)?)?(?:\\S+\\s+)?${FILES}`, 'i');
     for (const sentence of plain.split(/(?<=[.:;!?])\s+|\n/)) {

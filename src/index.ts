@@ -18,8 +18,8 @@ Options:
   --kit-path <k=dir>   use a kit's checkout instead of its package, like
                        musicfit=../musicfit (repeat it, or MAKERSMCP_KIT_PATHS
                        with commas)
-  --check              print the kits, the Chrome and the ffmpeg they run (and
-                       ffprobe while launch-film is on) and the folder, and exit
+  --check              print the kits, the Chrome and the ffmpeg found for them
+                       (and ffprobe while launch-film is on) and the folder, and exit
   -h, --help           show this help
   -v, --version        show the version
 
