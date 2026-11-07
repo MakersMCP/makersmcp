@@ -107,7 +107,7 @@ check_video {"film": "https://example.com/with-music.mp4", "cues": "https://exam
 - A cues length warning means the cues are for another length: fit the track to the video's exact length.
 <!-- end -->
 <!-- without fit_music -->
-- A cues length warning means the track the cues are of is not as long as the video.
+- A cues length warning means the track the cues are of is longer or shorter than the video by more than a second.
 <!-- end -->
 
 ## A launch film's own numbers
