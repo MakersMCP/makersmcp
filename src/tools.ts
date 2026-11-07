@@ -7,7 +7,7 @@ import { NotStartedError, type AvailableKit, type JobView, type KitBackend } fro
 import type { ParamDefinition, ToolDefinition } from './kits.js';
 import { PLAYBOOK_TOOL } from './playbooks.js';
 import { errorResult, jobListed, jobOutputSchema, jobResult, type ResultContext } from './results.js';
-import { fillText, inWords, templateInWords, TextError, WAIT_SECONDS, type TextContext } from './texts.js';
+import { fillText, inWords, templateInWords, TextError, WAIT_SECONDS, withoutUnlisted, type TextContext } from './texts.js';
 
 /** A kit tool this server lists, with the kit it is of. */
 export interface RegisteredKitTool {
@@ -74,10 +74,13 @@ export function takesNumber(param: ParamDefinition): boolean {
   return false;
 }
 
-/** A kit text with its placeholders filled, or an error that names where it is. */
+/**
+ * A kit text with its placeholders filled and without the sentences that name a tool the
+ * server does not list, or an error that names where it is.
+ */
 function kitText(text: string, context: ToolContext, where: string): string {
   try {
-    return fillText(text, context.text, { kind: 'kit' });
+    return withoutUnlisted(fillText(text, context.text, { kind: 'kit' }), context.text);
   } catch (error) {
     if (error instanceof TextError) throw new Error(`${where}: ${error.message}`);
     throw error;

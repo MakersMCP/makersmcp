@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { JobDoc, JobFile, JobView } from './backend.js';
 import { docEntry, type KitDefinition, type NextLines, type ToolDefinition } from './kits.js';
-import { fillText, flagWords, inParameterWords, TextError, type Placeholder, type TextContext } from './texts.js';
+import { fillText, flagWords, inParameterWords, listedTools, TextError, unlistedTools, type Placeholder, type TextContext } from './texts.js';
 
 const MAX_LISTED = 40;
 /**
@@ -55,7 +55,7 @@ export interface ResultContext {
   topics: Set<string>;
   kit?: KitDefinition;
   tool?: ToolDefinition;
-  /** The kit tools the server lists. Without it, a tool is listed when its kit is on. */
+  /** The kit tools the server lists. Without it, those of text.listed, or a tool is listed when its kit is on. */
   listed?: { has(name: string): boolean };
 }
 
@@ -119,9 +119,10 @@ function fileRef(view: JobView, file: JobFile, hosted: boolean): string {
 
 /** The kit tools this server does not list, as their kits are off or a service holds them back. */
 function unlisted(context: ResultContext): string[] {
-  const { definitions, enabled } = context.text;
-  return definitions.flatMap(kit => kit.tools.map(tool => tool.name)
-    .filter(name => (context.listed ? !context.listed.has(name) : !enabled.has(kit.kit))));
+  const { listed } = context;
+  if (!listed) return unlistedTools(context.text);
+  const named = listedTools(context.text);
+  return context.text.definitions.flatMap(kit => kit.tools.map(tool => tool.name)).filter(name => !listed.has(name) || !named.has(name));
 }
 
 /**

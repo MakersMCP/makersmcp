@@ -5,7 +5,6 @@
   "about": "Clean screenshots of a website, a demo video of it, and screenshots for its web app manifest.",
   "repository": "https://github.com/EminBudak/easyscreenshotkit",
   "needs": ["chrome", "ffmpeg"],
-  "makes": ["screenshots", "demo videos"],
   "facts": {
     "size": { "desktop": "3200x1800", "mobile": "1080x1920", "iphone": "1320x2868" },
     "window": { "desktop": "1600x900", "mobile": "360x640", "iphone": "440x956" },
@@ -21,10 +20,11 @@
   "tools": [
     {
       "name": "take_screenshots",
+      "makes": ["screenshots"],
       "title": "Screenshots of a website",
       "asks": "screenshots of a site, App Store or Google Play screenshots, Product Hunt gallery images, or a web app manifest's screenshots",
       "playbook": "screenshots",
-      "description": "Opens a website in a headless browser, picks the pages worth showing (home, pricing, features and the like), hides cookie banners, chat bubbles and other floating boxes, and saves desktop, phone and whole-page screenshots in one folder. sheet.png, every page on one picture, is the picture to show first; SCREENSHOTS.md lists each page with why it was picked, its files and its headings. url and page are paths of one public site: a #route is dropped, nothing behind a login is reached, and above one page it starts at the site's root. clean hides everything fixed on the screen but a top bar and a side bar, so an app's own tab bar too. iphone is {fact:easyscreenshotkit.size.iphone}, the App Store's 6.9 inch size; mobile is {fact:easyscreenshotkit.size.mobile}, for Google Play phones. For the Google Play feature graphic and Chrome Web Store tiles, use make_launch_stills instead; for a view behind a click or a #route, record_demo_video with steps.",
+      "description": "Opens a website in a headless browser, picks the pages worth showing (home, pricing, features and the like), hides cookie banners, chat bubbles and other floating boxes, and saves desktop, phone and whole-page screenshots in one folder. sheet.png, every page on one picture, is the picture to show first; SCREENSHOTS.md lists each page with why it was picked, its files and its headings. url and page are paths of one public site: a #route is dropped, nothing behind a login is reached, and above one page it starts at the site's root. clean hides everything fixed on the screen but a top bar and a side bar, so an app's own tab bar too. iphone is {fact:easyscreenshotkit.size.iphone}, the App Store's 6.9 inch size; mobile is {fact:easyscreenshotkit.size.mobile}, for Google Play phones. For the Google Play feature graphic and Chrome Web Store tiles, use make_launch_stills instead. For a view behind a click or a #route, use record_demo_video with steps.",
       "args": ["{url}"],
       "out": { "flag": "--out", "name": "easyscreenshotkit-{host}", "ownOnly": true },
       "params": {
@@ -66,6 +66,7 @@
     },
     {
       "name": "record_demo_video",
+      "makes": ["demo videos"],
       "title": "Demo video of a website",
       "asks": "a demo video, a walkthrough, a GIF of a site, or footage of the real site for a video",
       "playbook": "demo-video",

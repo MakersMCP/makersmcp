@@ -17,7 +17,7 @@ import {
 } from './playbooks.js';
 import { withDraft2020 } from './schema-dialect.js';
 import { defaultOutDir } from './setup.js';
-import type { TextContext } from './texts.js';
+import { onNames, type TextContext } from './texts.js';
 import { registerCoreTools, registerKitTool, type ToolContext } from './tools.js';
 
 export { loadKitDefinitions, resolveKit, validateKitDefinition, docNames, docEntry, KITS_DIR } from './kits.js';
@@ -79,7 +79,11 @@ export interface MakersMcpOptions {
   outDir?: string;
   /** A kit's folder to use instead of its installed package, like { musicfit: '../musicfit' }; ~ is the home folder. For the local backend. */
   kitPaths?: Record<string, string>;
-  /** Kit definitions to use instead of the ones in kits/. */
+  /**
+   * Kit definitions to use instead of the ones in kits/. A kit of kits/ given with fewer
+   * tools, as a service passes one whose machines cannot run some of its tools, keeps the
+   * others for the texts: they are not listed, and the texts leave out what names them.
+   */
   definitions?: KitDefinition[];
   /** Where the jobs run. Default: a LocalBackend on outDir and kitPaths. */
   backend?: KitBackend;
@@ -92,13 +96,46 @@ export interface MakersMcpOptions {
 
 interface Prepared {
   backend: KitBackend;
+  /** Every kit the server knows, each with all its tools, for the texts. */
   definitions: KitDefinition[];
   available: AvailableKit[];
   enabled: Set<string>;
+  /** The kit tools the server lists. */
+  listed: Set<string>;
+}
+
+let packageKits: KitDefinition[] | undefined;
+
+/**
+ * The kits the texts read: those given, each with the tools of the same kit in kits/ that
+ * it leaves out. MakersMCP-Server passes a kit without the tools its workers cannot run now
+ * (check_video and fit_music on an older ffmpeg), and the texts still have to fill a
+ * default of such a tool and know to leave out what names it.
+ */
+function withHeldTools(given: KitDefinition[]): KitDefinition[] {
+  if (packageKits === undefined) {
+    try {
+      packageKits = loadKitDefinitions();
+    } catch {
+      packageKits = [];
+    }
+  }
+  return given.map(definition => {
+    const known = packageKits!.find(entry => entry.kit === definition.kit);
+    const names = new Set(definition.tools.map(tool => tool.name));
+    if (!known || known.tools.every(tool => names.has(tool.name))) return definition;
+    // The package's order, with each tool given as it was given, and any it does not know after.
+    const tools = [
+      ...known.tools.map(tool => definition.tools.find(entry => entry.name === tool.name) ?? tool),
+      ...definition.tools.filter(tool => !known.tools.some(entry => entry.name === tool.name)),
+    ];
+    return { ...definition, tools };
+  });
 }
 
 function prepare(options: MakersMcpOptions): Prepared {
-  const definitions = options.definitions ?? loadKitDefinitions();
+  const given = options.definitions ?? loadKitDefinitions();
+  const definitions = withHeldTools(given);
   const names = new Set<string>();
   for (const definition of definitions) {
     for (const tool of definition.tools) {
@@ -118,10 +155,13 @@ function prepare(options: MakersMcpOptions): Prepared {
 
   const backend = options.backend
     ?? new LocalBackend({ baseDir: options.outDir ?? defaultOutDir(), kitPaths: options.kitPaths });
-  const available = backend.available(definitions).filter(isAvailable);
+  // The backend gets the kits as given: a service's check_setup lists their tools.
+  const available = backend.available(given).filter(isAvailable);
   const wanted = all ? undefined : new Set(asked);
   const enabled = new Set(available.map(kit => kit.definition.kit).filter(kit => !wanted || wanted.has(kit)));
-  return { backend, definitions, available, enabled };
+  const listed = new Set(available.filter(kit => enabled.has(kit.definition.kit))
+    .flatMap(kit => kit.definition.tools.map(tool => tool.name).filter(name => !kit.tools || kit.tools.includes(name))));
+  return { backend, definitions, available, enabled, listed };
 }
 
 /** The setup report that check_setup gives, for `makersmcp --check`. */
@@ -132,7 +172,7 @@ export async function describeSetup(options: MakersMcpOptions = {}): Promise<str
 
 /** The tools' and the playbooks' context: the side, the kits on, their versions and texts, and the topics offered. */
 function toolContext(prepared: Prepared, playbooks: Playbooks): ToolContext {
-  const { backend, definitions, available, enabled } = prepared;
+  const { backend, definitions, available, enabled, listed } = prepared;
   const hosted = backend.where === 'hosted';
   const baseDir = backend.baseDir;
   const text: TextContext = {
@@ -141,6 +181,7 @@ function toolContext(prepared: Prepared, playbooks: Playbooks): ToolContext {
     ...(baseDir !== undefined && !hosted ? { baseDir } : {}),
     definitions,
     enabled,
+    listed,
     versions: new Map(available.map(kit => [kit.definition.kit, kit.version])),
     ...(hosted && backend.limits ? { limits: backend.limits } : {}),
   };
@@ -159,7 +200,7 @@ function toolContext(prepared: Prepared, playbooks: Playbooks): ToolContext {
     baseDir,
     enabled,
     text,
-    topics: new Set(offeredTopics(playbooks, enabled).map(topic => topic.name)),
+    topics: new Set(offeredTopics(playbooks, onNames(text)).map(topic => topic.name)),
     tools: new Map(),
   };
 }
@@ -187,7 +228,7 @@ export function createMcpServer(options: MakersMcpOptions = {}): McpServer {
   registerPlaybookResources(server, playbooks, context.text);
   for (const kit of prepared.available) {
     if (!context.enabled.has(kit.definition.kit)) continue;
-    for (const tool of kit.definition.tools) registerKitTool(server, context, kit, tool);
+    for (const tool of kit.definition.tools) if (prepared.listed.has(tool.name)) registerKitTool(server, context, kit, tool);
   }
   registerCoreTools(server, context);
 

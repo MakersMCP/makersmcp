@@ -33,18 +33,20 @@ const LIMITS = { maxWaitSeconds: 47, jobMinutes: 13, jobsAtOnce: 3, jobsPerDay: 
 const LOCAL_DIR = '/home/someone/makersmcp';
 
 // A backend that runs nothing: it takes every kit and answers each start with the view it is given.
+// With `tools`, it says which tools of a kit it runs, as AvailableKit.tools.
 class FakeBackend {
-  constructor({ where = 'local', limits, view } = {}) {
+  constructor({ where = 'local', limits, view, tools } = {}) {
     this.where = where;
     this.place = where === 'local' ? 'on this machine' : 'on makersmcp.com';
     if (where === 'local') this.baseDir = LOCAL_DIR;
     if (limits) this.limits = limits;
     this.view = view;
+    this.tools = tools;
     this.started = [];
   }
 
   available(definitions) {
-    return definitions.map(definition => ({ definition, version: '9.9.9' }));
+    return definitions.map(definition => ({ definition, version: '9.9.9', ...(this.tools?.[definition.kit] ? { tools: this.tools[definition.kit] } : {}) }));
   }
 
   async start(request) {
@@ -73,9 +75,12 @@ class FakeBackend {
   close() {}
 }
 
-async function connect({ definitions, playbooks, where = 'local', limits, kits, view } = {}) {
-  const backend = new FakeBackend({ where, limits, view });
-  const server = createMcpServer({ definitions, playbooks, backend, kits });
+/** The kits as MakersMCP-Server passes them when its workers hold tools back: each without those tools (runnableDefinitions). */
+const withoutTools = (definitions, held = []) => definitions.map(kit => ({ ...kit, tools: kit.tools.filter(tool => !held.includes(tool.name)) }));
+
+async function connect({ definitions, playbooks, where = 'local', limits, kits, view, held, runs } = {}) {
+  const backend = new FakeBackend({ where, limits, view, tools: runs });
+  const server = createMcpServer({ definitions: held ? withoutTools(definitions, held) : definitions, playbooks, backend, kits });
   const client = new Client({ name: 'playbooks-test', version: '1.0.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
@@ -485,7 +490,7 @@ function argumentsFor(schema) {
  * Every problem with a set of kits and playbooks, each as one line that says where and
  * what. `corpus` holds the texts quoted errors must come from; `budgets` the lengths.
  */
-async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new Set() }) {
+async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new Set(), held = [] }) {
   const problems = [];
   const add = (where, message) => problems.push(`${where}: ${message}`);
   const {
@@ -520,8 +525,8 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
     if (!playbooks.topics.some(topic => topic.kit === kit)) add(kit, 'no topic has this kit as its kit');
   }
   for (const topic of playbooks.topics) {
-    for (const kit of [...topic.requires, ...topic.any, ...topic.optional]) {
-      if (!kitIds.includes(kit)) add(`${topic.name}.md`, `names the kit ${kit}, which has no file in kits/`);
+    for (const name of [...topic.requires, ...topic.any, ...topic.optional]) {
+      if (!kitIds.includes(name) && !toolKit.has(name)) add(`${topic.name}.md`, `names ${name}, which is no kit in kits/ and no tool of one`);
     }
     if (topic.kit !== 'makersmcp' && !kitIds.includes(topic.kit)) add(`${topic.name}.md`, `its kit ${topic.kit} has no file in kits/`);
   }
@@ -530,14 +535,16 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
   for (const kits of [kitIds, ...(kitIds.length > 1 ? kitIds.map(kit => [kit]) : [])]) {
     configs.push({ where: 'local', kits }, { where: 'hosted', kits }, { where: 'hosted', limits: LIMITS, kits });
   }
+  // A hosted service whose workers hold tools back, as MakersMCP-Server passes its kits then.
+  if (held.length) configs.push({ where: 'hosted', limits: LIMITS, kits: kitIds, held });
 
   for (const config of configs) {
-    const every = config.kits.length === kitIds.length;
-    const label = `${config.where}${config.limits ? ' with limits' : ''}, ${every ? 'every kit on' : `${config.kits[0]} alone`}`;
+    const every = config.kits.length === kitIds.length && !config.held;
+    const label = `${config.where}${config.limits ? ' with limits' : ''}, ${config.held ? `${config.held.join(' and ')} held back` : every ? 'every kit on' : `${config.kits[0]} alone`}`;
     const enabled = new Set(config.kits);
     let session;
     try {
-      session = await connect({ definitions, playbooks: dir, where: config.where, limits: config.limits, kits: config.kits });
+      session = await connect({ definitions, playbooks: dir, where: config.where, limits: config.limits, kits: config.kits, held: config.held });
     } catch (error) {
       add(label, `the server does not start: ${error.message}`);
       continue;
@@ -548,11 +555,15 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
       const listedParams = new Set(session.tools.flatMap(tool => Object.keys(tool.inputSchema.properties ?? {})));
       // The values a parameter's text offers, like the size names of take_screenshots' sizes.
       const offeredWords = session.tools.flatMap(tool => Object.values(tool.inputSchema.properties ?? {}).map(property => property.description ?? '')).join('\n');
-      const expected = playbooks.topics.filter(topic => topic.requires.every(kit => enabled.has(kit))
-        && (!topic.any.length || topic.any.some(kit => enabled.has(kit)))).map(topic => topic.name);
+      // A topic is offered when its kits are on and the tools it requires are listed.
+      const on = name => enabled.has(name) || listed.has(name);
+      const expected = playbooks.topics.filter(topic => topic.requires.every(on) && (!topic.any.length || topic.any.some(on))).map(topic => topic.name);
       const playbookTool = listed.get('makersmcp_playbook');
       const offered = playbookTool?.inputSchema.properties.topics.items.enum ?? [];
       if (JSON.stringify(offered) !== JSON.stringify(expected)) add(label, `makersmcp_playbook offers [${offered}], and the topics whose kits are on are [${expected}]`);
+      // The kit tools this server does not list, as their kits are off or a service holds them back: no text may name one.
+      const absent = [...toolKit.keys()].filter(name => !listed.has(name));
+      const namesAbsent = content => absent.filter(name => hasWord(content, name));
 
       // The texts every client gets, by side.
       const always = [['the instructions', session.instructions, false]];
@@ -576,6 +587,8 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
         for (const problem of sideProblems(`${what}, ${label}`, content, config.where)) problems.push(problem);
         for (const problem of styleProblems(`${what}, ${label}`, content, { markdown: false })) problems.push(problem);
         if (/\{[a-z_]+(?::[^{}\s]+)?\}/.test(content)) add(`${what}, ${label}`, `a placeholder left: ${/\{[a-z_]+(?::[^{}\s]+)?\}/.exec(content)[0]}`);
+        for (const name of namesAbsent(content)) add(`${what}, ${label}`, `names ${name}, which this server does not list`);
+        if (!content.trim()) add(`${what}, ${label}`, 'is empty, as every sentence of it names a tool this server does not list');
       }
 
       for (const [name, markdown] of rendered) {
@@ -584,6 +597,8 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
         const left = /\{[a-z_]+(?::[^{}\s]+)?\}/.exec(outside);
         if (left) add(where, `a placeholder left after rendering: ${left[0]}`);
         problems.push(...sideProblems(where, markdown, config.where), ...styleProblems(where, markdown));
+        // In prose or code, with backticks or without: a block for its kit or tool is where such a name goes.
+        for (const tool of namesAbsent(markdown)) add(where, `names ${tool}, which this server does not list: put it in a with block`);
 
         // Example calls: valid with this side's schema, every argument one it lists.
         for (const call of callsOf(markdown)) {
@@ -615,7 +630,7 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
               if (/^[a-z][a-z0-9_]*$/.test(word)) {
                 if (listed.has(word)) continue;
                 if (toolKit.has(word)) {
-                  add(where, `\`${word}\` is a tool of ${toolKit.get(word).kit}, which is off here: put it in a with block`);
+                  add(where, `\`${word}\` is a tool of ${toolKit.get(word).kit}, which this server does not list: put it in a with block`);
                   continue;
                 }
                 if (params.has(word) || listedParams.has(word) || COMMON.has(word) || RESULT_FIELDS.has(word) || FORMAT_FIELDS.has(word)
@@ -688,7 +703,10 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
           }
         }
 
-        // Results: the Next line under the heading, files that are there, the site note, JSON fenced, flags in words.
+      }
+      if ((every && !config.limits) || config.held) {
+        // Results: the Next line under the heading, files that are there, the site note, JSON
+        // fenced, flags in words, and with tools held back, none of them named.
         for (const definition of definitions) {
           for (const tool of definition.tools) {
             if (!listed.has(tool.name)) continue;
@@ -729,8 +747,10 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
 async function resultProblems(definitions, dir, config, tool, view, state, allWrites) {
   const problems = [];
   const label = `${tool.name}'s result, ${state}${view.files?.length ? '' : ' with no files'}, ${config.where}`;
-  const session = await connect({ definitions, playbooks: dir, where: config.where, kits: config.kits, view: () => structuredClone(view) });
+  const session = await connect({ definitions, playbooks: dir, where: config.where, kits: config.kits, held: config.held, view: () => structuredClone(view) });
   try {
+    const listedNames = new Set(session.tools.map(entry => entry.name));
+    const absent = definitions.flatMap(kit => kit.tools.map(entry => entry.name)).filter(name => !listedNames.has(name));
     const schema = session.tools.find(entry => entry.name === tool.name).inputSchema;
     const result = await session.client.callTool({ name: tool.name, arguments: argumentsFor(schema) });
     const body = text(result);
@@ -739,6 +759,7 @@ async function resultProblems(definitions, dir, config, tool, view, state, allWr
     if (next !== undefined) {
       if (parts[1] !== `Next: ${next}`) problems.push(`${label}: the Next line is not right under the heading`);
       problems.push(...sideProblems(`${label}, its Next line`, next, config.where), ...styleProblems(`${label}, its Next line`, next, { markdown: false }));
+      for (const name of absent.filter(entry => hasWord(next, entry))) problems.push(`${label}: the Next line names ${name}, which this server does not list`);
       for (const ref of next.match(/job:[^\s/]+\/[^\s,;:)]+/g) ?? []) {
         const file = ref.replace(/^job:[^/]+\//, '').replace(/[.]$/, '');
         if (!view.files?.some(entry => entry.path === file)) problems.push(`${label}: the Next line names ${file}, which the job did not list`);
@@ -811,7 +832,7 @@ test('the lint finds each kind of fault in a fixture broken one rule at a time',
     [{ 'painting.md': text => text.replace('checks it. It runs', 'checks it, **seamlessly**. It runs') }, /bold|stock phrase/],
     [{ 'sound.md': text => text.replace('with `meter` beats', 'with beats').replace(', "meter": 4', '').replace(', "meter": "4"', '') }, /its topics never name meter, a parameter of mix_sound/],
     [{ 'sound.md': text => text.replace(/```call\nmix_sound \{"track": "https:[^\n]*\n```\n/, '') }, /soundkit, hosted, every kit on: its topics have no call of mix_sound/],
-    [{ 'getting-started.md': text => text.replace('Sounds come from `mix_sound`.\n<!-- end -->', '<!-- end -->\nSounds come from `mix_sound`.') }, /`mix_sound` is a tool of soundkit, which is off here/],
+    [{ 'getting-started.md': text => text.replace('Sounds come from `mix_sound`.\n<!-- end -->', '<!-- end -->\nSounds come from `mix_sound`.') }, /`mix_sound` is a tool of soundkit, which this server does not list/],
     [{ 'jobs-and-files.md': text => text.replace('{default:wait_for_job.wait_seconds} by default and ', '') + '\n'.repeat(1) + 'x'.repeat(13000) }, /jobs-and-files\.md, .*characters, outside/],
   ];
   for (const [change, expected] of cases) {
@@ -845,7 +866,8 @@ test('the kits in kits/ and the topics in playbooks/ pass every check of the lin
     ...textFiles(path.join(here, '..', 'src')),
     ...readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors.map(entry => entry.text),
   ];
-  const problems = await lint({ definitions, dir: PLAYBOOKS_DIR, corpus, extraNames: launchFilmNames() });
+  // MakersMCP-Server's workers hold these back where their ffmpeg cannot run them.
+  const problems = await lint({ definitions, dir: PLAYBOOKS_DIR, corpus, extraNames: launchFilmNames(), held: ['check_video', 'fit_music'] });
   // The size of each topic, so one past 8,000 characters is seen.
   try {
     const playbooks = loadPlaybooks();
@@ -895,7 +917,7 @@ test('a playbook that breaks a rule of its format is refused with its file, line
     [{ 'a.md': topic('a', 'A note <!-- hidden --> here') }, /an HTML comment here would reach the model/],
     [{ 'a.md': topic('a', '<!-- local -->\n<!-- hosted -->\nx\n<!-- end -->\n<!-- end -->') }, /a hosted block inside a local block never shows/],
     [{ 'a.md': topic('a', '<!-- with k -->\n<!-- local -->\n<!-- with j -->\nx\n<!-- end -->\n<!-- end -->\n<!-- end -->', { optional: '[k, j]' }) }, /blocks go 2 deep at most/],
-    [{ 'a.md': topic('a', '<!-- with paintkit -->\nx\n<!-- end -->') }, /names a kit the frontmatter does not list: add it to optional/],
+    [{ 'a.md': topic('a', '<!-- with paintkit -->\nx\n<!-- end -->') }, /names a kit or a tool the frontmatter does not list: add it to optional/],
     [{ 'a.md': topic('a', '<!-- without paintkit -->\nx\n<!-- end -->', { requires: '[paintkit]' }) }, /never shows, since the topic requires paintkit/],
     [{ 'a.md': topic('a', 'The folder is easybrandkit-{host}.') }, /\{host\} is not a placeholder here/],
     [{ 'a.md': topic('a', 'Wait {limit:max_wait}.') }, /\{limit:max_wait\} goes inside a <!-- hosted --> block/],
@@ -1313,4 +1335,114 @@ test('the docs of one result share their budget, and the whole result stays unde
   } finally {
     await two.close();
   }
+});
+
+/** The fixture kits without their topics, for a folder of topics of a test's own. */
+const kitsWithoutTopics = () => fixtureKits().map(kit => ({ ...kit, tools: kit.tools.map(({ playbook, ...tool }) => tool) }));
+
+async function withTopicsAsync(files, callback) {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-playbooks-'));
+  try {
+    writeFileSync(path.join(dir, '_instructions.md'), 'Kits run {place}. The kits make {makes}.\n');
+    for (const [name, body] of Object.entries(files)) writeFileSync(path.join(dir, name), body);
+    return await callback(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('a tool MakersMCP-Server holds back is not listed and no text names it, while its defaults still fill', async () => {
+  // As MakersMCP-Server passes them: the package's kits without the tools its workers cannot run (runnableDefinitions).
+  const session = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits: LIMITS, held: ['check_video', 'fit_music'] });
+  try {
+    const names = session.tools.map(tool => tool.name);
+    assert.ok(!names.includes('check_video') && !names.includes('fit_music'), names.join());
+    assert.ok(names.includes('analyze_music') && names.includes('render_launch_film'));
+    const topics = session.tools.find(tool => tool.name === 'makersmcp_playbook').inputSchema.properties.topics.items.enum;
+    assert.ok(!topics.includes('checks') && !topics.includes('music'), topics.join());
+    const read = await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['launch-kit', 'launch-film', 'jobs-and-files'] } });
+    assert.notEqual(read.isError, true, text(read));
+    assert.equal(read.content.length, 3);
+    assert.doesNotMatch(text(read), /check_video|fit_music/);
+    assert.doesNotMatch(session.instructions, /a check of any video|music fitted to a video/);
+    for (const tool of session.tools) assert.doesNotMatch(JSON.stringify(tool), /check_video|fit_music/, tool.name);
+    // A render's Next line has its sentences that need no check.
+    session.backend.view = (request, id) => ({ id, kit: 'launch-film', tool: 'render_launch_film', title: 'Render a launch film', status: 'done', exitCode: 0, elapsedSeconds: 60,
+      folder: 'x', files: [{ path: 'film.mp4', bytes: 10, url: 'https://x/film.mp4' }, { path: 'film.timeline.json', bytes: 10, url: 'https://x/t' }], expiresAt: 1800000000 });
+    const rendered = await session.client.callTool({ name: 'render_launch_film', arguments: { film: 'job:job0/film.json' } });
+    assert.equal(rendered.structuredContent.next, "film.timeline.json below has the film's length and each clip's start.");
+  } finally {
+    await session.close();
+  }
+});
+
+test('a backend that runs only some tools of a kit lists those, and blocks, requires, descriptions and makes follow it', async () => {
+  const kits = kitsWithoutTopics();
+  const [paint, check] = kits[0].tools;
+  paint.description += ' To check it, use check_picture.';
+  check.params.expect.default = '1200x630';
+  check.makes = ['a check of any picture'];
+  kits[0].makes = ['a picture of a website'];
+  const files = {
+    'a.md': topic('a', [
+      '`paint_picture` paints.',
+      '<!-- with check_picture -->',
+      '`check_picture` checks it.',
+      '<!-- end -->',
+      '<!-- without check_picture -->',
+      'Nothing here checks it, though a check expects {default:check_picture.expect}.',
+      '<!-- end -->',
+      '<!-- with check_picture, mix_sound -->',
+      'A sound or a check follows.',
+      '<!-- end -->',
+      '<!-- without check_picture, mix_sound -->',
+      'Neither follows.',
+      '<!-- end -->',
+    ].join('\n'), { optional: '[check_picture, mix_sound]' }),
+    'b.md': topic('b', 'Checks.', { requires: '[check_picture]', order: 20 }),
+  };
+  await withTopicsAsync(files, async dir => {
+    const playbooks = loadPlaybooks(dir);
+    for (const [kitsOn, sound] of [[undefined, true], [['paintkit'], false]]) {
+      const session = await connect({ definitions: kits, playbooks, kits: kitsOn, runs: { paintkit: ['paint_picture'] } });
+      try {
+        const names = session.tools.map(tool => tool.name);
+        assert.ok(names.includes('paint_picture') && !names.includes('check_picture'), names.join());
+        const tool = session.tools.find(entry => entry.name === 'makersmcp_playbook');
+        assert.deepEqual(tool.inputSchema.properties.topics.items.enum, ['a']);
+        const read = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['a'] } }));
+        assert.match(read, /Nothing here checks it, though a check expects 1200x630\./);
+        assert.doesNotMatch(read, /check_picture/);
+        assert.equal(/A sound or a check follows\./.test(read), sound);
+        assert.equal(/Neither follows\./.test(read), !sound);
+        assert.doesNotMatch(names.map(name => session.tools.find(entry => entry.name === name).description).join('\n'), /check_picture/);
+        assert.equal(session.instructions, `Kits run on this machine. The kits make a picture of a website${sound ? ' and a sound for a picture' : ''}.`);
+      } finally {
+        await session.close();
+      }
+    }
+  });
+});
+
+test('makersmcp_playbook reads each topic on its own, so one that cannot be read leaves the others', async () => {
+  const files = { 'a.md': topic('a', 'Fine.'), 'b.md': topic('b', 'Fps {fact:paintkit.fps}.', { order: 20 }) };
+  await withTopicsAsync(files, async dir => {
+    const session = await connect({ definitions: kitsWithoutTopics(), playbooks: loadPlaybooks(dir) });
+    try {
+      const both = await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['a', 'b'] } });
+      assert.notEqual(both.isError, true);
+      assert.match(both.content[0].text, /^# A topic\n\nFine\.$/);
+      assert.match(both.content[1].text, /^## makersmcp_playbook: b could not be read\n\nb\.md: \{fact:paintkit\.fps\}: paintkit has no fact fps/);
+      const alone = await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['b'] } });
+      assert.equal(alone.isError, true);
+    } finally {
+      await session.close();
+    }
+  });
+});
+
+test('a numbered list counts from 1 when a block takes its first item', () => {
+  withTopics({ 'a.md': topic('a', '<!-- with soundkit -->\n1. Mix.\n<!-- end -->\n2. Paint.\n3. Check.', { optional: '[soundkit]' }) }, dir => {
+    assert.match(renderTopic(loadPlaybooks(dir), 'a', ctx({ enabled: new Set(['paintkit']) })), /\n\n1\. Paint\.\n2\. Check\.$/);
+  });
 });

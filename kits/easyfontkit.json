@@ -5,7 +5,6 @@
   "about": "A website's fonts, how each one is licensed, and the closest free font for each one that is not free.",
   "repository": "https://github.com/EminBudak/easyfontkit",
   "needs": ["chrome"],
-  "makes": ["a page's fonts with their licenses"],
   "facts": {
     "run_seconds": "15 to 60",
     "late_timeout": 240,
@@ -17,6 +16,7 @@
       "title": "Fonts of a website",
       "asks": "the fonts a site uses, their files and licenses, or free fonts that match a site's type",
       "playbook": "fonts",
+      "makes": ["a page's fonts with their licenses"],
       "description": "Reads one page of a website in a headless browser and saves its fonts in one folder: which font draws its headings, body text, buttons and code, every font file the page loads, how each one is licensed, and the closest free font for each one that is not free. FONTS.md is the file to read first, fonts.css is for pages, with a variable for each role, and fonts.json for tools. The license of each font is written next to it so the user can decide what to use. It reads only the page at url, so a font used only on another page needs a run on that page, and a page that answers with an error gives that error page's fonts. For a whole brand kit with logos and colors, use make_brand_kit instead.",
       "args": ["{url}"],
       "out": { "flag": "--out", "name": "easyfontkit-{host}", "ownOnly": true },

@@ -111,10 +111,16 @@ export interface TextContext {
   place: string;
   /** The local backend's folder. */
   baseDir?: string;
-  /** Every kit this server knows, on or off. */
+  /**
+   * Every kit this server knows, on or off, each with all its tools, the ones the server
+   * does not list too, so a text can still fill a default of such a tool and leave out
+   * what names it.
+   */
   definitions: KitDefinition[];
   /** The kits that are on. */
   enabled: Set<string>;
+  /** The kit tools the server lists. Without it, every tool of a kit that is on. */
+  listed?: Set<string>;
   /** The version each kit the backend can run is at. */
   versions: Map<string, string>;
   /** A hosted service's limits. */
@@ -123,6 +129,44 @@ export interface TextContext {
 
 /** A placeholder that cannot be filled, like a fact a kit does not have. */
 export class TextError extends Error {}
+
+/** The kit tools the server lists: the context's, or every tool of a kit that is on. */
+export function listedTools(context: TextContext): Set<string> {
+  if (context.listed) return context.listed;
+  return new Set(context.definitions.filter(kit => context.enabled.has(kit.kit)).flatMap(kit => kit.tools.map(tool => tool.name)));
+}
+
+/** What a with or without block and a topic's requires can name: the kits that are on and the tools the server lists. */
+export function onNames(context: TextContext): Set<string> {
+  return new Set([...context.enabled, ...listedTools(context)]);
+}
+
+/** The kit tools the server knows and does not list, as their kits are off or a service holds them back. */
+export function unlistedTools(context: TextContext): string[] {
+  const listed = listedTools(context);
+  return context.definitions.flatMap(kit => kit.tools.map(tool => tool.name)).filter(name => !listed.has(name));
+}
+
+/** Whether a text names one of these tools, as a word of its own. */
+export function namesTool(text: string, tools: string[]): boolean {
+  return tools.some(name => new RegExp(`(?<![\\w-])${name}(?![\\w-])`).test(text));
+}
+
+/** A text's sentences: it is cut after each . ! or ? that a space follows, so 29.333 and fitted.wav stay whole. */
+export function sentencesOf(text: string): string[] {
+  return text.trim().split(/(?<=[.!?])\s+(?=\S)/);
+}
+
+/**
+ * A kit's text without the sentences that name a tool the server does not list, like "For
+ * font files, use make_font_kit instead." with easyfontkit off, so a description never
+ * points at a tool that is not there.
+ */
+export function withoutUnlisted(text: string, context: TextContext): string {
+  const absent = unlistedTools(context);
+  if (!absent.length || !namesTool(text, absent)) return text;
+  return sentencesOf(text).filter(sentence => !namesTool(sentence, absent)).join(' ');
+}
 
 /** Items in words: a, b and c, or with `or`, a, b or c. */
 export function inWords(items: string[], last = 'and'): string {
@@ -264,10 +308,21 @@ export function fillText(text: string, context: TextContext, options: FillOption
   });
 }
 
-/** What the kits that are on make, joined: a website's brand kit, ... and music fitted to a video. */
+/**
+ * What the kits that are on make, joined: a website's brand kit, ... and music fitted to a
+ * video. A kit's own phrases count while it is on, a tool's while the server lists it.
+ */
 export function makesText(context: TextContext): string {
-  const phrases = context.definitions.filter(kit => context.enabled.has(kit.kit)).flatMap(kit => kit.makes ?? []);
-  return phrases.length ? inWords(phrases) : 'files';
+  const listed = listedTools(context);
+  const phrases = context.definitions.filter(kit => context.enabled.has(kit.kit))
+    .flatMap(kit => [...(kit.makes ?? []), ...kit.tools.filter(tool => listed.has(tool.name)).flatMap(tool => tool.makes ?? [])]);
+  return phrases.length ? inWords([...new Set(phrases)]) : 'files';
+}
+
+/** A kit with only the tools the server lists, for the texts made from its tools. */
+export function listedKit(kit: KitDefinition, context: TextContext): KitDefinition {
+  const listed = listedTools(context);
+  return kit.tools.every(tool => listed.has(tool.name)) ? kit : { ...kit, tools: kit.tools.filter(tool => listed.has(tool.name)) };
 }
 
 /**
@@ -301,7 +356,7 @@ export function flagsText(context: TextContext): string {
   let example: [string, string] | undefined;
   let dashed = false;
   for (const kit of context.definitions.filter(entry => context.enabled.has(entry.kit))) {
-    for (const [flag, words] of flagWords(kit, undefined, context.where)) {
+    for (const [flag, words] of flagWords(listedKit(kit, context), undefined, context.where)) {
       const line = `\`${flag}\` is ${words.includes(' ') ? words.replace(/^(\w+)/, '`$1`') : `\`${words}\``}`;
       if (words === flag.slice(2).replace(/-/g, '_')) {
         same.add(line);

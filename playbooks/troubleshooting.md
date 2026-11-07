@@ -5,7 +5,7 @@ index: setup, the errors the tools return and their fixes, the kits' flag names
 description: Explains how a MakersMCP result shows a problem, from an argument the schema refused to a job that failed or a check that did not pass, lists the errors makersmcp itself returns with their fixes, says what check_setup reports and how to fix the setup, and maps the command line flags kit messages may name to the parameters they mean. Use it when a tool returns an error, a job fails, a tool is missing, or a message names a flag.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music]
 order: 90
 ---
 # When a tool fails
@@ -71,7 +71,7 @@ Read the result before anything else: its first line says what happened, and the
 <!-- hosted -->
 ## The setup
 
-Nothing needs installing: the kits run on makersmcp.com. `check_setup` lists the kits running there with their versions and tools, and how long files are kept. A kit "not running on makersmcp.com right now." has no tools until it is back.
+Nothing needs installing: the kits run on makersmcp.com. `check_setup` lists the kits running there with their versions and tools, and how long files are kept. A kit "not running on makersmcp.com right now." has no tools until it is back, and a tool the servers cannot run for now is not listed: `check_setup` names it as "Held back: <tool> (<why>)". Tell the user it is not there for now.
 <!-- end -->
 
 ## The kits' own words
@@ -92,8 +92,11 @@ Kit messages can name the kit's command line flags, like --timeout or --page. A 
 - `take_screenshots` and `check_pwa_screenshots`: the screenshots topic. `record_demo_video`: the demo-video topic.
 <!-- end -->
 <!-- with launch-film -->
-- `make_launch_film`, `plan_launch_film`, `render_launch_film`, `make_launch_stills` and `launch_film_guide`: the launch-film topic, and a film.json's problems the film-json topic. `check_video`: the checks topic.
+- `make_launch_film`, `plan_launch_film`, `render_launch_film`, `make_launch_stills` and `launch_film_guide`: the launch-film topic, and a film.json's problems the film-json topic.
 <!-- end -->
-<!-- with musicfit -->
+<!-- with check_video -->
+- `check_video`: the checks topic.
+<!-- end -->
+<!-- with fit_music -->
 - `fit_music` and `analyze_music`: the music topic.
 <!-- end -->

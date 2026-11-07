@@ -5,7 +5,7 @@ index: long jobs, calls that end early, cancelling, folders, passing one job's f
 description: Explains how a MakersMCP job runs and ends, how to wait for a long one, what to do after a call that ended with no result, what cancel_job and list_jobs do, where each kit saves its files and what a new run replaces, and how one job's files go into the next. Use it before running jobs side by side, after a call ended early, when a folder already holds files, or when a file from one job has to go into another.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music]
 order: 80
 ---
 # Jobs, waits and files
@@ -105,20 +105,25 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 <!-- with launch-film -->
 - film.json of `plan_launch_film` or `make_launch_film` goes to `film` of `render_launch_film` and `source` of `make_launch_stills`, and words.json to `words` of the next plan, which then does not read the page again.
+<!-- end -->
+<!-- with check_video -->
 - film.mp4 goes to `film` of `check_video`, which finds film.timeline.json beside it, under that name only.
 <!-- end -->
 <!-- with easyscreenshotkit -->
 - pwa/manifest-screenshots.json of `take_screenshots` with `pwa` goes to `manifest` of `check_pwa_screenshots`, and demo.yaml of a `record_demo_video` tour to its `steps`, to record that tour again.
 <!-- end -->
-<!-- with musicfit -->
+<!-- with fit_music -->
 - `length` and `hit` of `fit_music` come from the video.
 <!-- with launch-film -->
-  A launch film's length and its logo close's start are in its film.timeline.json, and in the Cuts table of the `CHECK.md` that `check_video` returns.
+  A launch film's length and its logo close's start are in its film.timeline.json.
+<!-- end -->
+<!-- with check_video -->
+  The Cuts table of the `CHECK.md` that `check_video` returns has them too.
 <!-- end -->
 <!-- with easyscreenshotkit -->
   A demo's are video.duration and a click's pressedAt in its steps.json.
 <!-- end -->
-<!-- with launch-film -->
+<!-- with check_video -->
 - cues.json of `fit_music` or `analyze_music` goes to `cues` of `check_video`.
 <!-- end -->
 <!-- end -->

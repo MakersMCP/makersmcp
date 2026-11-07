@@ -5,7 +5,6 @@
   "about": "A website's brand kit: its real logo files, colors, fonts and first screen.",
   "repository": "https://github.com/EminBudak/easybrandkit",
   "needs": ["chrome"],
-  "makes": ["a website's brand kit"],
   "facts": {
     "screen_size": "3200x1800",
     "card_size": "2400x1350",
@@ -21,6 +20,7 @@
       "title": "Brand kit from a website",
       "asks": "a site's logo, colors, fonts or brand guidelines, or to design, build or animate anything for a product whose site is known",
       "playbook": "brand",
+      "makes": ["a website's brand kit"],
       "description": "Reads a website in a headless browser, the way it is drawn, and saves its brand in one folder: the logo files cut from their real background (PNG and SVG), the colors with where each one is used, the fonts, the first screen, a brand card, and the app store icon and screenshots when the site links to its apps. BRAND.md is the file to read first and card.png the picture to show the user; brand.json is for tools and _brand.yml for Quarto and Shiny. With facts, it also saves what the site claims about itself, each claim with its page, in FACTS.md, for copy that needs the site's numbers, customers, quotes or prices; a launch film does not read it. An App Store or Google Play listing works as the address, a social profile is refused, and a deeper page is read from the home page. For font files and their licenses, use make_font_kit instead.",
       "args": ["{url}"],
       "out": { "flag": "--out", "name": "easybrandkit-{host}", "ownOnly": true },

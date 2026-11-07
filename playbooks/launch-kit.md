@@ -1,16 +1,16 @@
 ---
 name: launch-kit
 title: Everything a launch needs
-index: everything a launch needs, in order: brand, screenshots, demo, film, pictures, music, checks
-description: Runs the whole set of launch files for a product's site with MakersMCP, in the order that works and with what can run side by side: the brand kit, store and gallery screenshots, a demo video, launch films in 16:9 and 9:16, the pictures for Product Hunt, link previews, X, Google Play and the Chrome Web Store, music fitted to the film, and the checks. Says which place takes which file at which size and what to hand over. Use it when the user asks for a launch kit, for launch assets, or for what can be made for a launch on a named place.
+index: the files a launch needs, made in order across the kits, with the place map and what to hand over
+description: Runs the whole set of launch files for a product's site with the MakersMCP kits on the server, in the order that works and with what can run side by side, from the brand kit and screenshots to launch films, launch pictures, fitted music and checks, as far as those kits are on. Says which place takes which file at which size and what to hand over. Use it when the user asks for a launch kit, for launch assets, or for what can be made for a launch on a named place.
 kit: makersmcp
 requires: [launch-film]
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, musicfit]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, musicfit, check_video, fit_music]
 order: 20
 ---
 # Everything a launch needs
 
-A launch kit is the set of files a launch takes, all made from the product's own site: its brand kit, screenshots for the stores and the gallery, a demo video, a launch film in one shape or two, the launch pictures, music fitted to the film, and the checks on all of it. Each piece has a topic of its own. This one gives the order, what runs side by side, which file goes into which call, and what to hand over.
+A launch kit is the set of files a launch takes, all made from the product's own site with the kits on this server. Each piece has a topic of its own. This one gives the order, what runs side by side, which file goes into which call, and what to hand over.
 
 ## Decide first
 
@@ -51,7 +51,9 @@ Store and gallery screenshots come from `take_screenshots`, one `sizes` entry pe
 
 ## The order
 
+<!-- with easybrandkit, easyscreenshotkit, easyfontkit -->
 1. Start the jobs that need only the site side by side, each with `wait_seconds` 0 and a folder of its own, then call `wait_for_job` on each until it ends:
+<!-- end -->
 <!-- with easybrandkit -->
    - `make_brand_kit`, with `facts` when the copy needs the site's claims.
 <!-- end -->
@@ -88,17 +90,16 @@ record_demo_video {"url": "https://linear.app", "wait_seconds": 0}
 ```
 <!-- end -->
 <!-- end -->
-2. Look at what came back before building on it.
 <!-- with easybrandkit -->
-   - Show the user `card.png` and check the brand's name, logo and colors in `BRAND.md`. The kit takes the name from the page, or from the host when the page gives no short one, and the film shows that name. When the brand is wrong, as with a cookie wall, a login page or no logo, tell the user what came back and ask for the logo and colors before going on.
-<!-- end -->
-<!-- without easybrandkit -->
-   - `plan_launch_film` reads the brand itself in the next step: check the name, logo and colors in its brand/BRAND.md before the render.
+2. Show the user `card.png` and check the brand's name, logo and colors in `BRAND.md` before building on them. The kit takes the name from the page, or from the host when the page gives no short one, and the film shows that name. When the brand is wrong, as with a cookie wall, a login page or no logo, tell the user what came back and ask for the logo and colors before going on.
 <!-- end -->
 <!-- with easyscreenshotkit -->
-   - Show `sheet.png`, and check that every page the places need is there.
+2. Show `sheet.png`, and check that every page the places need is there.
 <!-- end -->
 3. Plan the film with `plan_launch_film`, so its words can be read before it renders. Give the `look` (`launch_film_guide` with topic looks says what each suits), `seconds` from {fact:launch-film.length_min} to {fact:launch-film.length_max} and the `aspect`, and `music` false when the user's track goes under the film. The length lands on whole bars, so it can come out a few seconds off what was asked. For the other shape, plan again with `words` set to the first plan's words.json and the other `aspect`, so both films say the same.
+<!-- without easybrandkit -->
+   The plan reads the brand itself: check the name, logo and colors in its brand/BRAND.md before the render.
+<!-- end -->
 <!-- with easybrandkit -->
    Give `brand` the brand kit of step 1.
 <!-- local -->
@@ -121,7 +122,10 @@ plan_launch_film {"url": "https://linear.app", "brand": "job:<job_id>/brand.json
 <!-- hosted -->
    Read the plan in the result. A plan renders as it was planned here, so when a word or the name is wrong, tell the user before rendering.
 <!-- end -->
-4. Render each plan with `render_launch_film`, and check each film at once with `check_video` and `expect` {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16. Its `CHECK.md` gives the film's length under its heading and each cut's time in its Cuts table, the logo close last.
+4. Render each plan with `render_launch_film`.
+<!-- with check_video -->
+   Check each film at once with `check_video` and `expect` {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16. Its `CHECK.md` gives the film's length under its heading and each cut's time in its Cuts table, the logo close last.
+<!-- end -->
 <!-- local -->
 ```call
 render_launch_film {"film": "launch/film-16x9/film.json"}
@@ -131,9 +135,14 @@ check_video {"film": "launch/film-16x9/film.mp4", "expect": "{fact:launch-film.s
 <!-- hosted -->
 ```call
 render_launch_film {"film": "job:<job_id>/film.json"}
+```
+   film.json is the plan's job's.
+<!-- with check_video -->
+```call
 check_video {"film": "job:<job_id>/film.mp4", "expect": "{fact:launch-film.size_16_9}@{fact:launch-film.fps}"}
 ```
-   film.json is the plan's job's, film.mp4 the render's.
+   film.mp4 is the render's.
+<!-- end -->
 <!-- end -->
 5. Make the pictures with `make_launch_stills`, with `source` the film's film.json and `for` the places, so they match the film's look and words. They go to stills/ next to that film.json, with `stills/STILLS.md` saying which file is for which place.
 <!-- local -->
@@ -146,8 +155,8 @@ make_launch_stills {"source": "launch/film-16x9/film.json", "for": ["ph", "og", 
 make_launch_stills {"source": "job:<job_id>/film.json", "for": ["ph", "og", "x"]}
 ```
 <!-- end -->
-<!-- with musicfit -->
-6. For the user's track, follow the music topic: `analyze_music`, then `fit_music` with `length` the film's length and `hit` the time of its logo close, both from `CHECK.md` or film.timeline.json, and `fps` {fact:launch-film.fps}. `fit_music` writes the sound only.
+<!-- with fit_music -->
+6. For the user's track, follow the music topic: `analyze_music`, then `fit_music` with `length` the film's length and `hit` the time of its logo close, both from its film.timeline.json, and `fps` {fact:launch-film.fps}. `fit_music` writes the sound only.
 <!-- local -->
 ```call
 fit_music {"track": "music/track.mp3", "length": "24", "hit": "18.667", "fps": {fact:launch-film.fps}, "out_dir": "launch/music"}
@@ -161,20 +170,40 @@ fit_music {"track": "https://example.com/track.mp3", "length": "24", "hit": "18.
    No tool here lays it under the film: hand over the film and fitted.wav together.
 <!-- end -->
 <!-- end -->
-<!-- without musicfit -->
+<!-- without fit_music -->
 6. A track of the user's cannot be fitted here. Hand over the film with its own music, or the film planned with `music` false and the length the track must have.
 <!-- end -->
 7. Check the rest before the hand over.
 <!-- with easyscreenshotkit -->
-   - `check_pwa_screenshots` with `manifest` the pwa/manifest-screenshots.json of `take_screenshots`, and `check_video` on the demo with `expect` {fact:easyscreenshotkit.demo.size}@{default:record_demo_video.fps}.
+   - `check_pwa_screenshots` with `manifest` the pwa/manifest-screenshots.json of `take_screenshots`.
+<!-- with check_video -->
+   - `check_video` on the demo, with `expect` {fact:easyscreenshotkit.demo.size}@{default:record_demo_video.fps}.
+<!-- end -->
 <!-- end -->
    - Look at every check's sheet.png and at every picture, for words cut off, text on text and a wrong logo.
+<!-- with check_video -->
    - A film planned with `music` false fails the silence check of `check_video` until a track is under it; its size, frame rate and cuts are still measured right.
+<!-- end -->
 
 <!-- local -->
 ## Folders
 
-Give each piece its own folder under one launch folder: launch/brand, launch/screenshots, launch/demo, launch/film-16x9, launch/film-9x16 and launch/music. A run replaces what an earlier run of its kit left in its folder, and a new plan in a folder that holds a render leaves that film.mp4 and stills/ beside the new film.json, so give a second plan or a new look a new folder.
+Give each piece its own folder under one launch folder, so no run replaces another:
+<!-- with easybrandkit -->
+- launch/brand, the brand kit
+<!-- end -->
+<!-- with easyscreenshotkit -->
+- launch/screenshots and launch/demo
+<!-- end -->
+<!-- with easyfontkit -->
+- launch/fonts
+<!-- end -->
+- launch/film-16x9 and launch/film-9x16, one for each plan
+<!-- with musicfit -->
+- launch/music, the fitted track
+<!-- end -->
+
+A new plan in a folder that holds a render leaves that film.mp4 and stills/ beside the new film.json, so give a second plan or a new look a new folder.
 <!-- end -->
 
 ## Tempo

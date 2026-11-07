@@ -4,8 +4,8 @@ title: Music fitted to a film or a demo
 index: analyze_music and fit_music: a track fitted to a film or a demo, the hit, a voice, what comes after
 description: Fits a music track to a video's exact length with musicfit, lands its drop on a chosen moment, ducks it under a voice and sets its loudness. Use it when a track from the user, a library or a music model has to fit a launch film, a demo or any cut.
 kit: musicfit
-requires: [musicfit]
-optional: [launch-film, easyscreenshotkit]
+requires: [musicfit, fit_music]
+optional: [launch-film, easyscreenshotkit, check_video]
 order: 70
 ---
 # Music fitted to a film or a demo
@@ -25,7 +25,10 @@ order: 70
 ## Where the numbers come from
 
 <!-- with launch-film -->
-- A launch film runs at {fact:launch-film.fps} frames a second. `film.timeline.json` beside its `film.mp4` gives its length as `seconds`, and its logo close, the usual hit, as the `start` of the clip whose `kind` is logo. Without access to that file, `check_video` without `cues` gives the same in `CHECK.md`: the length and frame rate of any video, and a launch film's cuts with their times and kinds.
+- A launch film runs at {fact:launch-film.fps} frames a second. `film.timeline.json` beside its `film.mp4` gives its length as `seconds`, and its logo close, the usual hit, as the `start` of the clip whose `kind` is logo.
+<!-- end -->
+<!-- with check_video -->
+  Without access to that file, `check_video` without `cues` gives the same in `CHECK.md`: the length and frame rate of any video, and a launch film's cuts with their times and kinds.
 <!-- end -->
 <!-- with easyscreenshotkit -->
 - A demo from `record_demo_video` runs at its `fps`, {default:record_demo_video.fps} unless set. Its `steps.json` gives the length as `video.duration`, or as `video.frames` with an f, and each click's moment as `pressedAt`.
@@ -77,10 +80,10 @@ fit_music {"track": "https://example.com/track.mp3", "length": "32", "hit": "27.
 <!-- end -->
 3. Read `FIT.md`: its "Where to listen" table gives the start, each seam, the hit and the end. Show `seams.png`, and act on any warning.
 4. Lay the track under the video, as the next section says.
-<!-- with launch-film -->
+<!-- with check_video -->
 5. Check it with `check_video`, then hand it over.
 <!-- end -->
-<!-- without launch-film -->
+<!-- without check_video -->
 5. Hand it over.
 <!-- end -->
 
@@ -103,7 +106,7 @@ Nothing here runs a command, so hand over the links to the video and the track.
 <!-- end -->
 Tell the user to put `fitted.wav`, or `mix.wav` with a voice, under the whole video from its first frame, in the app they cut video with, without trimming or stretching it: it is already exactly as long.
 
-<!-- with launch-film -->
+<!-- with check_video -->
 ## Checking it
 
 `check_video` with `cues` set to the fit's `cues.json` measures whether each cut lands on a beat. Its `expect` is {fact:launch-film.size_16_9}@{fact:launch-film.fps} for a launch film, {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16.
@@ -124,10 +127,15 @@ check_video {"film": "job:<film_job_id>/film.mp4", "expect": "{fact:launch-film.
 <!-- with easyscreenshotkit -->
 - For a demo, give `cuts` the clicks' `pressedAt` in seconds, like "2.25,4.632,7.017": `steps.json` is no cuts file.
 <!-- end -->
+<!-- end -->
 
+<!-- with launch-film -->
 ## A launch film's tempo
 
-A launch film's clips last whole bars of its look's own music, so its cuts follow the look's tempo: launch {fact:launch-film.look_bpm.launch}, aurora {fact:launch-film.look_bpm.aurora}, gridline {fact:launch-film.look_bpm.gridline}, pop {fact:launch-film.look_bpm.pop} and journal {fact:launch-film.look_bpm.journal} BPM. Nothing here changes it. With the drop on the logo close, a track at that tempo, or half or double it, lands every cut on a beat; at any other tempo, a near one too, some cuts fall between beats. So before a plan, read the track and tell the user which look matches its tempo, if one does, since the look also sets the film's style (`launch_film_guide` with topic looks). Give `plan_launch_film` that `look` once they agree. For a film already made, say which cuts `check_video` found off the beat.
+A launch film's clips last whole bars of its look's own music, so its cuts follow the look's tempo: launch {fact:launch-film.look_bpm.launch}, aurora {fact:launch-film.look_bpm.aurora}, gridline {fact:launch-film.look_bpm.gridline}, pop {fact:launch-film.look_bpm.pop} and journal {fact:launch-film.look_bpm.journal} BPM. Nothing here changes it. With the drop on the logo close, a track at that tempo, or half or double it, lands every cut on a beat; at any other tempo, a near one too, some cuts fall between beats. So before a plan, read the track and tell the user which look matches its tempo, if one does, since the look also sets the film's style (`launch_film_guide` with topic looks). Give `plan_launch_film` that `look` once they agree.
+<!-- with check_video -->
+For a film already made, say which cuts `check_video` found off the beat.
+<!-- end -->
 <!-- end -->
 
 ## Every parameter
@@ -185,7 +193,7 @@ Warnings come with a done job, in `FIT.md` too:
 - The links to the video and to the track to lay in.
 <!-- end -->
 - From `FIT.md`: the length and level, the tempo, where the drop landed, and the moments to listen at.
-<!-- with launch-film -->
+<!-- with check_video -->
 - What `check_video` measured: cuts on the beat, loudness, true peak.
 <!-- end -->
 - That nothing here checked whether the track may be used.

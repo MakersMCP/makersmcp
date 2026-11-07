@@ -9,7 +9,9 @@ import { TOPIC_NAME } from './kits.js';
 import {
   fillText,
   HOSTED_ONLY,
+  listedTools,
   LOCAL_ONLY,
+  onNames,
   ON_THEIR_OWN_LINE,
   placeholderProblem,
   placeholdersIn,
@@ -30,6 +32,9 @@ import {
  *   <!-- hosted --> ... <!-- end -->         only on a hosted server
  *   <!-- with launch-film --> ... <!-- end -->     only while that kit is on
  *   <!-- without launch-film --> ... <!-- end -->  only while it is off
+ *   <!-- with check_video --> ... <!-- end -->     only while the server lists that tool
+ *   <!-- with easybrandkit, easyfontkit --> ... <!-- end -->  while any of them is on;
+ *                                            without, while none is
  *
  * and placeholders from a fixed list (texts.ts), so one file serves every side and every
  * set of kits. playbooks/_instructions.md is the server's instructions, made the same way.
@@ -47,6 +52,9 @@ const MAX_DESCRIPTION = 1024;
 /** Blocks go two deep at most: a side, and a kit inside it, or the other way round. */
 const MAX_DEPTH = 2;
 const KIT_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** A kit tool's name, which a block and a topic's requires can name as they name a kit. */
+const TOOL_NAME = /^[a-z][a-z0-9_]*$/;
+const isName = (name: string) => KIT_ID.test(name) || TOOL_NAME.test(name);
 const KEYS = ['name', 'title', 'index', 'description', 'kit', 'requires', 'any', 'optional', 'order'] as const;
 const LIST_KEYS = new Set(['requires', 'any', 'optional']);
 const REQUIRED_KEYS = ['name', 'title', 'index', 'description', 'kit', 'order'];
@@ -57,7 +65,8 @@ const INDEX_HEAD = "Returns MakersMCP's playbooks. Each covers one kind of job f
 /** A playbook file that cannot be used, with where and why. */
 export class PlaybookError extends Error {}
 
-type Condition = { kind: 'local' | 'hosted' } | { kind: 'with' | 'without'; kit: string };
+/** A block's condition: a side, or kits that are on or off and tools the server lists or not, any of them for with. */
+type Condition = { kind: 'local' | 'hosted' } | { kind: 'with' | 'without'; names: string[] };
 
 interface Line {
   line: number;
@@ -81,11 +90,11 @@ export interface Topic {
   description: string;
   /** The kit that owns it, or makersmcp for one across kits. */
   kit: string;
-  /** Kits that must all be on for it to be offered. */
+  /** Kits that must all be on, and tools the server must list, for it to be offered. */
   requires: string[];
   /** Kits of which one must be on, when any are named. */
   any: string[];
-  /** Kits the text has with or without blocks for. */
+  /** Kits and tools the text has with or without blocks for. */
   optional: string[];
   /** Its place in the index. */
   order: number;
@@ -177,7 +186,7 @@ function parseTopic(file: string, text: string): Topic {
     const match = /^\[(.*)\]$/.exec(value);
     if (!match) fail(undefined, `${key} is a list, like [launch-film, musicfit]`);
     const items = match![1]!.split(',').map(item => unquoted(item.trim())).filter(Boolean);
-    for (const item of items) if (!KIT_ID.test(item)) fail(undefined, `${key}: ${item} is not a kit's id`);
+    for (const item of items) if (!isName(item)) fail(undefined, `${key}: ${item} is not a kit's id or a tool's name`);
     return items;
   };
   const requires = list('requires');
@@ -187,9 +196,9 @@ function parseTopic(file: string, text: string): Topic {
   const bodyText = lines.slice(end + 1).join('\n');
   const body = parseBody(bodyText, base, end + 2, 'topic');
   const listed = new Set([...requires, ...any, ...optional]);
-  for (const [kit, kind, line] of blockKits(body)) {
-    if (!listed.has(kit)) fail(line, `<!-- ${kind} ${kit} --> names a kit the frontmatter does not list: add it to optional`);
-    if (kind === 'without' && requires.includes(kit)) fail(line, `<!-- without ${kit} --> never shows, since the topic requires ${kit}`);
+  for (const [name, kind, line] of blockNames(body)) {
+    if (!listed.has(name)) fail(line, `<!-- ${kind} ${name} --> names a kit or a tool the frontmatter does not list: add it to optional`);
+    if (kind === 'without' && requires.includes(name)) fail(line, `<!-- without ${name} --> never shows, since the topic requires ${name}`);
   }
   const first = bodyText.split('\n').find(line => line.trim());
   if (first?.startsWith('# ') && first.trim() !== `# ${fields['title']}`) fail(end + 2, `the heading is not the title, # ${fields['title']}`);
@@ -209,13 +218,15 @@ function parseTopic(file: string, text: string): Topic {
   };
 }
 
-/** The kits a block's with and without markers name, with the line of each. */
-function blockKits(block: Block): Array<[string, 'with' | 'without', number]> {
+/** The kits and tools a block's with and without markers name, with the line of each. */
+function blockNames(block: Block): Array<[string, 'with' | 'without', number]> {
   const found: Array<[string, 'with' | 'without', number]> = [];
   for (const item of block.items) {
     if (!('items' in item)) continue;
-    if (item.condition && 'kit' in item.condition) found.push([item.condition.kit, item.condition.kind, item.line]);
-    found.push(...blockKits(item));
+    if (item.condition && 'names' in item.condition) {
+      for (const name of item.condition.names) found.push([name, item.condition.kind, item.line]);
+    }
+    found.push(...blockNames(item));
   }
   return found;
 }
@@ -275,11 +286,12 @@ function parseBody(text: string, file: string, firstLine: number, kind: TextKind
         open.pop();
         return;
       }
-      const kitMarker = /^(with|without)\s+(\S+)$/.exec(words);
+      const nameMarker = /^(with|without)\s+(\S.*)$/.exec(words);
+      const names = nameMarker ? nameMarker[2]!.split(/\s*,\s*|\s+/).filter(Boolean) : [];
       let condition: Condition;
       if (words === 'local' || words === 'hosted') condition = { kind: words };
-      else if (kitMarker && KIT_ID.test(kitMarker[2]!)) condition = { kind: kitMarker[1] as 'with' | 'without', kit: kitMarker[2]! };
-      else return fail(line, `<!-- ${words} --> is not a block marker; the markers are local, hosted, with <kit>, without <kit> and end`);
+      else if (nameMarker && names.every(isName) && new Set(names).size === names.length) condition = { kind: nameMarker[1] as 'with' | 'without', names };
+      else return fail(line, `<!-- ${words} --> is not a block marker; the markers are local, hosted, with <kit or tool>, without <kit or tool> (several, with commas, for any of them) and end`);
       if (open.length > MAX_DEPTH) fail(line, `blocks go ${MAX_DEPTH} deep at most`);
       for (const outer of open) {
         const was = outer.condition;
@@ -287,8 +299,8 @@ function parseBody(text: string, file: string, firstLine: number, kind: TextKind
         if ((was.kind === 'local' || was.kind === 'hosted') && (condition.kind === 'local' || condition.kind === 'hosted')) {
           fail(line, `a ${condition.kind} block inside a ${was.kind} block ${condition.kind === was.kind ? 'adds nothing' : 'never shows'}`);
         }
-        if ('kit' in was && 'kit' in condition && was.kit === condition.kit) {
-          fail(line, `a ${condition.kind} ${condition.kit} block inside a ${was.kind} ${was.kit} block ${condition.kind === was.kind ? 'adds nothing' : 'never shows'}`);
+        if ('names' in was && 'names' in condition && was.names.join() === condition.names.join()) {
+          fail(line, `a ${condition.kind} ${condition.names.join(', ')} block inside a ${was.kind} ${was.names.join(', ')} block ${condition.kind === was.kind ? 'adds nothing' : 'never shows'}`);
         }
       }
       const inner: Block = { condition, line, items: [] };
@@ -305,23 +317,23 @@ function parseBody(text: string, file: string, firstLine: number, kind: TextKind
   return root;
 }
 
-function holds(condition: Condition | undefined, context: TextContext): boolean {
+function holds(condition: Condition | undefined, context: TextContext, on: Set<string>): boolean {
   if (!condition) return true;
   switch (condition.kind) {
     case 'local':
     case 'hosted':
       return context.where === condition.kind;
     case 'with':
-      return context.enabled.has(condition.kit);
+      return condition.names.some(name => on.has(name));
     case 'without':
-      return !context.enabled.has(condition.kit);
+      return !condition.names.some(name => on.has(name));
   }
 }
 
-function select(block: Block, context: TextContext, into: Line[] = []): Line[] {
+function select(block: Block, context: TextContext, on: Set<string> = onNames(context), into: Line[] = []): Line[] {
   for (const item of block.items) {
     if ('items' in item) {
-      if (holds(item.condition, context)) select(item, context, into);
+      if (holds(item.condition, context, on)) select(item, context, on, into);
     } else {
       into.push(item);
     }
@@ -329,22 +341,27 @@ function select(block: Block, context: TextContext, into: Line[] = []): Line[] {
   return into;
 }
 
-/** The topics offered with these kits on: those whose required kits are all on, and one of any. */
-export function offeredTopics(playbooks: Playbooks, enabled: Set<string>): Topic[] {
-  return playbooks.topics.filter(topic => topic.requires.every(kit => enabled.has(kit))
-    && (topic.any.length === 0 || topic.any.some(kit => enabled.has(kit))));
+/**
+ * The topics offered: those whose required kits are all on and required tools all listed,
+ * with one of any. `on` holds the kits that are on and the tools the server lists, as
+ * onNames gives them; a set of kits alone offers no topic that requires a tool.
+ */
+export function offeredTopics(playbooks: Playbooks, on: Set<string>): Topic[] {
+  return playbooks.topics.filter(topic => topic.requires.every(name => on.has(name))
+    && (topic.any.length === 0 || topic.any.some(name => on.has(name))));
 }
 
 /**
- * Each kit tool that is on, with its topic and what the user wants when it fits (its asks),
- * for getting-started: a line like "- `make_brand_kit` (brand): a site's logo, ...". The
- * line is short, since every tool of every kit is on this list.
+ * Each kit tool the server lists, with its topic and what the user wants when it fits (its
+ * asks), for getting-started: a line like "- `make_brand_kit` (brand): a site's logo, ...".
+ * The line is short, since every tool of every kit is on this list.
  */
 function requestsText(playbooks: Playbooks, context: TextContext): string {
-  const offered = new Set(offeredTopics(playbooks, context.enabled).map(topic => topic.name));
+  const offered = new Set(offeredTopics(playbooks, onNames(context)).map(topic => topic.name));
+  const listed = listedTools(context);
   const lines: string[] = [];
   for (const kit of context.definitions.filter(entry => context.enabled.has(entry.kit))) {
-    for (const tool of kit.tools) {
+    for (const tool of kit.tools.filter(entry => listed.has(entry.name))) {
       const topic = tool.playbook && offered.has(tool.playbook) ? ` (${tool.playbook})` : '';
       const asks = tool.asks ? fillText(tool.asks, context, { kind: 'kit' }) : tool.title;
       lines.push(`- \`${tool.name}\`${topic}: ${asks}.`);
@@ -364,7 +381,8 @@ function filled(text: string, code: boolean, playbooks: Playbooks, context: Text
 
 /**
  * Lines with one empty line at most between paragraphs, none at either end, and each
- * numbered list counted again, since a block left out can take an item with it.
+ * numbered list counted again from 1, since a block left out can take an item with it,
+ * the first one too.
  */
 function tidy(lines: Array<{ text: string; code: boolean }>): string {
   const out: string[] = [];
@@ -377,7 +395,7 @@ function tidy(lines: Array<{ text: string; code: boolean }>): string {
       const item = /^(\d+)\. /.exec(line);
       if (item) {
         const written = Number(item[1]);
-        const number = written === 1 || previous === undefined ? written : previous + 1;
+        const number = written === 1 || previous === undefined ? 1 : previous + 1;
         previous = number;
         out.push(`${number}. ${line.slice(item[0].length)}`);
         continue;
@@ -401,7 +419,7 @@ function cacheKey(what: string, playbooks: Playbooks, context: TextContext): str
     fingerprints.set(context.definitions, kits);
   }
   return JSON.stringify([what, playbooks.dir, context.where, context.place, context.baseDir ?? null, [...context.enabled].sort(),
-    [...context.versions].sort(), context.limits ?? null, kits]);
+    [...listedTools(context)].sort(), [...context.versions].sort(), context.limits ?? null, kits]);
 }
 
 function cached(key: string, make: () => string): string {
@@ -449,14 +467,10 @@ export function instructionsText(playbooks: Playbooks, context: TextContext): st
 /** makersmcp_playbook's description: what it returns, then each offered topic's index line, in order. */
 export function indexText(playbooks: Playbooks, context: TextContext): string {
   return cached(cacheKey('index', playbooks, context), () => {
-    const lines = offeredTopics(playbooks, context.enabled)
+    const lines = offeredTopics(playbooks, onNames(context))
       .map(topic => rendering(path.basename(topic.file), () => `- ${topic.name}: ${fillText(topic.index, context, { kind: 'kit' })}`));
     return `${INDEX_HEAD}\n${lines.join('\n')}`;
   });
-}
-
-function failed(text: string): CallToolResult {
-  return { content: [{ type: 'text', text }], isError: true };
 }
 
 /**
@@ -465,7 +479,7 @@ function failed(text: string): CallToolResult {
  * only the tool list still knows the topics. Nothing is registered when no topic is offered.
  */
 export function registerPlaybookTool(server: McpServer, playbooks: Playbooks, context: TextContext): string[] {
-  const names = offeredTopics(playbooks, context.enabled).map(topic => topic.name);
+  const names = offeredTopics(playbooks, onNames(context)).map(topic => topic.name);
   if (!names.length) return names;
   const example = names.includes('launch-film') ? 'launch-film' : names[0]!;
   server.registerTool(
@@ -482,15 +496,18 @@ export function registerPlaybookTool(server: McpServer, playbooks: Playbooks, co
       _meta: { 'anthropic/alwaysLoad': true },
     },
     async ({ topics }: { topics: string[] }) => {
+      // Each topic on its own, so one that cannot be read leaves the others.
       const content: CallToolResult['content'] = [];
+      let read = 0;
       for (const name of [...new Set(topics)]) {
         try {
           content.push({ type: 'text', text: renderTopic(playbooks, name, context) });
+          read++;
         } catch (error) {
-          return failed(`## ${PLAYBOOK_TOOL}: ${name} could not be read\n\n${error instanceof Error ? error.message : String(error)}`);
+          content.push({ type: 'text', text: `## ${PLAYBOOK_TOOL}: ${name} could not be read\n\n${error instanceof Error ? error.message : String(error)}` });
         }
       }
-      return { content };
+      return read ? { content } : { content, isError: true };
     },
   );
   return names;
@@ -498,7 +515,7 @@ export function registerPlaybookTool(server: McpServer, playbooks: Playbooks, co
 
 /** Each offered topic as a resource too, makersmcp://playbooks/<topic>, for clients whose users attach them. */
 export function registerPlaybookResources(server: McpServer, playbooks: Playbooks, context: TextContext): void {
-  for (const topic of offeredTopics(playbooks, context.enabled)) {
+  for (const topic of offeredTopics(playbooks, onNames(context))) {
     const uri = `makersmcp://playbooks/${topic.name}`;
     server.registerResource(
       `playbook-${topic.name}`,

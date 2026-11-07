@@ -54,6 +54,12 @@ export interface JobView {
 export interface AvailableKit {
   definition: KitDefinition;
   version: string;
+  /**
+   * The tools of the kit the backend runs now, by name; without it, every tool of the
+   * definition. A service whose machines cannot run a tool for now leaves it out: the
+   * server does not list it, and its texts leave out what names it.
+   */
+  tools?: string[];
 }
 
 /** A kit the backend cannot run, and why. */

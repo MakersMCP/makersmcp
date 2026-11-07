@@ -179,6 +179,11 @@ export interface ToolDefinition {
   hostedNext?: NextLines;
   /** The files the tool writes, by name or pattern, like card.png, logo-*.png or pages/*.md, for the tests of the texts that name them. */
   writes?: string[];
+  /**
+   * What the tool makes, as short phrases like "a check of any video", for the server's
+   * instructions while the server lists the tool: a service may hold one tool of a kit back.
+   */
+  makes?: string[];
 }
 
 /** A file a tool returns with its result. */
@@ -214,7 +219,7 @@ export interface KitDefinition {
   repository: string;
   needs: string[];
   tools: ToolDefinition[];
-  /** What the kit makes, as short phrases like "launch films", for the server's instructions. */
+  /** What the kit makes, as short phrases like "launch films", for the server's instructions; a tool's own go on its `makes`. */
   makes?: string[];
   /** Numbers and short texts of the kit, like its frame rate, which {fact:<kit>.<key>} shows. */
   facts?: Facts;
@@ -301,8 +306,8 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
     const problem = textProblems(text, kind, where)[0];
     if (problem) fail(`${label}: ${problem}`);
   };
-  if (definition.makes !== undefined
-    && !(Array.isArray(definition.makes) && definition.makes.every(phrase => typeof phrase === 'string' && phrase.trim() && !/[.]$/.test(phrase)))) {
+  const phrases = (makes: unknown) => Array.isArray(makes) && makes.every(phrase => typeof phrase === 'string' && phrase.trim() && !/[.]$/.test(phrase));
+  if (definition.makes !== undefined && !phrases(definition.makes)) {
     fail('makes is a list of short phrases, like "launch films", without a final period');
   }
   if (definition.facts !== undefined) {
@@ -332,6 +337,9 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
       }
       if (/^\s*(?:use it when|the user wants)\b/i.test(tool.asks)) fail(`${tool.name}.asks: the server writes "Use it when the user wants" itself`);
       texts(tool.asks, `${tool.name}.asks`, 'kit', 'local');
+    }
+    if (tool.makes !== undefined && !phrases(tool.makes)) {
+      fail(`${tool.name}.makes is a list of short phrases, like "a check of any video", without a final period`);
     }
     if (tool.playbook !== undefined && !(typeof tool.playbook === 'string' && TOPIC_NAME.test(tool.playbook))) {
       fail(`${tool.name}.playbook names a topic, like launch-film`);

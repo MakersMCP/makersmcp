@@ -4,8 +4,8 @@ title: Checking a video before it goes out
 index: check_video: what to expect of each video, cuts on the beat, reading CHECK.md and the sheet
 description: Measures a video's size, frame rate, length, black, still and silent stretches, loudness, true peak, clipping and cuts on the beat with launch-film's check, and says what to ask of a launch film, a demo or a copy with music laid in, how to read the report and its contact sheet, and what the check does not measure. Use it before handing over any video, or when the user asks whether a video meets a platform's limits.
 kit: launch-film
-requires: [launch-film]
-optional: [easyscreenshotkit, musicfit]
+requires: [launch-film, check_video]
+optional: [easyscreenshotkit, fit_music]
 order: 67
 ---
 # Checking a video before it goes out
@@ -80,10 +80,10 @@ check_video {"film": "launch/film-16x9/with-music.mp4", "cuts": "launch/film-16x
 
 ## Beats
 
-<!-- with musicfit -->
+<!-- with fit_music -->
 - `cues` of `check_video` takes the `cues.json` of the track under the video: `fit_music` writes one for the fitted track, and `analyze_music` one for a track that plays as it is from the first frame. Its frames count at the fps written in it, so it need not be the video's.
 <!-- end -->
-<!-- without musicfit -->
+<!-- without fit_music -->
 - `cues` of `check_video` takes a `cues.json` with the track's beats as frame numbers at the fps it names.
 <!-- end -->
 - A track with no steady beat has no beats, and the check refuses its cues.
