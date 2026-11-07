@@ -220,10 +220,11 @@ function unlisted(context: ResultContext): string[] {
  * out, so the line never points at something that is not there, and so is one with a
  * placeholder that cannot be filled. {file:<name>} is the file's path here, or
  * job:<job_id>/<path> hosted, to give a tool; {name:<name>} is the name alone, for a file
- * whose link the user gets from the list. A refused job, whose kit stopped before it touched
- * its folder, has the refused lines, or else the playbook line: never the failed ones, which
- * may say what a run that got further deleted. A hosted job done with no file listed, as one
- * past the days its files are kept, has FILES_GONE_NEXT alone.
+ * whose link the user gets from the list; {input:<param>} is the file the call gave for that
+ * parameter, here only, like the film.json a stills job took. A refused job, whose kit
+ * stopped before it touched its folder, has the refused lines, or else the playbook line:
+ * never the failed ones, which may say what a run that got further deleted. A hosted job
+ * done with no file listed, as one past the days its files are kept, has FILES_GONE_NEXT alone.
  */
 export function nextSentences(view: JobView, context: ResultContext): string[] {
   const { tool } = context;
@@ -264,6 +265,9 @@ export function nextSentences(view: JobView, context: ResultContext): string[] {
             }
             case 'name':
               return listedFile(files, placeholder.arg!) ? placeholder.arg! : gone();
+            case 'input':
+              // The file the call gave, as the kit got it: a path here, nothing a hosted agent could use.
+              return hosted ? gone() : view.inputs?.[placeholder.arg!] ?? gone();
             default:
               return undefined;
           }
@@ -274,13 +278,14 @@ export function nextSentences(view: JobView, context: ResultContext): string[] {
       if (error instanceof TextError) continue;
       throw error;
     }
-    if (!missing && !absent.some(pattern => pattern.test(text))) kept.push(text.trim());
+    // A sentence the line already has, like two that name the same file, is not said twice.
+    if (!missing && !absent.some(pattern => pattern.test(text)) && !kept.includes(text.trim())) kept.push(text.trim());
   }
   return kept;
 }
 
 /** What a job's own values stand in for when the Next lines are checked: any name will do. */
-const STAND_INS = new Set(['job_id', 'folder', 'topic', 'file', 'name']);
+const STAND_INS = new Set(['job_id', 'folder', 'topic', 'file', 'name', 'input']);
 
 /**
  * Fills each Next sentence a tool can show on this side, with stand-ins for a job's own

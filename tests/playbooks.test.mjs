@@ -559,6 +559,9 @@ function fakeView(tool, kit, state, id, where, { files = true } = {}) {
   const list = files ? names.map(name => ({ path: name, bytes: 10, ...(where === 'hosted' ? { url: `https://files.example.com/${id}/${name}?s=1` } : {}) })) : [];
   const flag = Object.values(tool.params).find(param => param.flag)?.flag ?? '--out';
   const failed = state === 'failed' || state === 'refused';
+  // The files the call gave, by parameter, as a local job knows them, for a Next line's {input:<param>}.
+  const inputs = Object.fromEntries(Object.entries(tool.params).filter(([, param]) => ['path', 'url_or_path', 'text_or_path'].includes(param.type))
+    .map(([name]) => [name, path.join(LOCAL_DIR, 'given', `${name}.json`)]));
   const docs = (tool.docs ?? []).map(entry => {
     const name = typeof entry === 'string' ? entry : entry.file;
     return { name, text: /\.json$/i.test(name) ? `{ "said": "${flag}" }` : `# ${name}\n\nRun again with ${flag} to change it.` };
@@ -571,6 +574,7 @@ function fakeView(tool, kit, state, id, where, { files = true } = {}) {
     exitCode: state === 'refused' ? 2 : state === 'failed' ? 3 : state === 'check_failed' ? 1 : 0,
     elapsedSeconds: 4,
     folder,
+    ...(where === 'local' && Object.keys(inputs).length ? { inputs } : {}),
     ...(failed ? { failure: `It broke. Try ${flag} again.` } : { summary: `Saved it. Give ${flag} another value.`, files: list, docs }),
     ...(where === 'hosted' && !failed ? { expiresAt: 1800000000 } : {}),
   };
@@ -971,6 +975,8 @@ async function resultProblems(definitions, dir, config, tool, view, state, topic
         if (!view.files?.some(entry => entry.path === file)) problems.push(`${label}: the Next line names ${file}, which the job did not list`);
       }
       for (const full of next.match(new RegExp(`${LOCAL_DIR.replace(/\//g, '\\/')}[^\\s,;:)]+`, 'g')) ?? []) {
+        // A file the call gave, as {input:<param>} names it, is no file of the job's.
+        if (Object.values(view.inputs ?? {}).includes(full.replace(/[.]$/, ''))) continue;
         const file = path.relative(view.folder, full.replace(/[.]$/, ''));
         // A folder, like {folder}/brand, is no file to list.
         if (!/\.\w+$/.test(file)) continue;
@@ -1667,6 +1673,51 @@ test('a refusal can name a file the call gave, and counts only for a call that g
   // A placeholder names a file parameter of the tool.
   paint.refuses = ['could not read {hue}: '];
   assert.throws(() => validateKitDefinition(kits[0]), /paint_picture\.refuses: \{hue\} is no file the call gives/);
+});
+
+test('{input:<param>} names the file the call gave for that parameter, on this machine only, so a stills job from a film.json says where to change its words', async () => {
+  const definitions = loadKitDefinitions();
+  const film = `${LOCAL_DIR}/launch/film-16x9/film.json`;
+  const stills = ['STILLS.md', 'og.png', 'x.png'].map(name => ({ path: `stills/${name}`, bytes: 10 }));
+  const view = (overrides = {}) => ({ id: 'job_7', kit: 'launch-film', tool: 'make_launch_stills', title: 'Launch pictures', status: 'done', exitCode: 0, elapsedSeconds: 3,
+    folder: `${LOCAL_DIR}/launch/film-16x9`, summary: 'Made 3 stills.', files: stills, docs: [{ name: 'stills/STILLS.md', text: '# Stills' }], ...overrides });
+  let current;
+  const session = await connect({ definitions, view: () => current });
+  try {
+    // From a film.json, which the job does not list: the film.json given.
+    current = view({ inputs: { source: film } });
+    const fromFilm = (await session.client.callTool({ name: 'make_launch_stills', arguments: { source: 'launch/film-16x9/film.json' } })).structuredContent.next;
+    assert.match(fromFilm, new RegExp(`To change their words, change them in ${film.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} and make the pictures again with source ${film.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} and every place in for,`));
+    assert.equal(fromFilm.match(/To change their words/g).length, 1);
+    // From an address, which plans a film.json first: that one.
+    current = view({ folder: `${LOCAL_DIR}/launch-film-linear.app`, files: [...stills, { path: 'film.json', bytes: 10 }] });
+    const fromSite = (await session.client.callTool({ name: 'make_launch_stills', arguments: { source: 'https://linear.app' } })).structuredContent.next;
+    assert.match(fromSite, new RegExp(`change them in ${LOCAL_DIR}/launch-film-linear\\.app/film\\.json and make the pictures again with source `));
+    assert.equal(fromSite.match(/To change their words/g).length, 1);
+    // A film.json the job lists too, as one changed in the seconds before it started, is said once.
+    current = view({ inputs: { source: film }, files: [...stills, { path: 'film.json', bytes: 10 }] });
+    const both = (await session.client.callTool({ name: 'make_launch_stills', arguments: { source: 'launch/film-16x9/film.json' } })).structuredContent.next;
+    assert.equal(both.match(/To change their words/g).length, 1, both);
+  } finally {
+    await session.close();
+  }
+  // The placeholder names a file parameter of the tool, and only in a local text.
+  const kits = fixtureKits();
+  const paint = kits[0].tools.find(tool => tool.name === 'paint_picture');
+  paint.next.done.push('Draw over {input:sketch} again.');
+  validateKitDefinition(kits[0]);
+  assert.deepEqual(nextSentences(painted('job_4', { inputs: { sketch: `${LOCAL_DIR}/s.png` } }), { text: ctx({ definitions: kits }), topics: new Set(['painting']), kit: kits[0], tool: paint }).at(-1),
+    `Draw over ${LOCAL_DIR}/s.png again.`);
+  assert.equal(nextSentences(painted('job_4'), { text: ctx({ definitions: kits }), topics: new Set(['painting']), kit: kits[0], tool: paint }).length, 2);
+  // On a hosted server the kit got a copy the agent cannot use, so the sentence is left out there.
+  const hosted = nextSentences(painted('job_4', { inputs: { sketch: `${LOCAL_DIR}/s.png` } }),
+    { text: ctx({ definitions: kits, where: 'hosted', place: 'on makersmcp.com' }), topics: new Set(['painting']), kit: kits[0], tool: { ...paint, hostedNext: undefined } });
+  assert.ok(hosted.length && !hosted.some(sentence => sentence.includes('Draw over')), hosted.join(' | '));
+  paint.next.done.push('Draw over {input:hue} again.');
+  assert.throws(() => validateKitDefinition(kits[0]), /paint_picture\.next\.done: \{input:hue\} names no parameter of paint_picture that takes a file/);
+  paint.next.done.pop();
+  paint.hostedNext.done.push('Draw over {input:sketch} again.');
+  assert.throws(() => validateKitDefinition(kits[0]), /paint_picture\.hostedNext\.done: \{input:sketch\} is for a local text only/);
 });
 
 test('hosted, a job done with no file listed, as one past the days its files are kept, says its files are gone and nothing else', async () => {

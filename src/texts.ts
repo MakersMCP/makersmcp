@@ -23,12 +23,12 @@ const BY_KIND: Record<TextKind, Set<string>> = {
   topic: new Set([...EVERYWHERE, 'base_dir', 'requests', 'flags', 'makes']),
   instructions: new Set([...EVERYWHERE, 'base_dir', 'makes']),
   kit: EVERYWHERE,
-  next: new Set([...EVERYWHERE, 'job_id', 'folder', 'topic', 'file', 'name']),
+  next: new Set([...EVERYWHERE, 'job_id', 'folder', 'topic', 'file', 'name', 'input']),
 };
 /** Placeholders with an argument after a colon. */
-const WITH_ARGUMENT = new Set(['fact', 'bounds', 'default', 'version', 'limit', 'file', 'name']);
+const WITH_ARGUMENT = new Set(['fact', 'bounds', 'default', 'version', 'limit', 'file', 'name', 'input']);
 /** Placeholders a hosted text never takes, and those only a hosted one does. */
-export const LOCAL_ONLY = new Set(['base_dir', 'folder']);
+export const LOCAL_ONLY = new Set(['base_dir', 'folder', 'input']);
 export const HOSTED_ONLY = new Set(['limit']);
 /** Placeholders that stand alone on their line, since each becomes a list. */
 export const ON_THEIR_OWN_LINE = new Set(['requests', 'flags']);
@@ -88,6 +88,8 @@ export function placeholderProblem(placeholder: Pick<Placeholder, 'name' | 'arg'
       return /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/.test(arg) ? undefined : `${shown} is written {${name}:<tool>.<parameter>}`;
     case 'version':
       return /^[a-z0-9-]+$/.test(arg) ? undefined : `${shown} is written {version:<kit>}`;
+    case 'input':
+      return /^[a-z][a-z0-9_]*$/.test(arg) ? undefined : `${shown} is written {input:<parameter>}, a parameter that takes a file`;
     default:
       return undefined;
   }

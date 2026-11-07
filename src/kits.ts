@@ -253,6 +253,8 @@ export interface MissingKit {
 const PARAM_TYPES = new Set<ParamType>([
   'url', 'url_or_path', 'path', 'text_or_path', 'string', 'integer', 'number', 'boolean', 'enum', 'list', 'repeat',
 ]);
+/** The parameters that can give the kit a file, which a refuses entry and a Next line's {input:...} may name. */
+const FILE_TYPES = new Set<ParamType>(['path', 'url_or_path', 'text_or_path']);
 const NAME = /^[a-z][a-z0-9_]*$/;
 /** A playbook topic's name, like launch-film. */
 export const TOPIC_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -371,6 +373,9 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
         for (const sentence of sentences as string[]) {
           texts(sentence, `${tool.name}.${field}.${state}`, 'next', field === 'hostedNext' ? 'hosted' : undefined);
           if (field === 'next' && /\{limit:/.test(sentence)) fail(`${tool.name}.next.${state}: a limit is for hostedNext`);
+          for (const [, param] of sentence.matchAll(/\{input:([^{}]*)\}/g)) {
+            if (!FILE_TYPES.has(tool.params[param!]?.type as ParamType)) fail(`${tool.name}.${field}.${state}: {input:${param}} names no parameter of ${tool.name} that takes a file`);
+          }
         }
       }
     }
@@ -383,7 +388,7 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
     for (const words of tool.refuses ?? []) {
       for (const [whole, name] of words.matchAll(/\{([^{}:]*)(?::[^{}]*)?\}/g)) {
         const type = tool.params[name!]?.type;
-        if (!/^\{[a-z][a-z0-9_]*(?::name)?\}$/.test(whole) || !(type === 'path' || type === 'url_or_path' || type === 'text_or_path')) {
+        if (!/^\{[a-z][a-z0-9_]*(?::name)?\}$/.test(whole) || !FILE_TYPES.has(type as ParamType)) {
           fail(`${tool.name}.refuses: ${whole} is no file the call gives; write {<param>} for a file parameter's path as the kit gets it, or {<param>:name} for its name`);
         }
       }

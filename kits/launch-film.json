@@ -100,7 +100,8 @@
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
-          "A run without brand that failed while reading the site may have emptied {folder}/brand, which an earlier film.json there needs, so plan again before rendering one."
+          "When the reason shows \"Planned <n> clips\", or a clip it rendered, this run replaced film.json, words.json and brand/ in {folder}, so the film.mp4, film.timeline.json and frames/ there may be of the earlier film: make the film again before using them.",
+          "A run that failed while reading the site, before it planned, may have emptied or replaced {folder}/brand, which an earlier film.json there needs, so plan again before rendering one."
         ]
       },
       "hostedNext": {
@@ -169,7 +170,7 @@
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
-          "A run without brand that failed while reading the site may have emptied {folder}/brand, which an earlier film.json there needs, so plan again before rendering one."
+          "A run that failed while reading the site may have emptied or replaced {folder}/brand, which an earlier film.json there needs, so plan again before rendering one."
         ]
       },
       "hostedNext": {
@@ -257,7 +258,8 @@
       "next": {
         "done": [
           "Read STILLS.md below and look at every picture, or give the user the paths to look at, then tell the user which place each file is for and its size.",
-          "To change their words, change them in {file:film.json} and make the pictures again with source {file:film.json} and every place, since a run leaves the pictures of the other places as they were."
+          "To change their words, change them in {file:film.json} and make the pictures again with source {file:film.json} and every place in for, since a run leaves the pictures of the other places as they were.",
+          "To change their words, change them in {input:source} and make the pictures again with source {input:source} and every place in for, since a run leaves the pictures of the other places as they were."
         ]
       },
       "hostedNext": {

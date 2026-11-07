@@ -167,10 +167,14 @@ A run writes only the places it is given, and `stills/STILLS.md` lists only thos
 <!-- end -->
 - `clip <n>: no logo could close the film: <reasons>`: no logo file of the brand kit could be used.
 <!-- local -->
-  Point the logo clip at another logo file or an app icon, as the film-json topic says, or ask the user for a logo file.
+  Point the logo clip at another logo file or an app icon, as the film-json topic says, or ask the user for a logo file. When every reason says "could not be read as a picture", look at the ffprobe line of `check_setup` first: without ffprobe launch-film reads no picture, and the troubleshooting topic has the fix.
 <!-- end -->
 <!-- hosted -->
   Ask the user for a logo, since a plan cannot be changed here.
+<!-- end -->
+- `No logo could be used (<reasons>), so the name stands in for it.` is a note of `make_launch_stills`, which then ends done with the brand's name where the logo goes: tell the user.
+<!-- local -->
+  When its reasons say "could not be read as a picture", look at the ffprobe line of `check_setup` as above: without ffprobe the pictures lack the screen too, so make them again once it is fixed.
 <!-- end -->
 - `"<url>" is not a command or an address. Run launch-film --help.` from `make_launch_film`, `give the site's address, e.g. launch-film plan example.com` from `plan_launch_film`, and `"<url>" is not an address or a film.json` from `make_launch_stills`: the host has no dot, like localhost.
 - `Not on Google Fonts, so the look's own typeface stood in: <family>.` is a note, not a failure: tell the user the film uses the look's typeface for that family.

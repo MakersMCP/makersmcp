@@ -864,6 +864,23 @@ test('a call a kit refuses before it touches its folder leaves an earlier run th
       assert.deepEqual(after, [], `${label} deleted the earlier run before it failed`);
       assert.match(next, / (?:is|are) gone: this run deleted (?:it|them) before it failed/, label);
     }
+
+    // Given a brand kit and the page's words, make_launch_film plans without a browser and fails at the render: the plan's files
+    // are this run's, the film's the earlier one's, as the Next line says.
+    mkdirSync(path.join(baseDir, 'kit'));
+    writeFileSync(path.join(baseDir, 'kit', 'brand.json'), JSON.stringify({ version: 1, name: 'Acme', url: SITE, colors: [{ hex: '#1f6f4a', role: 'button' }, { hex: '#f4efe6', role: 'surface' }], logos: [], screenshots: [] }));
+    writeFileSync(path.join(baseDir, 'page-words.json'), JSON.stringify({ lang: 'en', title: 'Acme: plants, remembered', description: 'Acme tells you which plant needs water today.', siteName: 'Acme',
+      headings: [{ level: 1, text: 'Keep every plant alive', after: 'Acme tells you which plant needs water today.' }, { level: 2, text: 'Every pot, every window', after: 'It learns from each one.' }], ctas: ['Start for free'], paragraphs: [], jsonld: [] }));
+    const planned = await run('make_launch_film', { url: SITE, brand: 'kit', words: 'page-words.json' }, EARLIER.film);
+    const folder = path.join(baseDir, `case-${n}`);
+    assert.equal(planned.result.structuredContent?.status, 'failed', text(planned.result));
+    assert.match(text(planned.result), /Planned \d+ clips in the \w+ look/);
+    assert.match(text(planned.result), /Chrome was not found/);
+    assert.notEqual(readFileSync(path.join(folder, 'film.json'), 'utf8'), EARLIER.film['film.json']);
+    assert.notEqual(readFileSync(path.join(folder, 'words.json'), 'utf8'), EARLIER.film['words.json']);
+    assert.equal(readFileSync(path.join(folder, 'film.mp4'), 'utf8'), EARLIER.film['film.mp4']);
+    assert.equal(readFileSync(path.join(folder, 'film.timeline.json'), 'utf8'), EARLIER.film['film.timeline.json']);
+    assert.ok(planned.next.includes(`When the reason shows "Planned <n> clips", or a clip it rendered, this run replaced film.json, words.json and brand/ in ${folder}, so the film.mp4, film.timeline.json and frames/ there may be of the earlier film`), planned.next);
   } finally {
     for (const { client, server } of sessions.values()) {
       await client.close();
