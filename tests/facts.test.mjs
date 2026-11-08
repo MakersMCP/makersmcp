@@ -368,6 +368,43 @@ async function finished(client, name, args) {
 
 const measured = file => JSON.parse(readFileSync(path.join(path.dirname(file), 'check', 'check.json'), 'utf8'));
 
+// What jobs-and-files and launch-kit tell the model to find in the CHECK.md that check_video returns for a launch film:
+// its length in the line under the heading, and each clip's start a row of its Cuts table, the logo close last. The slow
+// test below holds launch-film's CHECK.md to these on a rendered film.
+const FROM_CHECK = {
+  'jobs-and-files': "The `CHECK.md` that `check_video` returns has them too: the length in the line under its heading, and the logo close's start as the last row of its Cuts table.",
+  'launch-kit': "Its `CHECK.md` gives the film's length under its heading and each cut's time in its Cuts table, the logo close last.",
+};
+
+test('jobs-and-files and launch-kit say where CHECK.md gives a film\'s length and its logo close, on both sides while check_video and fit_music are listed', async () => {
+  for (const where of ['local', 'hosted']) {
+    const backend = {
+      where, place: where === 'local' ? 'on this machine' : 'on makersmcp.com', ...(where === 'local' ? { baseDir: os.tmpdir() } : {}),
+      available: definitions => definitions.map(definition => ({ definition, version: '9.9.9' })),
+      start: async () => {
+        throw new Error('no job runs here');
+      },
+      wait: async () => undefined, cancel: async () => undefined, list: async () => [], setupReport: () => '', close() {},
+    };
+    const server = createMcpServer({ definitions: kits, backend });
+    const client = new Client({ name: 'facts-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    try {
+      const { tools } = await client.listTools();
+      assert.ok(['check_video', 'fit_music'].every(name => tools.some(tool => tool.name === name)), where);
+      for (const [topic, sentence] of Object.entries(FROM_CHECK)) {
+        const read = text(await client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [topic] } }));
+        assert.ok(read.includes(sentence), `${topic}, ${where}, leaves out: ${sentence}`);
+      }
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  }
+});
+
 test('a two clip film renders at the size, frame rate and loudness launch-film\'s facts give', { skip: !SLOW && 'set MAKERSMCP_SLOW=1 to render and measure' }, async t => {
   await withServer(async (client, outDir) => {
     const film = {
@@ -389,7 +426,8 @@ test('a two clip film renders at the size, frame rate and loudness launch-film\'
     assert.equal(`${report.video.width}x${report.video.height}`, size);
     assert.equal(report.video.fps, fps);
     // jobs-and-files and launch-kit find a film's length and its last clip's start, a plan's logo close, in the CHECK.md
-    // check_video returns: the length in the line under its heading, and each clip's start a row of its Cuts table, in order.
+    // check_video returns (FROM_CHECK, which the test above holds them to): the length in the line under its heading, and
+    // each clip's start a row of its Cuts table, in order.
     const timeline = JSON.parse(readFileSync(path.join(outDir, 'film.timeline.json'), 'utf8'));
     const check = readFileSync(path.join(outDir, 'check', 'CHECK.md'), 'utf8').split('\n');
     const under = check.slice(1).find(line => line.trim());

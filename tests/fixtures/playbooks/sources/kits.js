@@ -9,3 +9,6 @@ throw new Error(`Read https://paint.example/help: ${file} has no paint left`);
  * Each sound fades out over its last beat before the next one starts.
  */
 const NAME_END = /\/"/; // A layer's name stops at its first slash or quote mark.
+const QUOTE = "a \" b"; // A sticker peels at its corner first.
+const SLASH = /[/"]/; // A brush keeps its shape in cold water.
+function quoted(text) { return /"/.test(text); } // A frame warps in damp air.
