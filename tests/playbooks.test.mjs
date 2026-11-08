@@ -2062,24 +2062,62 @@ test('a sentence that holds only while a tool is held back or off is not there w
   }
 });
 
-test('a wrong brand, a bot check or a missing logo is answered with another address, never with another page of the same site, which the brand is read from the home page of', async () => {
-  const read = async (options, topics) => {
+// Which pages of a site give the same brand kit, in the words of every text that answers a wrong brand, a bot check or a
+// missing logo: what easybrandkit's homePageOf reads for each address, the cases tests/kits.test.mjs holds the kit to.
+const HOME_PAGES = "A brand is read from the home page at a site's root, so a deeper page, like /pricing or /en/about, gives the same brand kit, "
+  + 'while a home page in a language, like /de, /en/ or /pt-br, is read as it is, and so is /home: '
+  + "when a site's root is a language or country chooser, ask for its home page in the user's language.";
+
+test('a wrong brand, a bot check or a missing logo is answered with another address, and the texts say which pages of a site give the same brand kit, as easybrandkit reads them', async () => {
+  // Each address the sentence gives is read as it says by the easybrandkit the lock pins: a deeper page, one under a home
+  // page in a language too, from the root, and a home page in a language or at /home as it is.
+  const { homePageOf } = requireHere('easybrandkit');
+  const [deeper, rest] = HOME_PAGES.split(' while ');
+  const deeperPages = deeper.match(/\/[\w/-]+/g);
+  const homePages = rest.slice(0, rest.indexOf(':')).match(/\/[\w/-]+/g);
+  assert.deepEqual([deeperPages, homePages], [['/pricing', '/en/about'], ['/de', '/en/', '/pt-br', '/home']]);
+  for (const page of deeperPages) assert.equal(homePageOf(`https://linear.app${page}`), 'https://linear.app/', page);
+  for (const page of homePages) assert.equal(homePageOf(`https://linear.app${page}`), null, page);
+
+  const read = async (options, topic) => {
     const session = await connect({ definitions: loadKitDefinitions(), ...options });
     try {
-      return text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics } }));
+      return text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [topic] } }));
     } finally {
       await session.close();
     }
   };
-  for (const options of [{}, { where: 'hosted', limits: LIMITS }, { where: 'hosted', limits: LIMITS, held: ['check_video', 'fit_music'] }]) {
-    const read3 = await read(options, ['brand', 'troubleshooting', 'launch-film']);
-    assert.doesNotMatch(read3, /ask (?:the user )?for (?:the right page|a page|another page)\b/, JSON.stringify(options));
-    assert.doesNotMatch(await read(options, ['launch-kit']), /ask (?:the user )?for (?:the right page|a page|another page)\b/, JSON.stringify(options));
+  // A line that says a deeper page gives the same brand kit, in a text that holds the whole sentence, points to it.
+  const POINTER = /deeper page of (?:the same|that) site/;
+  const sides = { local: {}, hosted: { where: 'hosted', limits: LIMITS }, held: { where: 'hosted', limits: LIMITS, held: ['check_video', 'fit_music'] } };
+  // How often each topic holds the sentence, and how many lines point to it, on each side.
+  const expected = {
+    local: { brand: [1, 0], troubleshooting: [0, 0], 'launch-film': [0, 0], 'launch-kit': [0, 0] },
+    hosted: { brand: [1, 2], troubleshooting: [1, 1], 'launch-film': [0, 0], 'launch-kit': [0, 0] },
+  };
+  for (const [side, options] of Object.entries(sides)) {
+    for (const [topic, [whole, pointers]] of Object.entries(expected[side === 'local' ? 'local' : 'hosted'])) {
+      const read1 = await read(options, topic);
+      const label = `${topic}, ${side}`;
+      assert.doesNotMatch(read1, /ask (?:the user )?for (?:the right page|a page|another page)\b/, label);
+      // Never "another page" or "any page" of a site: a home page in a language is read as it is.
+      assert.doesNotMatch(read1, /\b(?:another|any|other|whatever) page of (?:it|the same site|that site|this site|a site)\b/, label);
+      assert.equal(read1.split(HOME_PAGES).length - 1, whole, label);
+      const pointing = read1.split('\n').filter(line => POINTER.test(line));
+      assert.equal(pointing.length, pointers, label);
+      for (const line of pointing) assert.match(line, /as step 4 says|as above/, label);
+    }
+    // The note a deeper page gets names the case where the root it was read from is no home page of the brand.
+    assert.match(await read(options, 'brand'), /was read instead: the home page carries the brand's own header and colors\.": nothing to fix, unless <home> is a language or country chooser; then ask for the site's home page in the user's language, as step 4 says\./, side);
+    // launch-film is at its length and points to the brand topic; launch-kit asks for the product's own site as that topic does.
+    assert.match(await read(options, 'launch-film'), side === 'local' ? /^ {3}The brand topic says which address of a site gives its brand\.$/m : /tell the user and ask before rendering/, side);
+    assert.match(await read(options, 'launch-kit'), /ask for the product's own site when the address is not it, as the brand topic says, or (?:for the logo and colors, before going on|whether to go on with it)\./, side);
   }
-  // Hosted, where no tool takes the user's own logo or colors, each answer says why another page does not help.
-  const hosted = await read({ where: 'hosted', limits: LIMITS }, ['brand', 'troubleshooting']);
-  assert.equal(hosted.match(/another page of (?:the same|that) site/g)?.length, 5, hosted);
-  assert.match(hosted, /ask for another address: the product's own site when this one is not it/);
+  // Without easybrandkit, there is no brand topic to point to, and launch-film asks for the product's own site.
+  const alone = await read({ kits: ['launch-film'] }, 'launch-film');
+  assert.doesNotMatch(alone, /brand topic|deeper page/);
+  assert.match(alone, /ask for the logo file or for the product's own site\. Never render a wrong brand/);
+  assert.match(await read(sides.hosted, 'troubleshooting'), /ask for another address: the product's own site when this one is not it/);
 });
 
 test('a backend that runs only some tools of a kit lists those, and blocks, requires, descriptions and makes follow it', async () => {

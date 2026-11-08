@@ -56,7 +56,10 @@ plan_launch_film {"url": "https://linear.app", "out_dir": "launch/film-16x9"}
 plan_launch_film {"url": "https://linear.app", "brand": "launch/brand", "out_dir": "launch/film-16x9"}
 ```
 <!-- end -->
-2. Read the result, which holds `film.json`, `words.json` and `brand/BRAND.md`. Check the brand's name first: the kit takes it from the site's name, its title or its host, and the film shows it. Then check every word on screen against `words.json`, and look at `brand/card.png`. When the brand is wrong, as with a cookie wall, a login page or no logo, tell the user what came back and ask for the logo file or for the product's own site, since any page of this site gives the same brand. Never render a wrong brand: the film would show it as the product's.
+2. Read the result, which holds `film.json`, `words.json` and `brand/BRAND.md`. Check the brand's name first: the kit takes it from the site's name, its title or its host, and the film shows it. Then check every word on screen against `words.json`, and look at `brand/card.png`. When the brand is wrong, as with a cookie wall, a login page or no logo, tell the user what came back and ask for the logo file or for the product's own site. Never render a wrong brand: the film would show it as the product's.
+<!-- with easybrandkit -->
+   The brand topic says which address of a site gives its brand.
+<!-- end -->
 3. Change `film.json` where it is wrong, as the film-json topic says.
 4. Render it, which takes {fact:launch-film.render_minutes} for a 30 second film, then call `wait_for_job` with the `job_id` until it is done:
 ```call

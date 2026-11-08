@@ -14,7 +14,7 @@ order: 30
 
 ## Decide first
 
-- The address, as `url`. Give the product's home page, like https://linear.app. A deeper page, or a blog, docs or help subdomain, is read from the home page, since those often wear another theme. For an app, its App Store or Google Play listing works: the icon and screenshots come from the listing, the rest from the website it names. A profile on X, Instagram, Facebook, LinkedIn, YouTube, TikTok, Threads or Pinterest is refused. When the user names a product but no address, ask for it.
+- The address, as `url`. Give the product's home page, like https://linear.app. A deeper page, or a blog, docs or help subdomain, is read from the home page at the site's root, since those often wear another theme. For an app, its App Store or Google Play listing works: the icon and screenshots come from the listing, the rest from the website it names. A profile on X, Instagram, Facebook, LinkedIn, YouTube, TikTok, Threads or Pinterest is refused. When the user names a product but no address, ask for it.
 - `facts`, for work that needs what the site says about itself: numbers, testimonials, customers, prices, integrations or security standards, as in launch copy, a comparison page or a pricing table. It also reads the pricing, customers, security, integrations and about pages the home page links to, where robots.txt allows, and takes longer. A launch film does not read the facts: it reads the page itself.
 - `stores` false skips the icons, screenshots and profile pictures of the apps and social pages the site links to.
 <!-- with easyfontkit -->
@@ -49,10 +49,10 @@ make_brand_kit {"url": "https://linear.app", "facts": true}
    - The colors. A cookie wall, a login page or a loading screen gives colors that are not the brand's.
 3. Show `card.png` to the user: the name, the first screen, the logos, the colors and the fonts on one picture.
 <!-- local -->
-4. When the name, a logo or the colors are wrong, tell the user what came back and ask for the product's own site when this address is not it, or for the logo file or the colors: another page of the same site is read from its home page and gives the same kit. Never fill in a brand from a guess, since everything built on the kit would carry it.
+4. When the name, a logo or the colors are wrong, tell the user what came back and ask for the product's own site when this address is not it, or for the logo file or the colors. A brand is read from the home page at a site's root, so a deeper page, like /pricing or /en/about, gives the same brand kit, while a home page in a language, like /de, /en/ or /pt-br, is read as it is, and so is /home: when a site's root is a language or country chooser, ask for its home page in the user's language. Never fill in a brand from a guess, since everything built on the kit would carry it.
 <!-- end -->
 <!-- hosted -->
-4. When the name, a logo or the colors are wrong, tell the user what came back. No tool here takes a logo, colors or screens the user gives in place of the site's own, and another page of the same site is read from its home page and gives the same kit, so ask for the product's own site when this address is not it, or whether to go on with this kit. Never fill in a brand from a guess, since everything built on the kit would carry it.
+4. When the name, a logo or the colors are wrong, tell the user what came back. No tool here takes a logo, colors or screens the user gives in place of the site's own, so ask for the product's own site when this address is not it, or whether to go on with this kit. A brand is read from the home page at a site's root, so a deeper page, like /pricing or /en/about, gives the same brand kit, while a home page in a language, like /de, /en/ or /pt-br, is read as it is, and so is /home: when a site's root is a language or country chooser, ask for its home page in the user's language. Never fill in a brand from a guess, since everything built on the kit would carry it.
 <!-- with launch-film -->
    For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, closes on the app's icon.
 <!-- end -->
@@ -110,7 +110,7 @@ Each error as the result shows it, then the fix.
 - "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": ask the user for the logo file and the main colors.
 <!-- end -->
 <!-- hosted -->
-- "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": tell the user. No tool here takes a logo or colors the user gives, and another page of that site is read from the same home page, so ask for the product's own site when this address is not it.
+- "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": tell the user. No tool here takes a logo or colors the user gives, and a deeper page of that site is read from the same home page, as step 4 says, so ask for the product's own site when this address is not it.
 <!-- with launch-film -->
   From an App Store listing, a plan with no `brand` is made from the listing alone when the site the listing names cannot be read like this.
 <!-- end -->
@@ -129,9 +129,9 @@ Notes in a finished result:
 - "No logo was found on the page itself.": tell the user, and ask for the logo file.
 <!-- end -->
 <!-- hosted -->
-- "No logo was found on the page itself.": no tool here takes a logo the user gives, and another page of the same site gives the same kit, so tell the user and ask whether to go on without a logo, as step 4 says.
+- "No logo was found on the page itself.": no tool here takes a logo the user gives, and a deeper page of the same site gives the same brand kit, so tell the user and ask for another address or whether to go on without a logo, as step 4 says.
 <!-- end -->
-- "<url> is not the home page, so <home> was read instead: the home page carries the brand's own header and colors.": nothing to fix.
+- "<url> is not the home page, so <home> was read instead: the home page carries the brand's own header and colors.": nothing to fix, unless <home> is a language or country chooser; then ask for the site's home page in the user's language, as step 4 says.
 - "<url> is a store listing that names no website, so only the listing was read: the kit has the app icon and screenshots but no logos, colors or fonts. Give the product's website for those.": make the kit again from the website.
 - A note that starts "Did not read" names a fact page left out. With "the site's robots.txt asks tools not to read it", the kit kept to robots.txt, so `FACTS.md` holds nothing from that page. With "the run ran out of time; give timeout_seconds more seconds", run again with a longer `timeout_seconds`.
 

@@ -98,10 +98,10 @@ record_demo_video {"url": "https://linear.app", "wait_seconds": 0}
 <!-- with easybrandkit -->
 2. Show the user `card.png` and check the brand's name, logo and colors in `BRAND.md` before building on them. The kit takes the name from the page, or from the host when the page gives no short one, and the film shows that name.
 <!-- local -->
-   When the brand is wrong, as with a cookie wall, a login page or no logo, tell the user what came back and ask for the logo and colors before going on.
+   When the brand is wrong, as with a cookie wall, a login page or no logo, tell the user what came back and ask for the product's own site when the address is not it, as the brand topic says, or for the logo and colors, before going on.
 <!-- end -->
 <!-- hosted -->
-   When the brand is wrong, as with a cookie wall, a login page or no logo, tell the user what came back: no tool here takes a logo or colors the user gives, so ask whether to go on with it. For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, closes on the app's icon.
+   When the brand is wrong, as with a cookie wall, a login page or no logo, tell the user what came back: no tool here takes a logo or colors the user gives, so ask for the product's own site when the address is not it, as the brand topic says, or whether to go on with it. For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, closes on the app's icon.
 <!-- end -->
 <!-- end -->
 <!-- with easyscreenshotkit -->

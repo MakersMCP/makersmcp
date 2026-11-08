@@ -388,6 +388,15 @@ test('a two clip film renders at the size, frame rate and loudness launch-film\'
     const report = measured(path.join(outDir, 'film.mp4'));
     assert.equal(`${report.video.width}x${report.video.height}`, size);
     assert.equal(report.video.fps, fps);
+    // jobs-and-files and launch-kit find a film's length and its last clip's start, a plan's logo close, in the CHECK.md
+    // check_video returns: the length in the line under its heading, and each clip's start a row of its Cuts table, in order.
+    const timeline = JSON.parse(readFileSync(path.join(outDir, 'film.timeline.json'), 'utf8'));
+    const check = readFileSync(path.join(outDir, 'check', 'CHECK.md'), 'utf8').split('\n');
+    const under = check.slice(1).find(line => line.trim());
+    const length = Number(/, ([\d.]+) s[,.]/.exec(under)?.[1]);
+    assert.ok(Math.abs(length - timeline.seconds) <= 0.1, `"${under}" against the timeline's ${timeline.seconds} s`);
+    const cuts = check.slice(check.indexOf('## Cuts')).filter(line => /^\| \d+ \|/.test(line));
+    assert.deepEqual(cuts.map(row => Number.parseFloat(row.split('|')[2])), timeline.clips.map(clip => clip.start));
     const { integrated, truePeak } = report.audio;
     t.diagnostic(`the film measures ${integrated} LUFS and a true peak of ${truePeak} dBTP; launch-film aims at ${target} LUFS and ${fact('launch-film', 'true_peak')} dBTP`);
     // loudnorm lands above its target on these films: this 20 second one measured -14.2 LUFS

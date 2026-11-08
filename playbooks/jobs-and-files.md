@@ -136,7 +136,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
   A launch film's length and its logo close's start are in its film.timeline.json.
 <!-- end -->
 <!-- with check_video -->
-  The Cuts table of the `CHECK.md` that `check_video` returns has them too.
+  The `CHECK.md` that `check_video` returns has them too: the length in the line under its heading, and the logo close's start as the last row of its Cuts table.
 <!-- end -->
 <!-- with easyscreenshotkit -->
   A demo's are video.duration and a click's pressedAt in its steps.json.

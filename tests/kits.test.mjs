@@ -526,7 +526,7 @@ test('render_launch_film and make_launch_stills read the brand and every picture
   }
 });
 
-test('easybrandkit reads a deeper page of a site, or its blog, docs or help site, from its home page, so another page of the same site gives the same kit, as the texts say', () => {
+test('easybrandkit reads a deeper page of a site, or its blog, docs or help site, from the home page at its root, and a home page in a language or at /home as it is, as the texts say', () => {
   const require = createRequire(import.meta.url);
   const { homePageOf } = require('easybrandkit');
   for (const [page, home] of [
@@ -536,9 +536,15 @@ test('easybrandkit reads a deeper page of a site, or its blog, docs or help site
     ['https://docs.linear.app/', 'https://linear.app/'],
     // An app's sign-in page is read from that app's own home page, not the product's site.
     ['https://app.linear.app/login', 'https://app.linear.app/'],
+    // A deeper page under a home page in a language is read from the root, a language chooser on many sites.
+    ['https://linear.app/en/about', 'https://linear.app/'],
+    ['https://linear.app/pt-br/pricing', 'https://linear.app/'],
   ]) assert.equal(homePageOf(page), home, page);
-  // A home page, one in a language of its own too, is read as it is.
-  for (const page of ['https://linear.app/', 'https://linear.app/tr', 'https://linear.app/en-us/']) assert.equal(homePageOf(page), null, page);
+  // A home page, one in a language of its own or at /home too, is read as it is. tests/playbooks.test.mjs holds the
+  // sentence that gives these addresses as examples to the same reading.
+  for (const page of ['https://linear.app/', 'https://linear.app/tr', 'https://linear.app/en-us/', 'https://linear.app/de', 'https://linear.app/en/', 'https://linear.app/pt-br', 'https://linear.app/home']) {
+    assert.equal(homePageOf(page), null, page);
+  }
   const tool = kits.find(kit => kit.kit === 'easybrandkit').tools.find(entry => entry.name === 'make_brand_kit');
   assert.match(tool.description, /a deeper page is read from the home page/);
 });
