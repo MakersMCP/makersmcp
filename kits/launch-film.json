@@ -114,7 +114,7 @@
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
-          "When the reason says the brand could not be read, no tool here takes a logo file or colors, and a brand kit of the same site stops the same way: ask for the product's own site when the address is not it, or for an app its App Store listing."
+          "When the reason says the brand could not be read, no tool here takes a logo file or colors in place of the site's own, and a brand kit of the same site stops the same way: ask for the product's own site when the address is not it, or for an app its App Store listing."
         ]
       }
     },
@@ -183,7 +183,7 @@
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
-          "When the reason says the brand could not be read, no tool here takes a logo file or colors, and a brand kit of the same site stops the same way: ask for the product's own site when the address is not it, or for an app its App Store listing."
+          "When the reason says the brand could not be read, no tool here takes a logo file or colors in place of the site's own, and a brand kit of the same site stops the same way: ask for the product's own site when the address is not it, or for an app its App Store listing."
         ]
       }
     },
@@ -273,7 +273,7 @@
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
-          "When the reason says the brand could not be read, no tool here takes a logo file or colors, and a brand kit of the same site stops the same way: ask for the product's own site when the address is not it, or for an app its App Store listing."
+          "When the reason says the brand could not be read, no tool here takes a logo file or colors in place of the site's own, and a brand kit of the same site stops the same way: ask for the product's own site when the address is not it, or for an app its App Store listing."
         ]
       }
     },

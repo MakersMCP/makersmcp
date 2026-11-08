@@ -176,7 +176,7 @@ A run writes only the places it is given, and `stills/STILLS.md` lists only thos
   Point the logo clip at another logo file or an app icon, as the film-json topic says, or ask the user for a logo file. When every reason says "could not be read as a picture", look at the ffprobe line of `check_setup` first: without ffprobe launch-film reads no picture, and the troubleshooting topic has the fix.
 <!-- end -->
 <!-- hosted -->
-  No tool here takes a logo the user gives, and a plan cannot be changed, so tell the user that no film can be made from this brand kit here. For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, uses the app's icon, which can close the film instead. Pictures for places without ph still come out, with the name where the logo goes.
+  No tool here takes a logo the user gives in place of the site's own, and a plan cannot be changed, so tell the user that no film can be made from this brand kit here. For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, uses the app's icon, which can close the film instead. Pictures for places without ph still come out, with the name where the logo goes.
 <!-- end -->
 - `No logo could be used (<reasons>), so the name stands in for it.` is a note of `make_launch_stills` for places without ph, which then ends done with the brand's name where the logo goes: tell the user.
 <!-- local -->
@@ -188,7 +188,7 @@ A run writes only the places it is given, and `stills/STILLS.md` lists only thos
 - easybrandkit's own errors, like a bot check or a social profile, mean no brand was read: the brand topic has each one.
 <!-- end -->
 <!-- hosted -->
-- `The brand could not be read: ask for the logo file and the main colors, or give a kit with brand.` ends the reason when the site answered with a bot check. No tool here takes a logo file or colors, and a brand kit of the same site stops the same way, so ask for the product's own site when the address is not it, or for an app its App Store listing: a plan from it with no `brand` is made from the listing alone when the site it names cannot be read.
+- `The brand could not be read: ask for the logo file and the main colors, or give a kit with brand.` ends the reason when the site answered with a bot check. No tool here takes a logo file or colors in place of the site's own, and a brand kit of the same site stops the same way, so ask for the product's own site when the address is not it, or for an app its App Store listing: a plan from it with no `brand` is made from the listing alone when the site it names cannot be read.
 <!-- end -->
 <!-- local -->
 - `<tool> replaces the brand folder in <folder> with a copy of <kit>, deleting what is there, and <folder>/brand holds <files>, which its brand.json does not list and the copy would not bring back. Give another out_dir, or move those files first.` Nothing was deleted: give another `out_dir`, or give `brand` as that brand/ folder to use it where it is. The same holds for `<tool> makes the brand folder in <folder> again`, where a file of the user's has a name the kit writes.

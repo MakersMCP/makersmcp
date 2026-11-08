@@ -110,7 +110,7 @@ Each error as the result shows it, then the fix.
 - "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": ask the user for the logo file and the main colors.
 <!-- end -->
 <!-- hosted -->
-- "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": tell the user. No tool here takes a logo or colors the user gives, and a deeper page of that site is read from the same home page, as step 4 says, so ask for the product's own site when this address is not it.
+- "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": tell the user. No tool here takes a logo or colors the user gives in place of the site's own, and a deeper page of that site is read from the same home page, as step 4 says, so ask for the product's own site when this address is not it.
 <!-- with launch-film -->
   From an App Store listing, a plan with no `brand` is made from the listing alone when the site the listing names cannot be read like this.
 <!-- end -->
@@ -129,7 +129,7 @@ Notes in a finished result:
 - "No logo was found on the page itself.": tell the user, and ask for the logo file.
 <!-- end -->
 <!-- hosted -->
-- "No logo was found on the page itself.": no tool here takes a logo the user gives, and a deeper page of the same site gives the same brand kit, so tell the user and ask for another address or whether to go on without a logo, as step 4 says.
+- "No logo was found on the page itself.": a deeper page of the same site gives the same brand kit, so tell the user and ask for another address or whether to go on without a logo, as step 4 says.
 <!-- end -->
 - "<url> is not the home page, so <home> was read instead: the home page carries the brand's own header and colors.": nothing to fix, unless <home> is a language or country chooser; then ask for the site's home page in the user's language, as step 4 says.
 - "<url> is a store listing that names no website, so only the listing was read: the kit has the app icon and screenshots but no logos, colors or fonts. Give the product's website for those.": make the kit again from the website.

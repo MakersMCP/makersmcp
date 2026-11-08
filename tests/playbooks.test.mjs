@@ -2210,13 +2210,13 @@ test('a wrong brand, a bot check or a missing logo is answered with another addr
   assert.match(await read(sides.hosted, 'troubleshooting'), /ask for another address: the product's own site when this one is not it/);
 });
 
-test('hosted, a plan, a film or pictures that stop because the brand could not be read are answered with another address, since no tool there takes a logo file or colors', async () => {
+test('hosted, a plan, a film or pictures that stop because the brand could not be read are answered with another address, since no tool there takes a logo file or colors in place of the site\'s own', async () => {
   // launch-film ends easybrandkit's bot check with advice of its own, which a hosted agent cannot follow: no tool there takes
-  // a logo file or colors, and a brand kit of the same site stops on the same bot check.
+  // a logo file or colors in place of the site's own, and a brand kit of the same site stops on the same bot check.
   const advice = 'The brand could not be read: ask for the logo file and the main colors, or give a kit with --brand.';
   const reason = 'https://botsite.example/ answered with a bot check ("Just a moment...") instead of its page, so no kit was made. '
     + `Get the logo and colors from the site in a normal browser. ${advice}`;
-  const answer = 'When the reason says the brand could not be read, no tool here takes a logo file or colors, and a brand kit of the same site stops the same way: '
+  const answer = "When the reason says the brand could not be read, no tool here takes a logo file or colors in place of the site's own, and a brand kit of the same site stops the same way: "
     + "ask for the product's own site when the address is not it, or for an app its App Store listing.";
   const failed = (request, id) => ({ id, kit: 'launch-film', tool: request.tool.name, title: request.tool.title, status: 'failed', exitCode: 1, elapsedSeconds: 39, failure: reason });
   const calls = { plan_launch_film: { url: 'https://botsite.example' }, make_launch_film: { url: 'https://botsite.example' }, make_launch_stills: { source: 'https://botsite.example' } };
@@ -2248,10 +2248,59 @@ test('hosted, a plan, a film or pictures that stop because the brand could not b
       await session.close();
     }
   };
-  const quoted = `- \`${advice.replace('--brand', 'brand')}\` ends the reason when the site answered with a bot check. No tool here takes a logo file or colors, and a brand kit of the same site `
+  const quoted = `- \`${advice.replace('--brand', 'brand')}\` ends the reason when the site answered with a bot check. No tool here takes a logo file or colors in place of the site's own, and a brand kit of the same site `
     + "stops the same way, so ask for the product's own site when the address is not it, or for an app its App Store listing:";
   for (const options of [hosted, { ...hosted, kits: ['launch-film'] }]) assert.ok((await topic(options)).includes(quoted), JSON.stringify(options));
   assert.ok(!(await topic({})).includes(quoted));
+});
+
+// Hosted, record_demo_video's background takes a colour, two or three colours or a picture file, as a link the user gives.
+// What no tool there takes is a logo, colors or screens the user gives in place of the site's own, as the brand topic's
+// step 4 says, so a sentence that says no tool takes them says in place of what.
+const IN_PLACE = "in place of the site's own";
+
+test('hosted, a text that says no tool takes a logo, colors or screens says in place of the site\'s own, since record_demo_video\'s background takes colors and a picture link', async () => {
+  const definitions = loadKitDefinitions();
+  const kitOf = new Map(definitions.flatMap(kit => kit.tools.map(tool => [tool.name, { kit, tool }])));
+  let state;
+  const view = (request, id) => {
+    const { kit, tool } = kitOf.get(request.tool.name);
+    return fakeView(tool, kit, state, id, 'hosted');
+  };
+  for (const held of [undefined, ['check_video', 'fit_music']]) {
+    const label = held ? `${held.join(' and ')} held back` : 'every kit on';
+    const session = await connect({ definitions, where: 'hosted', limits: LIMITS, held, view });
+    try {
+      const listed = new Map(session.tools.map(tool => [tool.name, tool]));
+      assert.match(listed.get('record_demo_video').inputSchema.properties.background.description,
+        /a colour like #\w+, two or three colours for a gradient, or a .+? picture file\. For a file, give an https link to it/, label);
+      // What a client gets: the instructions, each tool's texts, every offered topic, and each kit tool's Next line in each state.
+      const texts = [['the instructions', session.instructions]];
+      for (const tool of session.tools) {
+        texts.push([`${tool.name}'s description`, tool.description]);
+        for (const [name, property] of Object.entries(tool.inputSchema.properties ?? {})) texts.push([`${tool.name}.${name}`, property.description ?? '']);
+      }
+      for (const topic of listed.get('makersmcp_playbook').inputSchema.properties.topics.items.enum) {
+        texts.push([`the ${topic} topic`, text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [topic] } }))]);
+      }
+      for (const [name, { tool }] of kitOf) {
+        if (!listed.has(name)) continue;
+        for (const each of tool.check ? ['passed', 'check_failed', 'failed', 'refused'] : ['done', 'failed', 'refused']) {
+          state = each;
+          const result = await session.client.callTool({ name, arguments: argumentsFor(listed.get(name).inputSchema) });
+          texts.push([`${name}'s Next line, ${state}`, result.structuredContent?.next ?? '']);
+        }
+      }
+      const claims = texts.flatMap(([where, content]) => content.split('\n').flatMap(sentencesIn)
+        .filter(sentence => /\bno tool (?:here|there) takes\b/i.test(sentence) && /\b(?:logos?|colou?rs?|screens?)\b/i.test(sentence))
+        .map(sentence => [where, sentence]));
+      // Both the topics and the Next lines make the claim, so neither goes unread.
+      assert.ok(claims.some(([where]) => where.endsWith(' topic')) && claims.some(([where]) => where.includes('Next line')), `${label}: ${JSON.stringify(claims)}`);
+      for (const [where, sentence] of claims) assert.ok(sentence.includes(IN_PLACE), `${label}, ${where}: ${sentence}`);
+    } finally {
+      await session.close();
+    }
+  }
 });
 
 test('a backend that runs only some tools of a kit lists those, and blocks, requires, descriptions and makes follow it', async () => {
