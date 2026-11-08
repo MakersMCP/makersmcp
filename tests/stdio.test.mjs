@@ -142,13 +142,22 @@ test('a kit path that starts with ~ is in the home folder, from --kit-path and f
   }
 });
 
+/** The timers that keep this process running: node --test waits for each of them before it ends the file. */
+const timers = () => process.getActiveResourcesInfo().filter(type => type === 'Timeout').length;
+
 /**
  * Starts a server with these arguments on pipes, as a client does: sends initialize and waits for its answer, so a start
  * that takes seconds on a loaded machine is over, then sends notifications/initialized and the call and closes stdin
  * right after them. Gives the exit code, the time from stdin's close to the end, and the answers.
+ *
+ * The timers of its two races do not keep this process running: while the server runs, its process and pipes do, so
+ * each timer still ends its race when it should, and the one a race leaves when it is won does not hold this file for up
+ * to a minute after its last test.
  */
 async function closeRightAfter(args, call) {
+  const before = timers();
   const child = spawn(process.execPath, args, { stdio: ['pipe', 'pipe', 'ignore'] });
+  let result;
   try {
     let stdout = '';
     const answers = () => stdout.split('\n').filter(line => line.trim()).map(line => JSON.parse(line));
@@ -163,14 +172,16 @@ async function closeRightAfter(args, call) {
     const ended = new Promise(resolve => child.on('close', code => resolve(code)));
     const lines = messages => messages.map(message => JSON.stringify(message)).join('\n') + '\n';
     child.stdin.write(lines([{ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'pipe', version: '1' } } }]));
-    assert.equal(await Promise.race([answered, ended.then(() => 'ended'), sleep(60_000).then(() => 'no answer')]), true, 'the server answered initialize');
+    assert.equal(await Promise.race([answered, ended.then(() => 'ended'), sleep(60_000, 'no answer', { ref: false })]), true, 'the server answered initialize');
     child.stdin.end(lines([{ jsonrpc: '2.0', method: 'notifications/initialized' }, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: call }]));
     const at = Date.now();
-    const code = await Promise.race([ended, sleep(4000).then(() => 'still running')]);
-    return { code, took: Date.now() - at, answers: answers() };
+    const code = await Promise.race([ended, sleep(4000, 'still running', { ref: false })]);
+    result = { code, took: Date.now() - at, answers: answers() };
   } finally {
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
   }
+  assert.equal(timers(), before, 'a timer of the races is left running, which keeps this file going after its last test');
+  return result;
 }
 
 test('a client that closes stdin right after its requests still gets the answers', async () => {
