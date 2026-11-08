@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -142,32 +142,75 @@ test('a kit path that starts with ~ is in the home folder, from --kit-path and f
   }
 });
 
+/**
+ * Starts a server with these arguments on pipes, as a client does: sends initialize and waits for its answer, so a start
+ * that takes seconds on a loaded machine is over, then sends notifications/initialized and the call and closes stdin
+ * right after them. Gives the exit code, the time from stdin's close to the end, and the answers.
+ */
+async function closeRightAfter(args, call) {
+  const child = spawn(process.execPath, args, { stdio: ['pipe', 'pipe', 'ignore'] });
+  try {
+    let stdout = '';
+    const answers = () => stdout.split('\n').filter(line => line.trim()).map(line => JSON.parse(line));
+    let initialized;
+    const answered = new Promise(resolve => {
+      initialized = resolve;
+    });
+    child.stdout.setEncoding('utf8').on('data', chunk => {
+      stdout += chunk;
+      if (stdout.endsWith('\n') && answers().some(answer => answer.id === 1)) initialized(true);
+    });
+    const ended = new Promise(resolve => child.on('close', code => resolve(code)));
+    const lines = messages => messages.map(message => JSON.stringify(message)).join('\n') + '\n';
+    child.stdin.write(lines([{ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'pipe', version: '1' } } }]));
+    assert.equal(await Promise.race([answered, ended.then(() => 'ended'), sleep(60_000).then(() => 'no answer')]), true, 'the server answered initialize');
+    child.stdin.end(lines([{ jsonrpc: '2.0', method: 'notifications/initialized' }, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: call }]));
+    const at = Date.now();
+    const code = await Promise.race([ended, sleep(4000).then(() => 'still running')]);
+    return { code, took: Date.now() - at, answers: answers() };
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+  }
+}
+
 test('a client that closes stdin right after its requests still gets the answers', async () => {
   const out = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-stdio-'));
   try {
-    const child = spawn(process.execPath, [bin, '--kits', 'easybrandkit', '--kit-path', `easybrandkit=${fakekit}`, '--out', out], {
-      stdio: ['pipe', 'pipe', 'ignore'],
-    });
-    let stdout = '';
-    child.stdout.setEncoding('utf8').on('data', chunk => {
-      stdout += chunk;
-    });
-    const ended = new Promise(resolve => child.on('close', code => resolve(code)));
-    const messages = [
-      { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'pipe', version: '1' } } },
-      { jsonrpc: '2.0', method: 'notifications/initialized' },
-      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'make_brand_kit', arguments: { url: 'https://example.com' } } },
-    ];
-    child.stdin.end(messages.map(message => JSON.stringify(message)).join('\n') + '\n');
-    const at = Date.now();
-    const code = await Promise.race([ended, sleep(4000).then(() => 'still running')]);
-    if (code === 'still running') child.kill('SIGKILL');
+    // makersmcp answers what was sent for up to a second after stdin ends, so the call gives wait_seconds 0 and returns
+    // once its job starts, instead of waiting for a kit, which can take longer than that to start on a loaded machine.
+    // The job, a slow one that writes nothing for 3 s, stops with makersmcp.
+    const { code, took, answers } = await closeRightAfter([bin, '--kits', 'easybrandkit', '--kit-path', `easybrandkit=${fakekit}`, '--out', out],
+      { name: 'make_brand_kit', arguments: { url: 'https://slow.example.com', wait_seconds: 0 } });
     assert.equal(code, 0);
-    assert.ok(Date.now() - at < 2000, 'it ended before a client would send SIGTERM');
-    const answers = stdout.trim().split('\n').map(line => JSON.parse(line));
+    assert.ok(took < 2000, `it ended ${took} ms after stdin closed, so a client would have sent SIGTERM`);
     assert.deepEqual(answers.map(answer => answer.id), [1, 2]);
-    assert.equal(answers[1].result.structuredContent.status, 'done');
+    assert.equal(answers[1].result.structuredContent.status, 'running');
+    assert.match(answers[1].result.structuredContent.job_id, /\S/);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
+});
+
+test('an answer that comes after stdin ends is still sent, within the second makersmcp waits for it', async () => {
+  // A backend in makersmcp's own process whose job ends 300 ms after it starts, so no kit has to start on a loaded
+  // machine, and the answer comes after stdin has ended.
+  const server = pathToFileURL(path.join(here, '..', 'dist', 'server.js')).href;
+  const script = [
+    `import { loadKitDefinitions, serveStdio } from ${JSON.stringify(server)};`,
+    "const definitions = loadKitDefinitions().filter(kit => kit.kit === 'easybrandkit');",
+    'let view;',
+    'const backend = {',
+    "  where: 'local', place: 'on this machine', baseDir: process.cwd(),",
+    "  available: kits => kits.map(definition => ({ definition, version: '9.9.9' })),",
+    "  async start(request) { view = { id: 'job_1', kit: 'easybrandkit', tool: request.tool.name, title: request.tool.title, status: 'running', exitCode: null, elapsedSeconds: 0 }; return view; },",
+    "  async wait() { await new Promise(resolve => setTimeout(resolve, 300)); return { ...view, status: 'done', exitCode: 0, summary: 'Saved it.', files: [], docs: [] }; },",
+    "  async cancel() { return undefined; }, async list() { return []; }, setupReport: () => '', close() {},",
+    '};',
+    'await serveStdio({ backend, definitions });',
+  ].join('\n');
+  const { code, took, answers } = await closeRightAfter(['--input-type=module', '-e', script], { name: 'make_brand_kit', arguments: { url: 'https://example.com' } });
+  assert.equal(code, 0);
+  assert.ok(took < 2000, `it ended ${took} ms after stdin closed, so a client would have sent SIGTERM`);
+  assert.deepEqual(answers.map(answer => answer.id), [1, 2]);
+  assert.equal(answers[1].result.structuredContent.status, 'done');
 });
