@@ -14,6 +14,7 @@ import { DRAFT_2020_12 } from '../dist/schema-dialect.js';
 import {
   LocalBackend, createMcpServer, expandHome, failureText, listFiles, loadKitDefinitions, readDocs, resolveKit, validateKitDefinition,
 } from '../dist/server.js';
+import { MAX_FILES, folderStamps } from '../dist/local-backend.js';
 import { defaultOutDir } from '../dist/setup.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -167,6 +168,8 @@ test('a slow job returns a job_id, and wait_for_job returns its result', async (
     const busy = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', wait_seconds: 0 } });
     assert.equal(busy.isError, true);
     assert.match(text(busy), new RegExp(`${jobId}.*still writing to`));
+    // In its default folder, with no out_dir given, it can still save in another.
+    assert.ok(text(busy).endsWith(`Wait for it with wait_for_job (job_id ${jobId}), or give another out_dir.`), text(busy));
 
     const progress = [];
     const done = await client.callTool(
@@ -637,6 +640,27 @@ test('a job lists the files it saved, not what its folder already held', async (
     assert.equal(result.structuredContent.folder, outDir);
     assert.deepEqual(result.structuredContent.files.map(file => file.path), ['REPORT.md', path.join('parts', 'data.json')]);
   });
+});
+
+test('a job lists at most MAX_FILES of its files, a folder\'s own first by name, against the folder as it started or by time', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-test-'));
+  try {
+    const before = folderStamps(dir);
+    const names = Array.from({ length: MAX_FILES + 5 }, (_, i) => `file-${String(i).padStart(4, '0')}.txt`);
+    for (const name of names) writeFileSync(path.join(dir, name), 'x');
+    mkdirSync(path.join(dir, 'a-folder'));
+    writeFileSync(path.join(dir, 'a-folder', 'inside.txt'), 'x');
+    const first = names.slice(0, MAX_FILES);
+    assert.deepEqual(listFiles(dir).map(file => file.path), first);
+    assert.deepEqual(listFiles(dir, Date.now() - 60_000).map(file => file.path), first);
+    assert.deepEqual(listFiles(dir, Date.now() - 60_000, undefined, before).map(file => file.path), first);
+    // Under the cap, every file, the subfolder's last.
+    rmSync(path.join(dir, names[0]));
+    for (const name of names.slice(MAX_FILES - 1)) rmSync(path.join(dir, name));
+    assert.deepEqual(listFiles(dir, undefined, undefined, before).map(file => file.path), [...names.slice(1, MAX_FILES - 1), path.join('a-folder', 'inside.txt')]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('a file that goes away while a folder is listed is left out', () => {

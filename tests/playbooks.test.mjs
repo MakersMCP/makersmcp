@@ -1305,6 +1305,8 @@ test('makersmcp_playbook lists the offered topics in its description, reads up t
     assert.equal(resources[1].description, 'Paints a picture of a website with paintkit and checks its size. Use it when the user wants a picture of a site, a cover or art for a post.');
     const contents = (await session.client.readResource({ uri: 'makersmcp://playbooks/painting' })).contents;
     assert.equal(contents[0].text, read.content[0].text);
+    assert.equal(contents[0].uri, 'makersmcp://playbooks/painting');
+    assert.equal(contents[0].mimeType, 'text/markdown');
   } finally {
     await session.close();
   }

@@ -871,8 +871,11 @@ test('a tool that reads a program from a setting that names no program file does
       broken.tools[0].needs = needs;
       assert.throws(() => validateKitDefinition(broken), /needs lists the programs the tool runs, some of its kit's needs \(ffmpeg\)/, JSON.stringify(needs));
     }
-    // usesUnless names parameters of the tool that take a file, beside its uses.
-    for (const [name, usesUnless, uses] of [['plan_launch_film', ['look'], true], ['plan_launch_film', ['logo'], true], ['plan_launch_film', [], true], ['render_launch_film', ['film'], false]]) {
+    // usesUnless names parameters of the tool that take a file, beside its uses: each of them, not one among others.
+    for (const [name, usesUnless, uses] of [
+      ['plan_launch_film', ['look'], true], ['plan_launch_film', ['logo'], true], ['plan_launch_film', [], true], ['render_launch_film', ['film'], false],
+      ['plan_launch_film', ['brand', 'look'], true],
+    ]) {
       const broken = structuredClone(kits.find(kit => kit.kit === 'launch-film'));
       const tool = broken.tools.find(entry => entry.name === name);
       tool.usesUnless = usesUnless;
