@@ -69,7 +69,9 @@ if (/links/.test(target)) {
   // A browser stand-in: its own process, with no pipes back, the way kits start Chrome.
   const browser = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
   fs.mkdirSync(out, { recursive: true });
-  fs.writeFileSync(path.join(out, "pids.json"), JSON.stringify({ kit: process.pid, browser: browser.pid }));
+  // Written under another name and renamed, so a test that waits for pids.json never reads it half written.
+  fs.writeFileSync(path.join(out, "pids.json.part"), JSON.stringify({ kit: process.pid, browser: browser.pid }));
+  fs.renameSync(path.join(out, "pids.json.part"), path.join(out, "pids.json"));
   let step = 0;
   setInterval(() => process.stderr.write(`Working ${++step}...\n`), 200);
 } else if (/slow/.test(target)) {
