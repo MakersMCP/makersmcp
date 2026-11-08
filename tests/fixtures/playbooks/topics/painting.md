@@ -50,6 +50,7 @@ check_picture {"picture": "job:<job_id>/picture.png", "expect": "1200x630"}
 
 - "<url> answered <status>, so no picture was painted.": check the address, or give more `timeout_seconds`.
 - "<file> could not be read as a picture": give a PNG.
+- "<file> has no paint left": give a picture with paint on it.
 
 ## Hand over
 

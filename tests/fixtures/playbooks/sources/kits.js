@@ -3,3 +3,9 @@ throw new Error(`${url} answered ${status}, so no picture was painted. Give more
 // A picture wider than the canvas is cut down to its widest side first.
 throw new Error(`${file} could not be read as a picture`);
 throw new Error("The sound is silent");
+throw new Error(`Read https://paint.example/help: ${file} has no paint left`);
+/* A layer that dries too fast cracks along its brush strokes. */
+/**
+ * Each sound fades out over its last beat before the next one starts.
+ */
+const NAME_END = /\/"/; // A layer's name stops at its first slash or quote mark.

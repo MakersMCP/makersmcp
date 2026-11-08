@@ -293,6 +293,9 @@ test('a call that gives a file from a running job\'s folder, or a film.json that
     assert.equal(text(await call('fake_render', { file: 'plan/film.json' })), busy('Fake render', shotsJob, 'shots', `, which holds ${at('shots', '01.png')}`, 'fake_render'));
     plan([{ kind: 'scene' }, { kind: 'screen', image: '../shots/01.png' }]);
     assert.equal(text(await call('fake_render', { file: 'plan/film.json' })), busy('Fake render', shotsJob, 'shots', `, which holds ${at('shots', '01.png')}`, 'fake_render'));
+    // And a picture it names that is not there yet, which that job may still write, like a screenshot taken again.
+    plan([{ kind: 'screen', image: '../shots/01-home.png' }]);
+    assert.equal(text(await call('fake_render', { file: 'plan/film.json' })), busy('Fake render', shotsJob, 'shots', `, which holds ${at('shots', '01-home.png')}`, 'fake_render'));
 
     // Files beside the running jobs' folders, and a film.json that names only such files, are no part of them.
     const done = async result => {
@@ -337,8 +340,29 @@ test('a call that cannot save elsewhere, refused for a job in a folder inside it
     // Given a file, fake_file saves next to it and takes no other out_dir; given an address, it takes one.
     assert.equal(text(await client.callTool({ name: 'fake_file', arguments: { file: 'film/film.json', wait_seconds: 0 } })), busy('Fake file', 'then call fake_file again.'));
     assert.equal(text(await client.callTool({ name: 'fake_file', arguments: { file: 'https://slow.example.com', out_dir: 'film', wait_seconds: 0 } })), busy('Fake file', 'or give another out_dir.'));
+    // A file that is not there, beside that job's folder and not in it, is not there: only a file in a running job's folder
+    // may be one that job writes.
+    assert.equal(text(await client.callTool({ name: 'fake_file', arguments: { file: 'film/new.json', wait_seconds: 0 } })),
+      `## Fake file: not started\n\nfile: there is nothing at ${path.join(outDir, 'film', 'new.json')}. A website's address starts with https://, like https://linear.app.`);
     const done = await client.callTool({ name: 'wait_for_job', arguments: { job_id: jobId, wait_seconds: 20 } });
     assert.equal(done.structuredContent.status, 'done', text(done));
+  });
+});
+
+test('a running job with no folder of its own, like a check of a manifest given by its link, holds no call back, and a file not there is not there', async () => {
+  await withClient({}, async (client, outDir) => {
+    const check = await client.callTool({ name: 'fake_check', arguments: { url: 'https://slow.example.com', wait_seconds: 0 } });
+    assert.equal(check.structuredContent.status, 'running', text(check));
+    // Both calls come while the check runs, which takes 3 seconds: neither waits on a job that saves nothing.
+    assert.equal(text(await client.callTool({ name: 'fake_file', arguments: { file: 'film/new.json', wait_seconds: 0 } })),
+      `## Fake file: not started\n\nfile: there is nothing at ${path.join(outDir, 'film', 'new.json')}. A website's address starts with https://, like https://linear.app.`);
+    const make = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', wait_seconds: 0 } });
+    assert.ok(make.structuredContent?.job_id, text(make));
+    for (const id of [check.structuredContent.job_id, make.structuredContent.job_id]) {
+      const ended = await client.callTool({ name: 'wait_for_job', arguments: { job_id: id, wait_seconds: 20 } });
+      assert.notEqual(ended.isError, true, text(ended));
+      assert.notEqual(ended.structuredContent.status, 'running', text(ended));
+    }
   });
 });
 
