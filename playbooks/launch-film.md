@@ -90,7 +90,10 @@ plan_launch_film {"url": "https://linear.app"}
 plan_launch_film {"url": "https://linear.app", "brand": "job:<job_id>/brand.json"}
 ```
 <!-- end -->
-2. Read the plan in the result, which holds `film.json`, `words.json` and `brand/BRAND.md`. Check the brand's name first: the kit takes it from the site's name, its title or its host, and the film shows it. Then check every word on screen against `words.json`. A plan cannot be changed here and renders as it was planned, so when the name or a word is wrong, or the brand came from a cookie wall or a login page, tell the user and ask before rendering.
+2. Read the plan in the result, which holds `film.json`, `words.json` and `brand/BRAND.md`. Check the brand's name first: the kit takes it from the site's name, its title or its host, and the film shows it. Then check every word on screen against `words.json`. A plan cannot be changed here and renders as it was planned, so when the name or a word is wrong, or the brand came from a cookie wall, a login page or a page with no logo, tell the user what came back before rendering, and ask for the product's own site when the address is not it, or whether to go on with it.
+<!-- with easybrandkit -->
+   The brand topic says which address of a site gives its brand.
+<!-- end -->
 3. Render it, which takes {fact:launch-film.render_minutes} for a 30 second film, then call `wait_for_job` with the `job_id` until it is done:
 ```call
 render_launch_film {"film": "job:<job_id>/film.json", "wait_seconds": 0}
@@ -183,6 +186,9 @@ A run writes only the places it is given, and `stills/STILLS.md` lists only thos
 - `Not on Google Fonts, so the look's own typeface stood in: <family>.` is a note, not a failure: tell the user the film uses the look's typeface for that family.
 <!-- with easybrandkit -->
 - easybrandkit's own errors, like a bot check or a social profile, mean no brand was read: the brand topic has each one.
+<!-- end -->
+<!-- hosted -->
+- `The brand could not be read: ask for the logo file and the main colors, or give a kit with brand.` ends the reason when the site answered with a bot check. No tool here takes a logo file or colors, and a brand kit of the same site stops the same way, so ask for the product's own site when the address is not it, or for an app its App Store listing: a plan from it with no `brand` is made from the listing alone when the site it names cannot be read.
 <!-- end -->
 <!-- local -->
 - `<tool> replaces the brand folder in <folder> with a copy of <kit>, deleting what is there, and <folder>/brand holds <files>, which its brand.json does not list and the copy would not bring back. Give another out_dir, or move those files first.` Nothing was deleted: give another `out_dir`, or give `brand` as that brand/ folder to use it where it is. The same holds for `<tool> makes the brand folder in <folder> again`, where a file of the user's has a name the kit writes.

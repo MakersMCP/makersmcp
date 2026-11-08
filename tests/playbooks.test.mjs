@@ -2103,19 +2103,24 @@ test('a sentence that holds only while a tool is held back or off is not there w
 });
 
 // Which pages of a site give the same brand kit, in the words of every text that answers a wrong brand, a bot check or a
-// missing logo: what easybrandkit's homePageOf reads for each address, the cases tests/kits.test.mjs holds the kit to.
+// missing logo: what easybrandkit's homePageOf reads for each address, the cases tests/kits.test.mjs holds the kit to. It
+// reads a path of at most two parts as it is when each is two letters, with a region or not, home or index.html, so a
+// deeper page of two letters, like /ai, is read as it is too.
 const HOME_PAGES = "A brand is read from the home page at a site's root, so a deeper page, like /pricing or /en/about, gives the same brand kit, "
-  + 'while a home page in a language, like /de, /en/ or /pt-br, is read as it is, and so is /home: '
+  + 'while a home page in a language, like /de, /en/ or /pt-br, is read as it is, and so are /home and other paths of two letters, like /ai: '
   + "when a site's root is a language or country chooser, ask for its home page in the user's language.";
+
+// Hosted launch-film's step 2: a plan renders as planned there, so a wrong brand is answered with the product's own site.
+const HOSTED_FILM_ASK = /or the brand came from a cookie wall, a login page or a page with no logo, tell the user what came back before rendering, and ask for the product's own site when the address is not it, or whether to go on with it\./;
 
 test('a wrong brand, a bot check or a missing logo is answered with another address, and the texts say which pages of a site give the same brand kit, as easybrandkit reads them', async () => {
   // Each address the sentence gives is read as it says by the easybrandkit the lock pins: a deeper page, one under a home
-  // page in a language too, from the root, and a home page in a language or at /home as it is.
+  // page in a language too, from the root, and a home page in a language, /home and a path of two letters as it is.
   const { homePageOf } = requireHere('easybrandkit');
   const [deeper, rest] = HOME_PAGES.split(' while ');
   const deeperPages = deeper.match(/\/[\w/-]+/g);
   const homePages = rest.slice(0, rest.indexOf(':')).match(/\/[\w/-]+/g);
-  assert.deepEqual([deeperPages, homePages], [['/pricing', '/en/about'], ['/de', '/en/', '/pt-br', '/home']]);
+  assert.deepEqual([deeperPages, homePages], [['/pricing', '/en/about'], ['/de', '/en/', '/pt-br', '/home', '/ai']]);
   for (const page of deeperPages) assert.equal(homePageOf(`https://linear.app${page}`), 'https://linear.app/', page);
   for (const page of homePages) assert.equal(homePageOf(`https://linear.app${page}`), null, page);
 
@@ -2149,8 +2154,11 @@ test('a wrong brand, a bot check or a missing logo is answered with another addr
     }
     // The note a deeper page gets names the case where the root it was read from is no home page of the brand.
     assert.match(await read(options, 'brand'), /was read instead: the home page carries the brand's own header and colors\.": nothing to fix, unless <home> is a language or country chooser; then ask for the site's home page in the user's language, as step 4 says\./, side);
-    // launch-film is at its length and points to the brand topic; launch-kit asks for the product's own site as that topic does.
-    assert.match(await read(options, 'launch-film'), side === 'local' ? /^ {3}The brand topic says which address of a site gives its brand\.$/m : /tell the user and ask before rendering/, side);
+    // launch-film points to the brand topic on both sides; hosted, where a plan cannot be changed, its step 2 asks for the
+    // product's own site as the brand topic and launch-kit do. launch-kit asks for that site as the brand topic does.
+    const film = await read(options, 'launch-film');
+    assert.match(film, /^ {3}The brand topic says which address of a site gives its brand\.$/m, side);
+    if (side !== 'local') assert.match(film, HOSTED_FILM_ASK, side);
     assert.match(await read(options, 'launch-kit'), /ask for the product's own site when the address is not it, as the brand topic says, or (?:for the logo and colors, before going on|whether to go on with it)\./, side);
   }
   // Each sentence holds only with the kits it is about: the home pages with a kit that reads a brand, an app's icon with launch-film.
@@ -2160,7 +2168,54 @@ test('a wrong brand, a bot check or a missing logo is answered with another addr
   const alone = await read({ kits: ['launch-film'] }, 'launch-film');
   assert.doesNotMatch(alone, /brand topic|deeper page/);
   assert.match(alone, /ask for the logo file or for the product's own site\. Never render a wrong brand/);
+  const hostedAlone = await read({ where: 'hosted', limits: LIMITS, kits: ['launch-film'] }, 'launch-film');
+  assert.doesNotMatch(hostedAlone, /brand topic|deeper page/);
+  assert.match(hostedAlone, HOSTED_FILM_ASK);
   assert.match(await read(sides.hosted, 'troubleshooting'), /ask for another address: the product's own site when this one is not it/);
+});
+
+test('hosted, a plan, a film or pictures that stop because the brand could not be read are answered with another address, since no tool there takes a logo file or colors', async () => {
+  // launch-film ends easybrandkit's bot check with advice of its own, which a hosted agent cannot follow: no tool there takes
+  // a logo file or colors, and a brand kit of the same site stops on the same bot check.
+  const advice = 'The brand could not be read: ask for the logo file and the main colors, or give a kit with --brand.';
+  const reason = 'https://botsite.example/ answered with a bot check ("Just a moment...") instead of its page, so no kit was made. '
+    + `Get the logo and colors from the site in a normal browser. ${advice}`;
+  const answer = 'When the reason says the brand could not be read, no tool here takes a logo file or colors, and a brand kit of the same site stops the same way: '
+    + "ask for the product's own site when the address is not it, or for an app its App Store listing.";
+  const failed = (request, id) => ({ id, kit: 'launch-film', tool: request.tool.name, title: request.tool.title, status: 'failed', exitCode: 1, elapsedSeconds: 39, failure: reason });
+  const calls = { plan_launch_film: { url: 'https://botsite.example' }, make_launch_film: { url: 'https://botsite.example' }, make_launch_stills: { source: 'https://botsite.example' } };
+  const hosted = { where: 'hosted', limits: LIMITS };
+  for (const options of [hosted, { ...hosted, held: ['check_video', 'fit_music'] }, { ...hosted, kits: ['launch-film'] }, {}]) {
+    const session = await connect({ definitions: loadKitDefinitions(), view: failed, ...options });
+    try {
+      for (const [name, args] of Object.entries(calls)) {
+        const result = await session.client.callTool({ name, arguments: args });
+        const label = `${name}, ${JSON.stringify(options)}`;
+        if (options.where === 'hosted') {
+          // Right under the heading, and above the kit's advice, written with the parameter for its flag.
+          assert.equal(result.structuredContent.next, `makersmcp_playbook launch-film lists this tool's errors and their fixes. ${answer}`, label);
+          assert.ok(text(result).includes(`\n\nNext: ${result.structuredContent.next}\n\n${reason.replace('--brand', 'brand')}`), `${label}: ${text(result)}`);
+        } else {
+          assert.ok(!result.structuredContent.next.includes(answer), label);
+        }
+      }
+    } finally {
+      await session.close();
+    }
+  }
+  // The launch-film topic quotes the advice among its hosted errors with the same answer; locally the logo file goes into film.json.
+  const topic = async options => {
+    const session = await connect({ definitions: loadKitDefinitions(), ...options });
+    try {
+      return text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['launch-film'] } }));
+    } finally {
+      await session.close();
+    }
+  };
+  const quoted = `- \`${advice.replace('--brand', 'brand')}\` ends the reason when the site answered with a bot check. No tool here takes a logo file or colors, and a brand kit of the same site `
+    + "stops the same way, so ask for the product's own site when the address is not it, or for an app its App Store listing:";
+  for (const options of [hosted, { ...hosted, kits: ['launch-film'] }]) assert.ok((await topic(options)).includes(quoted), JSON.stringify(options));
+  assert.ok(!(await topic({})).includes(quoted));
 });
 
 test('a backend that runs only some tools of a kit lists those, and blocks, requires, descriptions and makes follow it', async () => {

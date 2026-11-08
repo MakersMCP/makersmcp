@@ -526,7 +526,7 @@ test('render_launch_film and make_launch_stills read the brand and every picture
   }
 });
 
-test('easybrandkit reads a deeper page of a site, or its blog, docs or help site, from the home page at its root, and a home page in a language or at /home as it is, as the texts say', () => {
+test('easybrandkit reads a deeper page of a site, or its blog, docs or help site, from the home page at its root, and a home page in a language, /home or another path of two letters as it is, as the texts say', () => {
   const require = createRequire(import.meta.url);
   const { homePageOf } = require('easybrandkit');
   for (const [page, home] of [
@@ -540,9 +540,11 @@ test('easybrandkit reads a deeper page of a site, or its blog, docs or help site
     ['https://linear.app/en/about', 'https://linear.app/'],
     ['https://linear.app/pt-br/pricing', 'https://linear.app/'],
   ]) assert.equal(homePageOf(page), home, page);
-  // A home page, one in a language of its own or at /home too, is read as it is. tests/playbooks.test.mjs holds the
-  // sentence that gives these addresses as examples to the same reading.
-  for (const page of ['https://linear.app/', 'https://linear.app/tr', 'https://linear.app/en-us/', 'https://linear.app/de', 'https://linear.app/en/', 'https://linear.app/pt-br', 'https://linear.app/home']) {
+  // A home page, one in a language of its own or at /home too, is read as it is, and so is any other path of at most two
+  // parts of two letters each, like /ai, which may be a deeper page. tests/playbooks.test.mjs holds the sentence that gives
+  // these addresses as examples to the same reading.
+  for (const page of ['https://linear.app/', 'https://linear.app/tr', 'https://linear.app/en-us/', 'https://linear.app/de', 'https://linear.app/en/', 'https://linear.app/pt-br', 'https://linear.app/home',
+    'https://linear.app/en/home', 'https://linear.app/ai', 'https://linear.app/go']) {
     assert.equal(homePageOf(page), null, page);
   }
   const tool = kits.find(kit => kit.kit === 'easybrandkit').tools.find(entry => entry.name === 'make_brand_kit');

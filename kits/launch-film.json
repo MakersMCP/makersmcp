@@ -113,7 +113,8 @@
           "Give the user the {name:film.mp4} link from the list below to watch before it goes out."
         ],
         "failed": [
-          "makersmcp_playbook {topic} lists this tool's errors and their fixes."
+          "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
+          "When the reason says the brand could not be read, no tool here takes a logo file or colors, and a brand kit of the same site stops the same way: ask for the product's own site when the address is not it, or for an app its App Store listing."
         ]
       }
     },
@@ -181,7 +182,8 @@
           "render_launch_film with film {file:film.json} renders it as planned, and make_launch_stills with source {file:film.json} makes pictures that match it."
         ],
         "failed": [
-          "makersmcp_playbook {topic} lists this tool's errors and their fixes."
+          "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
+          "When the reason says the brand could not be read, no tool here takes a logo file or colors, and a brand kit of the same site stops the same way: ask for the product's own site when the address is not it, or for an app its App Store listing."
         ]
       }
     },
@@ -268,6 +270,10 @@
       "hostedNext": {
         "done": [
           "Tell the user which place each picture is for and its size, from STILLS.md below, with the links from the list."
+        ],
+        "failed": [
+          "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
+          "When the reason says the brand could not be read, no tool here takes a logo file or colors, and a brand kit of the same site stops the same way: ask for the product's own site when the address is not it, or for an app its App Store listing."
         ]
       }
     },

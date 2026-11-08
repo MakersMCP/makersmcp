@@ -63,15 +63,15 @@ Read the result before anything else: its first line says what happened, and the
 <!-- end -->
 <!-- end -->
 <!-- hosted -->
-- A site that shows a bot check, a cookie wall or a login page instead of itself: a kit stops with "<address> answered with a bot check (<title>) instead of its page, so <what was not made>", or saves what the page showed. Tell the user what came back. No tool here takes a logo, colors or screens the user gives in place of the site's own, so ask for another address: the product's own site when this one is not it, like its home page in place of its app's sign-in page. Otherwise ask whether to go on with what the kit saved. Never fill in a brand from a guess.
+- A site that shows a bot check, a cookie wall or a login page instead of itself: a kit stops with "<address> answered with a bot check (<title>) instead of its page, so <what was not made>", or saves what the page showed. Tell the user what came back. No tool here takes a logo, colors or screens the user gives, so ask for another address: the product's own site when this one is not it, like its home page, not its app's sign-in page. Otherwise ask whether to go on with what the kit saved. Never fill in a brand from a guess.
 <!-- with easybrandkit, launch-film -->
-  A brand is read from the home page at a site's root, so a deeper page, like /pricing or /en/about, gives the same brand kit, while a home page in a language, like /de, /en/ or /pt-br, is read as it is, and so is /home: when a site's root is a language or country chooser, ask for its home page in the user's language.
+  A brand is read from the home page at a site's root, so a deeper page, like /pricing or /en/about, gives the same brand kit, while a home page in a language, like /de, /en/ or /pt-br, is read as it is, and so are /home and other paths of two letters, like /ai: when a site's root is a language or country chooser, ask for its home page in the user's language.
 <!-- end -->
 <!-- with easybrandkit -->
 - "No logo was found on the page itself.", in a brand kit's notes: no tool here takes a logo the user gives, and a deeper page of the same site gives the same brand kit, so tell the user and ask for another address as above, or whether to go on without a logo.
 <!-- end -->
 <!-- with launch-film -->
-- For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, closes on the app's icon, so it needs no logo from the site. From an App Store listing, a plan is made from the listing alone when the site the listing names cannot be read, as behind a bot check.
+- For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, closes on the app's icon, so it needs no logo from the site. From an App Store listing, a plan is made from the listing alone when the site it names cannot be read, as behind a bot check.
 <!-- end -->
 <!-- end -->
 
