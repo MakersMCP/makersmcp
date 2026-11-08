@@ -172,6 +172,12 @@ export interface ToolDefinition {
   /** Flags that take another kit's script, like { "--easybrandkit": "easybrandkit" }. */
   uses?: Record<string, string>;
   /**
+   * Parameters that take a file and, when the call gives one by any of them, have the kit run
+   * none of the kits in `uses`, like brand of plan_launch_film, given which launch-film copies
+   * that brand kit and runs no easybrandkit: the settings those kits read do not count then.
+   */
+  usesUnless?: string[];
+  /**
    * The programs the tool runs, chrome and ffmpeg, when it runs fewer than its kit's needs,
    * like [] for a tool that runs none: LocalBackend starts no tool whose setting for one of
    * them names no program file, and a tool that runs none of them is never stopped for one.
@@ -404,6 +410,10 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
           fail(`${tool.name}.refuses: ${whole} is no file the call gives; write {<param>} for a file parameter's path as the kit gets it, or {<param>:name} for its name`);
         }
       }
+    }
+    if (tool.usesUnless !== undefined && !(tool.uses && Array.isArray(tool.usesUnless) && tool.usesUnless.length
+      && tool.usesUnless.every(param => typeof param === 'string' && Object.hasOwn(tool.params, param) && FILE_TYPES.has(tool.params[param]!.type)))) {
+      fail(`${tool.name}.usesUnless names parameters of ${tool.name} that take a file, given which the kit runs none of the kits in uses`);
     }
     if (tool.needs !== undefined && !(Array.isArray(tool.needs) && tool.needs.every(need => typeof need === 'string' && (definition.needs ?? []).includes(need)))) {
       fail(`${tool.name}.needs lists the programs the tool runs, some of its kit's needs (${(definition.needs ?? []).join(', ') || 'none'})`);

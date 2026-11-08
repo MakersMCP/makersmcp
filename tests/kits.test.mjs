@@ -676,6 +676,12 @@ test('each kit gets the Chrome, the ffmpeg and the ffprobe check_setup reports u
     assert.deepEqual(report(both2), [`Chrome: ${pathChrome}`, `ffmpeg: ${pathFfmpeg}`, `ffprobe: ${ffprobe}`]);
     const every = kits.flatMap(kit => kit.tools.map(tool => settingsRead(kit.kit, tool.needs ?? kit.needs))).flat();
     assert.deepEqual(settingProblems(bare, every), []);
+    // A bare name names the program of that name, not one PATH has under the usual name: every kit runs ffmpeg-6 here.
+    const six = file('bin', 'ffmpeg-6');
+    assert.deepEqual(env({ PATH: bin, FFMPEG_PATH: 'ffmpeg-6' }),
+      { PATH: bin, CHROME_PATH: pathChrome, LAUNCH_FILM_CHROME: pathChrome, FFMPEG_PATH: six, LAUNCH_FILM_FFMPEG: six });
+    assert.deepEqual(report({ PATH: bin, FFMPEG_PATH: 'ffmpeg-6' }), [`Chrome: ${pathChrome}`, `ffmpeg: ${six}`,
+      'ffprobe: not found beside ffmpeg or on PATH. launch-film reads videos and pictures with it: install it with ffmpeg, or set LAUNCH_FILM_FFPROBE.']);
     // A bare name that is not on PATH names no program: check_setup's line, and the line a tool that runs it does not start with.
     const nowhere = env({ FFMPEG_PATH: 'ffmpeg7', LAUNCH_FILM_FFPROBE: 'ffprobe' });
     assert.deepEqual(nowhere, { PATH, FFMPEG_PATH: 'ffmpeg7', LAUNCH_FILM_FFPROBE: 'ffprobe' });
@@ -750,19 +756,55 @@ test('a tool that reads a program from a setting that names no program file does
       writeFileSync(path.join(baseDir, out, file), body);
     }
   };
+  // A Chrome on PATH, which the kits never get to start here, so each name a kit reads gets one when no setting names it.
+  const bin = path.join(baseDir, 'bin');
+  mkdirSync(bin);
+  writeFileSync(path.join(bin, 'google-chrome'), '#!/bin/sh\nexit 1\n');
+  chmodSync(path.join(bin, 'google-chrome'), 0o755);
+  const PATH = `${bin}${path.delimiter}${process.env.PATH ?? ''}`;
+  // A tool that starts: its job is there, and it is stopped at once.
+  const starts = async (client, tool, args) => {
+    const result = await client.callTool({ name: tool, arguments: { ...args, wait_seconds: 0 } });
+    assert.ok(result.structuredContent?.job_id, `${tool} started: ${text(result)}`);
+    await client.callTool({ name: 'cancel_job', arguments: { job_id: result.structuredContent.job_id } });
+  };
+  const notStarted = async (client, tool, args, line) => {
+    const result = await client.callTool({ name: tool, arguments: { ...args, wait_seconds: 60 } });
+    assert.equal(result.isError, true, tool);
+    assert.equal(result.structuredContent, undefined, `${tool}: no job started`);
+    assert.match(text(result), /: not started\n\n/, tool);
+    assert.ok(text(result).endsWith(line), `${tool}: ${text(result)}`);
+  };
   try {
-    // A folder, like a whole app bundle, as CHROME_PATH: no tool that opens a browser starts, and a brand kit there stays.
-    const folderChrome = await connect({ CHROME_PATH: folder });
+    // A folder, like a whole app bundle, as CHROME_PATH: no tool that opens a browser by it starts, and a brand kit there stays.
+    const folderChrome = await connect({ CHROME_PATH: folder, PATH });
     earlier('brand', EARLIER.brand);
+    earlier('film', EARLIER.film);
+    writeFileSync(path.join(baseDir, 'manifest.json'), '{ "screenshots": [] }\n');
     const before = filesIn(path.join(baseDir, 'brand'));
-    for (const [tool, args] of [['make_brand_kit', { url: SITE, out_dir: 'brand' }], ['take_screenshots', { url: SITE, out_dir: 'brand' }], ['plan_launch_film', { url: SITE, out_dir: 'brand' }]]) {
-      const result = await folderChrome.callTool({ name: tool, arguments: { ...args, wait_seconds: 60 } });
-      assert.equal(result.isError, true, tool);
-      assert.equal(result.structuredContent, undefined, `${tool}: no job started`);
-      assert.match(text(result), /: not started\n\n/, tool);
-      assert.ok(text(result).endsWith(noProgram('CHROME_PATH', folder)), `${tool}: ${text(result)}`);
+    for (const [tool, args] of [
+      ['make_brand_kit', { url: SITE, out_dir: 'brand' }], ['take_screenshots', { url: SITE, out_dir: 'brand' }], ['plan_launch_film', { url: SITE, out_dir: 'brand' }],
+      // From an address, the pictures plan a film first, which runs easybrandkit.
+      ['make_launch_stills', { source: SITE, for: ['og'], out_dir: 'brand' }],
+    ]) {
+      await notStarted(folderChrome, tool, args, noProgram('CHROME_PATH', folder));
       assert.deepEqual(filesIn(path.join(baseDir, 'brand')), before, `${tool} left the folder as it was`);
     }
+    // launch-film reads its own LAUNCH_FILM_CHROME first, which gets the Chrome found, and runs no easybrandkit given a brand
+    // kit or a film.json; check_pwa_screenshots runs no program.
+    await starts(folderChrome, 'render_launch_film', { film: 'film/film.json' });
+    await starts(folderChrome, 'make_launch_stills', { source: 'film/film.json', for: ['og'] });
+    await starts(folderChrome, 'plan_launch_film', { url: SITE, brand: 'brand', out_dir: 'film-b' });
+    await starts(folderChrome, 'make_launch_film', { url: SITE, brand: 'brand/brand.json', out_dir: 'film-c' });
+    await starts(folderChrome, 'check_pwa_screenshots', { manifest: 'manifest.json' });
+
+    // A folder as LAUNCH_FILM_CHROME stops launch-film's tools that open a browser, while check_video, which runs only
+    // ffmpeg, and easybrandkit, which reads CHROME_PATH, start.
+    const folderOwn = await connect({ LAUNCH_FILM_CHROME: folder, PATH });
+    await notStarted(folderOwn, 'render_launch_film', { film: 'film/film.json' }, noProgram('LAUNCH_FILM_CHROME', folder));
+    await notStarted(folderOwn, 'make_launch_stills', { source: 'film/film.json', for: ['og'] }, noProgram('LAUNCH_FILM_CHROME', folder));
+    await starts(folderOwn, 'check_video', { film: 'film/film.mp4', out_dir: 'film-check' });
+    await starts(folderOwn, 'make_brand_kit', { url: SITE, out_dir: 'brand-b' });
 
     // ffmpeg and ffprobe settings that name nothing: the tools that run them do not start, and a demo there stays.
     const noFfmpeg = await connect({ FFMPEG_PATH: path.join(baseDir, 'gone', 'ffmpeg'), LAUNCH_FILM_FFPROBE: gone });
@@ -792,6 +834,14 @@ test('a tool that reads a program from a setting that names no program file does
       const broken = structuredClone(kits.find(kit => kit.kit === 'musicfit'));
       broken.tools[0].needs = needs;
       assert.throws(() => validateKitDefinition(broken), /needs lists the programs the tool runs, some of its kit's needs \(ffmpeg\)/, JSON.stringify(needs));
+    }
+    // usesUnless names parameters of the tool that take a file, beside its uses.
+    for (const [name, usesUnless, uses] of [['plan_launch_film', ['look'], true], ['plan_launch_film', ['logo'], true], ['plan_launch_film', [], true], ['render_launch_film', ['film'], false]]) {
+      const broken = structuredClone(kits.find(kit => kit.kit === 'launch-film'));
+      const tool = broken.tools.find(entry => entry.name === name);
+      tool.usesUnless = usesUnless;
+      if (!uses) delete tool.uses;
+      assert.throws(() => validateKitDefinition(broken), new RegExp(`${name}\\.usesUnless names parameters of ${name} that take a file`), JSON.stringify(usesUnless));
     }
 
     // A bare command name the kits find on PATH is a working setting: check_video reads a video with ffprobe by that name.

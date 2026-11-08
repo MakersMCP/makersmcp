@@ -67,6 +67,7 @@
       },
       "destructive": true,
       "uses": { "--easybrandkit": "easybrandkit" },
+      "usesUnless": ["brand"],
       "params": {
         "url": { "type": "url", "required": true, "description": "The product's website, like https://linear.app, or its App Store or Google Play listing. A social profile is refused, and so is a host without a dot, like localhost." },
         "look": { "type": "enum", "flag": "--look", "values": ["launch", "aurora", "gridline", "pop", "journal"], "description": "The film's look, which also sets the tempo of its music and so how long a bar lasts (default: picked from the brand). launch_film_guide with topic looks says what each one suits." },
@@ -141,6 +142,7 @@
       },
       "destructive": true,
       "uses": { "--easybrandkit": "easybrandkit" },
+      "usesUnless": ["brand"],
       "params": {
         "url": { "type": "url", "required": true, "description": "The product's website, like https://linear.app, or its App Store or Google Play listing. A social profile is refused, and so is a host without a dot, like localhost." },
         "look": { "type": "enum", "flag": "--look", "values": ["launch", "aurora", "gridline", "pop", "journal"], "description": "The film's look, which also sets the tempo of its music and so how long a bar lasts (default: picked from the brand). launch_film_guide with topic looks says what each one suits." },
@@ -244,6 +246,7 @@
       },
       "destructive": true,
       "uses": { "--easybrandkit": "easybrandkit" },
+      "usesUnless": ["source"],
       "params": {
         "source": { "type": "url_or_path", "required": true, "filePattern": ".*\\.[jJ][sS][oO][nN]", "description": "The product's website, like https://linear.app, or a film.json you already have, so the pictures match that film. Given the website, it plans a film first with the default look, length and aspect; stills/ goes next to the film.json. The address needs a dot in its host, so localhost is refused.", "hostedDescription": "The product's website, like https://linear.app, or the film.json an earlier job saved, as job:<job_id>/film.json, so the pictures match that film. The address needs a dot in its host. A link is read as the website, and one that ends in .json is refused." },
         "for": { "type": "list", "flag": "--for", "values": ["ph", "og", "x", "play", "chrome"], "default": ["ph", "og", "x", "play", "chrome"], "description": "Which places to make pictures for (default all of them): ph, the Product Hunt gallery and thumbnail; og, a link preview; x, a post on X; play, the Google Play feature graphic; chrome, the Chrome Web Store tiles." }

@@ -250,10 +250,14 @@ export function failureText(stderr: string, exitCode: number | null): string {
 
 /**
  * The settings a tool's run reads its programs from: those of the programs it runs (its needs,
- * else its kit's), and those of each kit it runs, like easybrandkit for a plan of launch-film.
+ * else its kit's), and those of each kit it runs, like easybrandkit for a plan of launch-film,
+ * unless the call gives a file by one of the tool's usesUnless, like a plan given brand, which
+ * copies that brand kit and runs no easybrandkit. `inputs` are the files the call gives, by
+ * parameter (buildCommand).
  */
-function toolSettings(kit: KitDefinition, tool: ToolDefinition, installed: Map<string, InstalledKit>): string[][] {
+function toolSettings(kit: KitDefinition, tool: ToolDefinition, installed: Map<string, InstalledKit>, inputs: Record<string, string>): string[][] {
   const lists = settingsRead(kit.kit, tool.needs ?? kit.needs);
+  if ((tool.usesUnless ?? []).some(param => Object.hasOwn(inputs, param))) return lists;
   for (const used of Object.values(tool.uses ?? {})) {
     const other = installed.get(used)?.definition;
     if (other) lists.push(...settingsRead(other.kit, other.needs));
@@ -387,13 +391,6 @@ export class LocalBackend implements KitBackend {
     const installed = this.installed.get(kit.definition.kit);
     if (!installed) throw new NotStartedError(`${kit.definition.kit} is not installed here.`);
 
-    // The Chrome and ffmpeg a setting names, under each name a kit reads them by. A setting the
-    // tool reads a program from that names no program file, like a folder, would stop the kit, some
-    // only after they cleared their folder: the tool does not start, with check_setup's line for it.
-    const env = kitEnvironment(this.env ?? process.env);
-    const problems = settingProblems(env, toolSettings(installed.definition, tool, this.installed));
-    if (problems.length) throw new NotStartedError(problems.join(' '));
-
     let command;
     try {
       command = buildCommand(tool, input, { baseDir: this.baseDir, installed: this.installed, confine: this.confine });
@@ -401,6 +398,13 @@ export class LocalBackend implements KitBackend {
       if (error instanceof ArgumentError) throw new NotStartedError(error.message);
       throw error;
     }
+
+    // The Chrome and ffmpeg a setting names, under each name a kit reads them by. A setting this
+    // run reads a program from that names no program file, like a folder, would stop the kit, some
+    // only after they cleared their folder: the tool does not start, with check_setup's line for it.
+    const env = kitEnvironment(this.env ?? process.env);
+    const problems = settingProblems(env, toolSettings(installed.definition, tool, this.installed, command.inputs));
+    if (problems.length) throw new NotStartedError(problems.join(' '));
 
     // Every kit runs in baseDir, and on a first run, like ~/makersmcp, it is not there yet.
     try {
