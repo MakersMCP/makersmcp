@@ -49,12 +49,12 @@ make_brand_kit {"url": "https://linear.app", "facts": true}
    - The colors. A cookie wall, a login page or a loading screen gives colors that are not the brand's.
 3. Show `card.png` to the user: the name, the first screen, the logos, the colors and the fonts on one picture.
 <!-- local -->
-4. When the name, a logo or the colors are wrong, tell the user what came back and ask for the right page, the logo file or the colors. Never fill in a brand from a guess, since everything built on the kit would carry it.
+4. When the name, a logo or the colors are wrong, tell the user what came back and ask for the product's own site when this address is not it, or for the logo file or the colors: another page of the same site is read from its home page and gives the same kit. Never fill in a brand from a guess, since everything built on the kit would carry it.
 <!-- end -->
 <!-- hosted -->
-4. When the name, a logo or the colors are wrong, tell the user what came back and ask for the right page: no tool here takes a logo, colors or screens the user gives in place of the site's own. Never fill in a brand from a guess, since everything built on the kit would carry it.
+4. When the name, a logo or the colors are wrong, tell the user what came back. No tool here takes a logo, colors or screens the user gives in place of the site's own, and another page of the same site is read from its home page and gives the same kit, so ask for the product's own site when this address is not it, or whether to go on with this kit. Never fill in a brand from a guess, since everything built on the kit would carry it.
 <!-- with launch-film -->
-   Before a film is made from this kit, ask whether to go on with it.
+   For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, closes on the app's icon.
 <!-- end -->
 <!-- end -->
 
@@ -110,7 +110,10 @@ Each error as the result shows it, then the fix.
 - "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": ask the user for the logo file and the main colors.
 <!-- end -->
 <!-- hosted -->
-- "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": tell the user, and ask for a page that shows the brand, since no tool here takes a logo or colors the user gives.
+- "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": tell the user. No tool here takes a logo or colors the user gives, and another page of that site is read from the same home page, so ask for the product's own site when this address is not it.
+<!-- with launch-film -->
+  From an App Store listing, a plan with no `brand` is made from the listing alone when the site the listing names cannot be read like this.
+<!-- end -->
 <!-- end -->
 - "<url> still shows no content after 30 s, so nothing was read. Try again, or check the page in a browser.": run once more with `timeout_seconds` {fact:easybrandkit.slow_timeout}, then ask the user to check the page.
 - "Could not open <url>: <reason>": the address does not answer, as with net::ERR_NAME_NOT_RESOLVED. Check it with the user.
@@ -126,7 +129,7 @@ Notes in a finished result:
 - "No logo was found on the page itself.": tell the user, and ask for the logo file.
 <!-- end -->
 <!-- hosted -->
-- "No logo was found on the page itself.": tell the user, and ask for a page that shows the logo, since no tool here takes a logo the user gives.
+- "No logo was found on the page itself.": no tool here takes a logo the user gives, and another page of the same site gives the same kit, so tell the user and ask whether to go on without a logo, as step 4 says.
 <!-- end -->
 - "<url> is not the home page, so <home> was read instead: the home page carries the brand's own header and colors.": nothing to fix.
 - "<url> is a store listing that names no website, so only the listing was read: the kit has the app icon and screenshots but no logos, colors or fonts. Give the product's website for those.": make the kit again from the website.

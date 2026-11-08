@@ -63,9 +63,15 @@ Read the result before anything else: its first line says what happened, and the
 <!-- end -->
 <!-- end -->
 <!-- hosted -->
-- A site that shows a bot check, a cookie wall or a login page instead of itself: a kit stops with "<address> answered with a bot check (<title>) instead of its page, so <what was not made>", or saves what the page showed. Tell the user what came back: no tool here takes a logo, colors or screens the user gives in place of the site's own, so ask for a page that shows the brand, or whether to go on with it. Never fill in a brand from a guess.
+- A site that shows a bot check, a cookie wall or a login page instead of itself: a kit stops with "<address> answered with a bot check (<title>) instead of its page, so <what was not made>", or saves what the page showed. Tell the user what came back. No tool here takes a logo, colors or screens the user gives in place of the site's own, so ask for another address: the product's own site when this one is not it, like its home page in place of its app's sign-in page. Otherwise ask whether to go on with what the kit saved. Never fill in a brand from a guess.
+<!-- with easybrandkit, launch-film -->
+  A brand is read from the site's home page, whatever page of it the address names, so another page of the same site gives the same result.
+<!-- end -->
 <!-- with easybrandkit -->
-- "No logo was found on the page itself.", in a brand kit's notes: no tool here takes a logo the user gives, so tell the user, and ask for a page that shows the logo or whether to go on without it.
+- "No logo was found on the page itself.", in a brand kit's notes: no tool here takes a logo the user gives, and another page of the same site gives the same kit, so tell the user and ask whether to go on without a logo.
+<!-- end -->
+<!-- with launch-film -->
+- For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, closes on the app's icon, so it needs no logo from the site. From an App Store listing, a plan is made from the listing alone when the site the listing names cannot be read, as behind a bot check.
 <!-- end -->
 <!-- end -->
 

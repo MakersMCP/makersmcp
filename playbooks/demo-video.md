@@ -182,14 +182,19 @@ Each error as the result shows it, then the fix.
 <!-- with check_video -->
 Pass `demo.mp4` on by its path.
 <!-- end -->
-No tool here takes `steps.json`: read the times from it and give them as numbers.
 <!-- end -->
 <!-- hosted -->
 Each job saves into a folder of its own, and its links work for {limit:keep_days} for anyone who has them, so give them only to the user.
 <!-- with check_video -->
 Pass the video on as job:<job_id>/demo.mp4.
 <!-- end -->
-Give job:<job_id>/demo.yaml as `steps` to record a tour again as it was. No tool here takes `steps.json`: read the times from it in the result and give them as numbers.
+Give job:<job_id>/demo.yaml as `steps` to record a tour again as it was.
+<!-- end -->
+<!-- with check_video, fit_music -->
+No tool here takes `steps.json`: read the times from it in the result and give them as numbers.
+<!-- end -->
+<!-- without check_video, fit_music -->
+No tool here takes `steps.json` or its times: give them to the user for the app they edit the video in.
 <!-- end -->
 
 ## Hand over

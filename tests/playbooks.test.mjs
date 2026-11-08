@@ -1959,6 +1959,39 @@ test('a sentence that holds only while a tool is held back or off is not there w
   for (const held of [['check_video'], ['check_video', 'fit_music']]) {
     assert.doesNotMatch(await read(hosted(held), ['demo-video']), /Pass the video on as job/, held.join());
   }
+  // A demo's times go to a tool as numbers only while fit_music or check_video is listed, and to the user while neither is.
+  const asNumbers = /No tool here takes `steps\.json`: read the times from it in the result and give them as numbers\./;
+  const toUser = /No tool here takes `steps\.json` or its times: give them to the user/;
+  for (const options of [{}, { kits: ['easyscreenshotkit', 'musicfit'] }, { kits: ['easyscreenshotkit', 'launch-film'] }, hosted(), hosted(['check_video']), hosted(['fit_music'])]) {
+    const demo = await read(options, ['demo-video']);
+    assert.match(demo, asNumbers, JSON.stringify(options));
+    assert.doesNotMatch(demo, toUser, JSON.stringify(options));
+  }
+  for (const options of [{ kits: ['easyscreenshotkit'] }, hosted(['check_video', 'fit_music'])]) {
+    const demo = await read(options, ['demo-video']);
+    assert.match(demo, toUser, JSON.stringify(options));
+    assert.doesNotMatch(demo, /give them as numbers/, JSON.stringify(options));
+  }
+});
+
+test('a wrong brand, a bot check or a missing logo is answered with another address, never with another page of the same site, which the brand is read from the home page of', async () => {
+  const read = async (options, topics) => {
+    const session = await connect({ definitions: loadKitDefinitions(), ...options });
+    try {
+      return text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics } }));
+    } finally {
+      await session.close();
+    }
+  };
+  for (const options of [{}, { where: 'hosted', limits: LIMITS }, { where: 'hosted', limits: LIMITS, held: ['check_video', 'fit_music'] }]) {
+    const read3 = await read(options, ['brand', 'troubleshooting', 'launch-film']);
+    assert.doesNotMatch(read3, /ask (?:the user )?for (?:the right page|a page|another page)\b/, JSON.stringify(options));
+    assert.doesNotMatch(await read(options, ['launch-kit']), /ask (?:the user )?for (?:the right page|a page|another page)\b/, JSON.stringify(options));
+  }
+  // Hosted, where no tool takes the user's own logo or colors, each answer says why another page does not help.
+  const hosted = await read({ where: 'hosted', limits: LIMITS }, ['brand', 'troubleshooting']);
+  assert.equal(hosted.match(/another page of (?:the same|that) site/g)?.length, 5, hosted);
+  assert.match(hosted, /ask for another address: the product's own site when this one is not it/);
 });
 
 test('a backend that runs only some tools of a kit lists those, and blocks, requires, descriptions and makes follow it', async () => {
