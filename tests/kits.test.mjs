@@ -490,6 +490,42 @@ test('make_launch_stills takes for a film.json what launch-film takes for one, a
   }
 });
 
+test('render_launch_film and make_launch_stills read the brand and every picture a film.json names, as launch-film\'s loader reads them', () => {
+  const source = name => readFileSync(path.join(launchFilm.dir, 'src', name), 'utf8');
+  const film = source('film.js');
+  // loadFilm reads the brand from film.json's folder, and each clip's files through fileOf, a list of them like images too.
+  const brand = /readBrand\(path\.resolve\(dir, film\.(\w+)\)\)/.exec(film)?.[1];
+  assert.ok(brand && /Array\.isArray\(film\.clips\)/.test(film) && /fileOf\(rel,/.test(film), 'launch-film\'s loadFilm reads its brand and clips another way now');
+  const lists = [...film.matchAll(/Array\.isArray\(c\.(\w+)\) \? c\.\1 : \[\]/g)];
+  const places = [brand, ...[...film.matchAll(/fileOf\(c\.(\w+),/g), ...lists].map(match => `clips.${match[1]}`)];
+  assert.deepEqual([...new Set(places)].sort(), ['brand', 'clips.icon', 'clips.image', 'clips.images', 'clips.logo']);
+  assert.match(source('stills.js'), /loadFilm\(filmFile\)/, 'make_launch_stills reads its film.json with loadFilm');
+  const tools = kits.find(kit => kit.kit === 'launch-film').tools;
+  const folder = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-kits-'));
+  try {
+    mkdirSync(path.join(folder, 'film'));
+    const filmJson = path.join(folder, 'film', 'film.json');
+    writeFileSync(filmJson, JSON.stringify({
+      brand: 'brand/brand.json',
+      clips: [
+        { kind: 'screen', image: '../shots/01.png' },
+        { kind: 'shots', images: ['../store/a.png', '../store/b.png'] },
+        { kind: 'logo', logo: 'brand/logo-01.png' },
+        { kind: 'logo', icon: '../store/icon.png' },
+      ],
+    }));
+    const named = ['film/brand/brand.json', 'shots/01.png', 'store/a.png', 'store/b.png', 'film/brand/logo-01.png', 'store/icon.png'].map(file => path.join(folder, file));
+    for (const [name, param] of [['render_launch_film', 'film'], ['make_launch_stills', 'source']]) {
+      const tool = tools.find(entry => entry.name === name);
+      assert.deepEqual([...tool.params[param].reads].sort(), [...new Set(places)].sort(), `${name}.${param}`);
+      const { reads } = buildCommand(tool, { [param]: 'film/film.json' }, { baseDir: folder, installed: new Map() });
+      assert.deepEqual(reads.slice().sort(), [filmJson, ...named].sort(), name);
+    }
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
 test('what launch-film\'s tools take for a brand kit\'s own files, easybrandkit replaces as its own too', () => {
   const require = createRequire(import.meta.url);
   const { prepareDir } = require('easybrandkit');

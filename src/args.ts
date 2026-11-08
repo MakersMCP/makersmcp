@@ -1,4 +1,6 @@
-import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, realpathSync, statSync, type Dirent } from 'node:fs';
+import {
+  closeSync, constants, existsSync, fstatSync, lstatSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, statSync, type Dirent,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { InstalledKit, ParamDefinition, ReplacedFolder, ToolDefinition } from './kits.js';
@@ -20,6 +22,12 @@ export interface BuiltCommand {
   movable: boolean;
   /** The files the call names, by parameter, as the kit gets them. */
   inputs: Record<string, string>;
+  /**
+   * The files and folders the kit reads: those the call names, and those a JSON file it names
+   * points to by a parameter's `reads`, like the pictures of a film.json's clips, read from that
+   * file's folder as the kit reads them.
+   */
+  reads: string[];
 }
 
 export interface CommandContext {
@@ -191,7 +199,58 @@ export function buildCommand(
     if (other) args.push(flag, other.script);
   }
 
-  return { args, folder, movable, inputs };
+  const reads = [...files];
+  for (const [name, file] of Object.entries(inputs)) {
+    const places = tool.params[name]?.reads;
+    if (places) for (const named of namedIn(file, places)) if (!reads.includes(named)) reads.push(named);
+  }
+  return { args, folder, movable, inputs, reads };
+}
+
+/** The largest JSON file whose names namedIn reads: a film.json is a few kilobytes. */
+const MAX_NAMING_BYTES = 1024 * 1024;
+
+/**
+ * The files a JSON file names at `places`, like the image of each of a film.json's clips at
+ * clips.image, each read from the file's folder the way launch-film reads them. Nothing when
+ * it is no regular file, is larger than MAX_NAMING_BYTES or is no JSON, which the kit says
+ * itself. A fifo is opened without waiting on it, so it cannot hold the server.
+ */
+function namedIn(file: string, places: string[]): string[] {
+  let text: string;
+  let fd: number | undefined;
+  try {
+    fd = openSync(file, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.size > MAX_NAMING_BYTES) return [];
+    text = readFileSync(fd, 'utf8');
+  } catch {
+    return [];
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  const dir = path.dirname(file);
+  return places.flatMap(place => valuesAt(json, place))
+    .filter((value): value is string => typeof value === 'string' && value !== '')
+    .map(value => path.resolve(dir, value));
+}
+
+/** The values at a place in JSON like clips.image, a list met on the way taken item by item. */
+function valuesAt(json: unknown, place: string): unknown[] {
+  const flat = (values: unknown[]) => values.flatMap(value => (Array.isArray(value) ? value : [value]));
+  let found: unknown[] = [json];
+  for (const key of place.split('.')) {
+    found = flat(found).flatMap(value => (value !== null && typeof value === 'object' && Object.hasOwn(value, key)
+      ? [(value as Record<string, unknown>)[key]]
+      : []));
+  }
+  return flat(found);
 }
 
 /**

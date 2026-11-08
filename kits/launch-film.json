@@ -195,7 +195,7 @@
       "args": ["render", "{film}"],
       "out": { "name": "{dir:film}" },
       "params": {
-        "film": { "type": "path", "required": true, "description": "The film.json to render. film.mp4 and film.timeline.json go next to it.", "hostedDescription": "The film.json an earlier job saved, as job:<job_id>/film.json, so the brand and screens it names come with it." },
+        "film": { "type": "path", "required": true, "reads": ["brand", "clips.image", "clips.images", "clips.logo", "clips.icon"], "description": "The film.json to render. film.mp4 and film.timeline.json go next to it.", "hostedDescription": "The film.json an earlier job saved, as job:<job_id>/film.json, so the brand and screens it names come with it." },
         "jobs": { "type": "integer", "flag": "--jobs", "min": 1, "max": 4, "default": 2, "description": "Clips rendered at once (default {default:render_launch_film.jobs}). 1 suits a slow machine." },
         "keep": { "type": "boolean", "flag": "--keep", "default": false, "where": "local", "description": "Keep the work files, each clip's MP4, in a launch-film-work- folder in the system's temp folder, outside the film's folder; the summary names it." }
       },
@@ -248,7 +248,7 @@
       "uses": { "--easybrandkit": "easybrandkit" },
       "usesUnless": ["source"],
       "params": {
-        "source": { "type": "url_or_path", "required": true, "filePattern": ".*\\.[jJ][sS][oO][nN]", "description": "The product's website, like https://linear.app, or a film.json you already have, so the pictures match that film. Given the website, it plans a film first with the default look, length and aspect; stills/ goes next to the film.json. The address needs a dot in its host, so localhost is refused.", "hostedDescription": "The product's website, like https://linear.app, or the film.json an earlier job saved, as job:<job_id>/film.json, so the pictures match that film. The address needs a dot in its host. A link is read as the website, and one that ends in .json is refused." },
+        "source": { "type": "url_or_path", "required": true, "filePattern": ".*\\.[jJ][sS][oO][nN]", "reads": ["brand", "clips.image", "clips.images", "clips.logo", "clips.icon"], "description": "The product's website, like https://linear.app, or a film.json you already have, so the pictures match that film. Given the website, it plans a film first with the default look, length and aspect; stills/ goes next to the film.json. The address needs a dot in its host, so localhost is refused.", "hostedDescription": "The product's website, like https://linear.app, or the film.json an earlier job saved, as job:<job_id>/film.json, so the pictures match that film. The address needs a dot in its host. A link is read as the website, and one that ends in .json is refused." },
         "for": { "type": "list", "flag": "--for", "values": ["ph", "og", "x", "play", "chrome"], "default": ["ph", "og", "x", "play", "chrome"], "description": "Which places to make pictures for (default all of them): ph, the Product Hunt gallery and thumbnail; og, a link preview; x, a post on X; play, the Google Play feature graphic; chrome, the Chrome Web Store tiles." }
       },
       "docs": ["stills/STILLS.md"],

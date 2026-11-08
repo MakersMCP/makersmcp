@@ -258,6 +258,23 @@ test('a kit\'s doc is read only as a regular file with one name: a link, a hard 
   });
 });
 
+test('a film.json that is a fifo names no files the kit reads, and holds nothing up', { skip: notPosix }, async () => {
+  await withFolder(async ({ baseDir }) => {
+    const film = path.join(baseDir, 'film.json');
+    assert.equal(spawnSync('mkfifo', [film]).status, 0, 'mkfifo');
+    const render = {
+      name: 'fake_render', title: 'Fake render', description: 'Renders a file where it is.', args: ['render', '{file}'], out: { name: '{dir:file}' },
+      params: { file: { type: 'path', required: true, reads: ['brand', 'clips.image'], description: 'A film.json.' } },
+    };
+    // In a process of its own, so a file that holds it cannot hold the tests.
+    const script = `import { buildCommand } from ${JSON.stringify(pathToFileURL(path.join(here, '..', 'dist', 'server.js')).href)};\n`
+      + `process.stdout.write(JSON.stringify(buildCommand(${JSON.stringify(render)}, { file: 'film.json' }, { baseDir: ${JSON.stringify(baseDir)}, installed: new Map() }).reads));`;
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 10_000 });
+    assert.equal(run.status, 0, run.error ? `buildCommand did not return: ${run.error.message}` : run.stderr);
+    assert.deepEqual(JSON.parse(run.stdout), [film]);
+  });
+});
+
 test('a long doc is still cut, with where the rest is', async () => {
   await withFolder(async ({ baseDir }) => {
     writeFileSync(path.join(baseDir, 'LONG.md'), 'é'.repeat(100_000));

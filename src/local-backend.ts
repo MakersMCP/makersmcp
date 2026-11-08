@@ -436,11 +436,14 @@ export class LocalBackend implements KitBackend {
         ...(this.launcher ? { launcher: this.launcher } : {}),
         ...(within !== undefined ? { within } : {}),
         inputs: command.inputs,
+        reads: command.reads,
       });
     } catch (error) {
       if (error instanceof FolderBusyError) {
-        // Another out_dir helps only a call that can take one: not one whose folder follows a file it gave.
-        const then = command.movable
+        // Another out_dir helps only a call that can take one, and only when it reads no file that
+        // job may still change: not one whose folder follows a file it gave, nor a check of a film
+        // a render is still making.
+        const then = command.movable && !error.reads
           ? `Wait for it with wait_for_job (job_id ${error.job.id}), or give another out_dir.`
           : `Wait for it with wait_for_job (job_id ${error.job.id}), then call ${tool.name} again.`;
         throw new NotStartedError(`${error.message}. ${then}`, error.job.id);

@@ -38,6 +38,11 @@ export interface JobSpec {
   within?: string;
   /** The files the call gave the kit, by parameter, for the job's view (JobView.inputs). */
   inputs?: Record<string, string>;
+  /**
+   * The files and folders the kit reads (BuiltCommand.reads): the job does not start while
+   * another writes in a folder that holds one of them, since that job may still change it.
+   */
+  reads?: string[];
 }
 
 const STDOUT_LIMIT = 256 * 1024;
@@ -66,13 +71,20 @@ function within(outer: string, inner: string): boolean {
 /**
  * Another job is writing to the same folder, to one that holds `folder`, or to one inside it:
  * either job would list the other's files as its own, and one may clear what the other writes.
+ * With `reads`, `folder` is a file or folder the new job would read, which that job may still
+ * change, so the new job cannot run before it ends wherever it saves.
  */
 export class FolderBusyError extends Error {
-  constructor(readonly job: Job, folder: string = job.spec.folder!) {
+  constructor(readonly job: Job, folder: string = job.spec.folder!, readonly reads = false) {
     const running = job.spec.folder!;
     const how = running === folder ? '' : within(running, folder) ? `, which holds ${folder}` : `, inside ${folder}`;
     super(`${job.id} (${job.spec.tool}) is still writing to ${running}${how}`);
   }
+}
+
+/** Whether one of two paths, as both are written, is the other or a folder that holds it. */
+function overlap(a: string, b: string): boolean {
+  return within(a, b) || within(b, a);
 }
 
 /** What a file is now, to tell whether a run wrote it: empty when it is not there. */
@@ -282,10 +294,16 @@ export class JobManager {
 
   start(spec: JobSpec): Job {
     const { folder } = spec;
+    const writing = this.list().filter(job => job.status === 'running' && job.spec.folder !== undefined);
+    // A job never reads a file in a folder a running job writes, or a folder one writes in,
+    // wherever it saves itself: that job may still change it.
+    for (const file of spec.reads ?? []) {
+      const busy = writing.find(job => overlap(job.spec.folder!, file));
+      if (busy) throw new FolderBusyError(busy, file, true);
+    }
     if (folder) {
       // Two jobs never write into one folder, nor one into a folder inside the other's.
-      const busy = this.list().find(job => job.status === 'running' && job.spec.folder !== undefined
-        && (within(job.spec.folder, folder) || within(folder, job.spec.folder)));
+      const busy = writing.find(job => overlap(job.spec.folder!, folder));
       if (busy) throw new FolderBusyError(busy, folder);
     }
     const job = new Job(`job_${randomBytes(4).toString('hex')}`, spec);

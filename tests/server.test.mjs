@@ -219,19 +219,154 @@ test('a job refused for a running job\'s folder is offered another out_dir only 
     const film = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: 'film', wait_seconds: 0 } });
     const jobId = film.structuredContent.job_id;
     assert.ok(jobId, text(film));
-    const busy = (title, then) => `## ${title}: not started\n\n${jobId} (fake_make) is still writing to ${path.join(outDir, 'film')}. Wait for it with wait_for_job (job_id ${jobId}), ${then}`;
+    const busy = (title, how, then) => `## ${title}: not started\n\n${jobId} (fake_make) is still writing to ${path.join(outDir, 'film')}${how}. Wait for it with wait_for_job (job_id ${jobId}), ${then}`;
+    // Each reads film.json, which that job may still change, so the refusal names it.
+    const json = `, which holds ${path.join(outDir, 'film', 'film.json')}`;
     const render = await client.callTool({ name: 'fake_render', arguments: { file: 'film/film.json', out_dir: 'elsewhere', wait_seconds: 0 } });
-    assert.equal(text(render), busy('Fake render', 'then call fake_render again.'));
+    assert.equal(text(render), busy('Fake render', json, 'then call fake_render again.'));
     // Given a file, fake_file saves next to it and takes no other out_dir; given an address, it takes one.
     const nextTo = await client.callTool({ name: 'fake_file', arguments: { file: 'film/film.json', wait_seconds: 0 } });
-    assert.equal(text(nextTo), busy('Fake file', 'then call fake_file again.'));
+    assert.equal(text(nextTo), busy('Fake file', json, 'then call fake_file again.'));
     const address = await client.callTool({ name: 'fake_file', arguments: { file: 'https://slow.example.com', out_dir: 'film', wait_seconds: 0 } });
-    assert.equal(text(address), busy('Fake file', 'or give another out_dir.'));
+    assert.equal(text(address), busy('Fake file', '', 'or give another out_dir.'));
     const done = await client.callTool({ name: 'wait_for_job', arguments: { job_id: jobId, wait_seconds: 20 } });
     assert.equal(done.structuredContent.status, 'done', text(done));
     const again = await client.callTool({ name: 'fake_render', arguments: { file: 'film/film.json', wait_seconds: 20 } });
     assert.equal(again.structuredContent.status, 'done', text(again));
   });
+});
+
+test('a call that gives a file from a running job\'s folder, or a film.json that names one, waits for that job wherever it saves, and is never offered another out_dir', async () => {
+  const kits = structuredClone(definitions);
+  kits[0].tools.push(
+    // Like check_video: a check of a file, saved in check/ next to it unless out_dir says otherwise.
+    {
+      name: 'fake_look', title: 'Fake look', description: 'Checks a file.', args: ['check', '{file}'], check: true, report: 'REPORT.md',
+      out: { flag: '--out', name: '{dir:file}/check' }, docs: ['REPORT.md'],
+      params: {
+        file: { type: 'path', required: true, description: 'A file.' },
+        cues: { type: 'path', flag: '--cues', description: 'Another file.' },
+      },
+    },
+    // Like render_launch_film: it saves next to its film.json and reads the pictures that one names.
+    {
+      name: 'fake_render', title: 'Fake render', description: 'Renders a file where it is.', args: ['render', '{file}'], out: { name: '{dir:file}' },
+      params: { file: { type: 'path', required: true, reads: ['brand', 'clips.image', 'clips.images'], description: 'A film.json.' } },
+    },
+    // Like check_pwa_screenshots given a file: a check with no folder of its own.
+    {
+      name: 'fake_read', title: 'Fake read', description: 'Reads a file.', args: ['check', '{file}'], check: true, report: 'stdout', readOnly: true,
+      params: { file: { type: 'url_or_path', required: true, description: 'A file, or an address like https://example.com.' } },
+    },
+  );
+  await withClient({ definitions: kits }, async (client, outDir) => {
+    const at = (...parts) => path.join(outDir, ...parts);
+    for (const dir of ['film', 'shots', 'beside', 'plan']) mkdirSync(at(dir));
+    writeFileSync(at('film', 'film.mp4'), 'a film');
+    for (const dir of ['shots', 'beside']) writeFileSync(at(dir, '01.png'), 'a picture');
+    const plan = clips => writeFileSync(at('plan', 'film.json'), `${JSON.stringify({ brand: 'brand/brand.json', clips })}\n`);
+    const start = async out => {
+      const started = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: out, wait_seconds: 0 } });
+      assert.ok(started.structuredContent.job_id, text(started));
+      return started.structuredContent.job_id;
+    };
+    const filmJob = await start('film');
+    const shotsJob = await start('shots');
+    const busy = (title, jobId, folder, how, tool) => `## ${title}: not started\n\n${jobId} (fake_make) is still writing to ${at(folder)}${how}. Wait for it with wait_for_job (job_id ${jobId}), then call ${tool} again.`;
+    const call = (name, args) => client.callTool({ name, arguments: { ...args, wait_seconds: 0 } });
+    const film = `, which holds ${at('film', 'film.mp4')}`;
+
+    // In check/ next to the film, or in a folder of its own: either way it would check a film the job may still change.
+    assert.equal(text(await call('fake_look', { file: 'film/film.mp4' })), busy('Fake look', filmJob, 'film', film, 'fake_look'));
+    assert.equal(text(await call('fake_look', { file: 'film/film.mp4', out_dir: 'elsewhere' })), busy('Fake look', filmJob, 'film', film, 'fake_look'));
+    // Any file the call gives counts, and so does a folder that job writes in, or one that holds that job's folder.
+    assert.equal(text(await call('fake_look', { file: 'beside/01.png', cues: 'film/film.mp4', out_dir: 'elsewhere' })), busy('Fake look', filmJob, 'film', film, 'fake_look'));
+    assert.equal(text(await call('fake_look', { file: 'film', out_dir: 'elsewhere' })), busy('Fake look', filmJob, 'film', '', 'fake_look'));
+    assert.equal(text(await call('fake_look', { file: '.', out_dir: 'elsewhere' })), busy('Fake look', filmJob, 'film', `, inside ${outDir}`, 'fake_look'));
+    // A call with no folder of its own.
+    assert.equal(text(await call('fake_read', { file: 'film/film.mp4' })), busy('Fake read', filmJob, 'film', film, 'fake_read'));
+    // A film.json that names a picture in a folder a job is writing: the render would read it.
+    plan([{ kind: 'screen', image: '../beside/01.png' }, { kind: 'shots', images: ['../beside/01.png', '../shots/01.png'] }]);
+    assert.equal(text(await call('fake_render', { file: 'plan/film.json' })), busy('Fake render', shotsJob, 'shots', `, which holds ${at('shots', '01.png')}`, 'fake_render'));
+    plan([{ kind: 'scene' }, { kind: 'screen', image: '../shots/01.png' }]);
+    assert.equal(text(await call('fake_render', { file: 'plan/film.json' })), busy('Fake render', shotsJob, 'shots', `, which holds ${at('shots', '01.png')}`, 'fake_render'));
+
+    // Files beside the running jobs' folders, and a film.json that names only such files, are no part of them.
+    const done = async result => {
+      const ended = result.structuredContent.status === 'running'
+        ? await client.callTool({ name: 'wait_for_job', arguments: { job_id: result.structuredContent.job_id, wait_seconds: 20 } })
+        : result;
+      assert.ok(['done'].includes(ended.structuredContent?.status), text(ended));
+    };
+    await done(await call('fake_look', { file: 'beside/01.png', out_dir: 'elsewhere' }));
+    await done(await call('fake_read', { file: 'beside/01.png' }));
+    plan([{ kind: 'screen', image: '../beside/01.png' }, { kind: 'logo', logo: 'brand/logo-01.png' }]);
+    await done(await call('fake_render', { file: 'plan/film.json' }));
+
+    // Once those jobs have ended, every call above runs.
+    for (const jobId of [filmJob, shotsJob]) {
+      const ended = await client.callTool({ name: 'wait_for_job', arguments: { job_id: jobId, wait_seconds: 20 } });
+      assert.equal(ended.structuredContent.status, 'done', text(ended));
+    }
+    await done(await call('fake_look', { file: 'film/film.mp4' }));
+    await done(await call('fake_read', { file: 'film/film.mp4' }));
+    plan([{ kind: 'screen', image: '../shots/01.png' }]);
+    await done(await call('fake_render', { file: 'plan/film.json' }));
+  });
+});
+
+test('the files a parameter reads come from the places of its JSON file, read from that file\'s folder, and nothing else', () => {
+  const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-test-'));
+  try {
+    const render = {
+      name: 'fake_render', title: 'Fake render', description: 'Renders a file where it is.', args: ['render', '{file}'], out: { name: '{dir:file}' },
+      params: { file: { type: 'path', required: true, reads: ['brand', 'clips.image', 'clips.images', 'clips.logo'], description: 'A film.json.' } },
+    };
+    mkdirSync(path.join(baseDir, 'plan'));
+    const film = path.join(baseDir, 'plan', 'film.json');
+    const reads = json => {
+      writeFileSync(film, typeof json === 'string' ? json : JSON.stringify(json));
+      return buildCommand(render, { file: 'plan/film.json' }, { baseDir, installed: new Map() }).reads;
+    };
+    assert.deepEqual(reads({
+      brand: 'brand/brand.json',
+      clips: [
+        { kind: 'screen', image: '../shots/01.png' },
+        { kind: 'shots', images: ['/abs/a.png', '../shots/01.png', 3, ''] },
+        { kind: 'logo', logo: 'brand/logo-01.png', icon: 'brand/icon.png' },
+        { kind: 'scene', scene: { image: 'not-a-clip-field.png' } },
+      ],
+      music: 'track.mp3',
+    }), [film, path.join(baseDir, 'plan', 'brand', 'brand.json'), path.join(baseDir, 'shots', '01.png'), '/abs/a.png', path.join(baseDir, 'plan', 'brand', 'logo-01.png')]);
+    // A file that is no JSON, or JSON with nothing at those places, names nothing more.
+    assert.deepEqual(reads('{ not json'), [film]);
+    assert.deepEqual(reads([1, 2]), [film]);
+    assert.deepEqual(reads({ clips: 'none' }), [film]);
+    // Without reads, the file alone.
+    const plain = structuredClone(render);
+    delete plain.params.file.reads;
+    writeFileSync(film, JSON.stringify({ brand: 'brand/brand.json' }));
+    assert.deepEqual(buildCommand(plain, { file: 'plan/film.json' }, { baseDir, installed: new Map() }).reads, [film]);
+    // An address is no file, and reads nothing.
+    const stills = tool('make_launch_stills');
+    assert.deepEqual(buildCommand(stills, { source: 'https://example.com', out_dir: 'x' }, { baseDir, installed: new Map() }).reads, []);
+    // Only a parameter that takes a file reads the files it names, as places in it.
+    const kit = { kit: 'k', package: 'k', field: 'f', about: 'a', repository: 'r', needs: [], tools: [structuredClone(render)] };
+    validateKitDefinition(kit);
+    for (const [change, problem] of [
+      [param => { param.type = 'string'; param.flag = '--file'; delete param.required; }, /only a parameter that takes a file reads files it names/],
+      [param => { param.reads = []; }, /reads lists places in the file/],
+      [param => { param.reads = ['clips[0].image']; }, /reads lists places in the file/],
+      [param => { param.reads = 'brand'; }, /reads lists places in the file/],
+    ]) {
+      const broken = structuredClone(kit);
+      change(broken.tools[0].params.file);
+      if (broken.tools[0].params.file.type === 'string') broken.tools[0].args = ['render'];
+      assert.throws(() => validateKitDefinition(broken), problem);
+    }
+  } finally {
+    rmSync(baseDir, { recursive: true, force: true });
+  }
 });
 
 test('a job that ended keeps its own files and notes, so read again after later jobs saved in its folder, or in one inside it, it is still its own', async () => {

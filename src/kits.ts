@@ -52,6 +52,13 @@ export interface ParamDefinition {
    * it on disk, and so is a file it does not match, since the kit would read it as an address.
    */
   filePattern?: string;
+  /**
+   * For a file the kit reads as JSON, like a film.json: the places in it that name other
+   * files the kit reads, each a path from that file's folder, like brand and clips.image for
+   * the image of each clip. A job does not start while another writes in a folder that holds
+   * one of them, as for the file itself (LocalBackend).
+   */
+  reads?: string[];
   min?: number;
   max?: number;
   /**
@@ -460,6 +467,12 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
       if (param.filePattern !== undefined) {
         if (param.type !== 'url_or_path') fail(`${tool.name}.${name}: only url_or_path takes a filePattern`);
         if (!isPattern(param.filePattern)) fail(`${tool.name}.${name}: the filePattern is not a regular expression`);
+      }
+      if (param.reads !== undefined) {
+        if (!FILE_TYPES.has(param.type)) fail(`${tool.name}.${name}: only a parameter that takes a file reads files it names`);
+        if (!(Array.isArray(param.reads) && param.reads.length && param.reads.every(place => typeof place === 'string' && LISTED.test(place)))) {
+          fail(`${tool.name}.${name}: reads lists places in the file, like brand or clips.image`);
+        }
       }
       if ((param.min !== undefined || param.max !== undefined) && param.type !== 'integer' && param.type !== 'number') {
         fail(`${tool.name}.${name}: only numbers take min and max`);
