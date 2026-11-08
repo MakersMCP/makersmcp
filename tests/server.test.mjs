@@ -318,6 +318,30 @@ test('a call that gives a file from a running job\'s folder, or a film.json that
   });
 });
 
+test('a call that cannot save elsewhere, refused for a job in a folder inside its own, is told to call again', async () => {
+  // Like render_launch_film, and make_launch_stills given a film.json, while a check runs in check/ next to the film:
+  // only the folders overlap, and the call reads nothing that job writes.
+  const kits = structuredClone(definitions);
+  kits[0].tools.push({
+    name: 'fake_render', title: 'Fake render', description: 'Renders a file where it is.', args: ['render', '{file}'],
+    out: { name: '{dir:file}' }, params: { file: { type: 'path', required: true, description: 'A file.' } },
+  });
+  await withClient({ definitions: kits }, async (client, outDir) => {
+    mkdirSync(path.join(outDir, 'film'));
+    writeFileSync(path.join(outDir, 'film', 'film.json'), '{}\n');
+    const check = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: 'film/check', wait_seconds: 0 } });
+    const jobId = check.structuredContent.job_id;
+    assert.ok(jobId, text(check));
+    const busy = (title, then) => `## ${title}: not started\n\n${jobId} (fake_make) is still writing to ${path.join(outDir, 'film', 'check')}, inside ${path.join(outDir, 'film')}. Wait for it with wait_for_job (job_id ${jobId}), ${then}`;
+    assert.equal(text(await client.callTool({ name: 'fake_render', arguments: { file: 'film/film.json', wait_seconds: 0 } })), busy('Fake render', 'then call fake_render again.'));
+    // Given a file, fake_file saves next to it and takes no other out_dir; given an address, it takes one.
+    assert.equal(text(await client.callTool({ name: 'fake_file', arguments: { file: 'film/film.json', wait_seconds: 0 } })), busy('Fake file', 'then call fake_file again.'));
+    assert.equal(text(await client.callTool({ name: 'fake_file', arguments: { file: 'https://slow.example.com', out_dir: 'film', wait_seconds: 0 } })), busy('Fake file', 'or give another out_dir.'));
+    const done = await client.callTool({ name: 'wait_for_job', arguments: { job_id: jobId, wait_seconds: 20 } });
+    assert.equal(done.structuredContent.status, 'done', text(done));
+  });
+});
+
 test('a file a running job cleared to write it again, or has not written yet, is waited for as one of its files that is there, and a file no running job writes is not there', async () => {
   const kits = structuredClone(definitions);
   kits[0].tools.push(
@@ -352,11 +376,24 @@ test('a file a running job cleared to write it again, or has not written yet, is
     writeFileSync(at('beside.mp4'), 'a film');
     assert.equal(text(await call('fake_look', { file: 'beside.mp4', cues: 'film/parts/cues.json', out_dir: 'elsewhere' })), busy('Fake look', at('film', 'parts', 'cues.json'), 'fake_look'));
     assert.equal(text(await call('fake_file', { file: 'film/plan.json' })), busy('Fake file', at('film', 'plan.json'), 'fake_file'));
+    // A job of the same tool counts as any other, like a second plan given the words of a first one still running,
+    // for a file that is there and one that is not.
+    writeFileSync(at('slow.mp4'), 'a film');
+    mkdirSync(at('looks'));
+    writeFileSync(at('looks', 'old.md'), 'an earlier note');
+    const look = await call('fake_look', { file: 'slow.mp4', out_dir: 'looks' });
+    const lookId = look.structuredContent.job_id;
+    assert.ok(lookId, text(look));
+    const sameTool = file => `## Fake look: not started\n\n${lookId} (fake_look) is still writing to ${at('looks')}, which holds ${at('looks', file)}. Wait for it with wait_for_job (job_id ${lookId}), then call fake_look again.`;
+    assert.equal(text(await call('fake_look', { file: 'looks/old.md', out_dir: 'elsewhere' })), sameTool('old.md'));
+    assert.equal(text(await call('fake_look', { file: 'looks/REPORT.md', out_dir: 'elsewhere' })), sameTool('REPORT.md'));
     // A file in no running job's folder is not there, however close its name, as before.
     assert.equal(text(await call('fake_look', { file: 'film2/new.mp4', out_dir: 'elsewhere' })), `## Fake look: not started\n\nfile: there is nothing at ${at('film2', 'new.mp4')}`);
 
-    const done = await client.callTool({ name: 'wait_for_job', arguments: { job_id: jobId, wait_seconds: 20 } });
-    assert.equal(done.structuredContent.status, 'done', text(done));
+    for (const id of [jobId, lookId]) {
+      const done = await client.callTool({ name: 'wait_for_job', arguments: { job_id: id, wait_seconds: 20 } });
+      assert.equal(done.structuredContent.status, 'done', text(done));
+    }
     // The job wrote its report again, so a check of it runs; a file it never wrote is not there.
     const looked = await client.callTool({ name: 'fake_look', arguments: { file: 'film/REPORT.md', out_dir: 'elsewhere', wait_seconds: 20 } });
     assert.equal(looked.structuredContent.status, 'done', text(looked));
@@ -406,6 +443,7 @@ test('the files a parameter reads come from the places of its JSON file, read fr
       [param => { param.type = 'string'; param.flag = '--file'; delete param.required; }, /only a parameter that takes a file reads files it names/],
       [param => { param.reads = []; }, /reads lists places in the file/],
       [param => { param.reads = ['clips[0].image']; }, /reads lists places in the file/],
+      [param => { param.reads = ['clips..image']; }, /reads lists places in the file/],
       [param => { param.reads = 'brand'; }, /reads lists places in the file/],
     ]) {
       const broken = structuredClone(kit);

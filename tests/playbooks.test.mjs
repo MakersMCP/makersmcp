@@ -235,14 +235,100 @@ function launchFilmNames() {
   return found;
 }
 
-/** Every text file of a folder, for the errors a kit says. */
-function textFiles(dir, into = []) {
+// Words after which a / starts a regular expression, not a division.
+const BEFORE_PATTERN = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete', 'void', 'throw', 'instanceof', 'yield', 'await']);
+
+/**
+ * A JavaScript or TypeScript source with each comment blanked and every other character, its
+ * string and template literals among them, where it was. A comment, like a README, is prose,
+ * which holds any short run of words: ", which keeps" is in some kit's comments and docs, and
+ * in none of its messages.
+ */
+function withoutComments(source) {
+  const out = source.split('');
+  const n = source.length;
+  // The braces open in the ${...} of each template literal the scan is in, innermost last.
+  const templates = [];
+  let at = 0;
+  let last = '';
+  let word = '';
+  const blank = (from, to) => {
+    for (let i = from; i < to; i++) if (out[i] !== '\n') out[i] = ' ';
+  };
+  // A template's text from `at` to its closing backtick, or into its next ${.
+  const templateText = () => {
+    while (at < n) {
+      const char = source[at];
+      if (char === '\\') {
+        at += 2;
+      } else if (char === '`') {
+        at++;
+        templates.pop();
+        last = '`';
+        return;
+      } else if (char === '$' && source[at + 1] === '{') {
+        at += 2;
+        templates[templates.length - 1] = 1;
+        last = '{';
+        return;
+      } else {
+        at++;
+      }
+    }
+  };
+  while (at < n) {
+    const char = source[at];
+    word = /[\w$]/.test(last) ? word : '';
+    if (char === '/' && (source[at + 1] === '/' || source[at + 1] === '*')) {
+      const end = source[at + 1] === '/' ? source.indexOf('\n', at) : source.indexOf('*/', at + 2);
+      const stop = end < 0 ? n : source[at + 1] === '/' ? end : end + 2;
+      blank(at, stop);
+      at = stop;
+    } else if (char === '"' || char === "'") {
+      for (at++; at < n && source[at] !== char && source[at] !== '\n'; at += source[at] === '\\' ? 2 : 1);
+      at++;
+      last = char;
+    } else if (char === '`') {
+      at++;
+      templates.push(0);
+      templateText();
+    } else if (templates.length && templates[templates.length - 1] > 0 && (char === '{' || char === '}')) {
+      // A brace inside a template's ${...}: the one that closes it goes back to the template's text.
+      at++;
+      last = char;
+      if (char === '{') templates[templates.length - 1]++;
+      else if (--templates[templates.length - 1] === 0) templateText();
+    } else if (char === '/' && (last === '' || /[(,=:[!&|?{};+\-*%<>~^]/.test(last) || BEFORE_PATTERN.has(word))) {
+      // A regular expression, read to its closing / outside a character class, then its flags.
+      let inClass = false;
+      for (at++; at < n && source[at] !== '\n'; at++) {
+        if (source[at] === '\\') at++;
+        else if (source[at] === '[') inClass = true;
+        else if (source[at] === ']') inClass = false;
+        else if (source[at] === '/' && !inClass) break;
+      }
+      for (at++; at < n && /[a-z]/i.test(source[at]); at++);
+      last = '/';
+    } else {
+      if (/[\w$]/.test(char)) word = /[\w$]/.test(last) ? word + char : char;
+      if (!/\s/.test(char)) last = char;
+      at++;
+    }
+  }
+  return out.join('');
+}
+
+/**
+ * The code of every JavaScript and TypeScript file of a folder, comments blanked, for the
+ * errors a kit says: a message is in its literals, never in a comment or a Markdown file.
+ */
+function codeTexts(dir, into = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) textFiles(full, into);
-    } else if (/\.(?:[cm]?js|ts|md)$/.test(entry.name) && statSync(full).size < 2_000_000) {
-      into.push(readFileSync(full, 'utf8'));
+      if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) codeTexts(full, into);
+    } else if (/\.(?:[cm]?js|ts)$/.test(entry.name) && statSync(full).size < 2_000_000) {
+      into.push(withoutComments(readFileSync(full, 'utf8')));
     }
   }
   return into;
@@ -849,7 +935,7 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
 
         // Errors quoted as a result shows them.
         for (const quote of quotedErrors(markdown)) {
-          if (!knownError(quote, errorTexts)) add(where, `the error "${quote}" is in no kit's files, no file of makersmcp's src and not in tests/fixtures/hosted-errors.json`);
+          if (!knownError(quote, errorTexts)) add(where, `the error "${quote}" is in no kit's code, not in makersmcp's src and not in tests/fixtures/hosted-errors.json`);
         }
       }
 
@@ -1026,9 +1112,8 @@ async function resultProblems(definitions, dir, config, tool, view, state, topic
   return problems;
 }
 
-const fixtureCorpus = () => [
-  ...readdirSync(path.join(FIXTURES, 'sources')).map(file => readFileSync(path.join(FIXTURES, 'sources', file), 'utf8')),
-];
+// The fixture kits' code, read as the package's kits are: a README.md there is no kit's message, and neither is a comment.
+const fixtureCorpus = () => codeTexts(path.join(FIXTURES, 'sources'));
 const FIXTURE_BUDGETS = { topicMin: 50, startedMax: 6000, threeMax: 45000, descriptionMin: 100, descriptionMax: 1200 };
 
 /** A copy of the fixture topics with one change, in a folder of its own. */
@@ -1055,7 +1140,7 @@ test('the lint finds each kind of fault in a fixture broken one rule at a time',
     [{ 'painting.md': text => text.replace('"picture": "pictures/example/picture.png"', '"picture": "job:<job_id>/picture.png"') }, /a job: reference in a local call/],
     [{ 'painting.md': text => text.replace('`layers`, `length`', '`layerz`, `length`') }, /`layerz` is not a tool/],
     [{ 'painting.md': text => text.replace('Read `PAINT.md`', 'Read `PAINTS.md`') }, /`PAINTS\.md` is a file no tool this server lists writes/],
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> could not be opened as a picture"') }, /the error "<file> could not be opened as a picture" is in no kit's files/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> could not be opened as a picture"') }, /the error "<file> could not be opened as a picture" is in no kit's code/],
     [{ 'painting.md': text => text.replace('A job stops after {limit:job_minutes} here, and', 'Save it in out_dir, and') }, /painting\.md, hosted.*out_dir, which a hosted server does not take/],
     [{ 'painting.md': text => text.replace('`keep` keeps the work files.', '`keep` keeps the work files. Give job:<job_id>/x.png.') }, /painting\.md, local.*a job: reference/],
     [{ 'painting.md': text => text.replace('checks it. It runs', 'checks it \u2014 it runs') }, /an em or en dash/],
@@ -1072,7 +1157,10 @@ test('the lint finds each kind of fault in a fixture broken one rule at a time',
     [{ 'painting.md': text => text.replace('description: Paints a picture', 'description: Saves in ~/paint on this machine. Paints a picture') }, /the resource makersmcp:\/\/playbooks\/painting's title and description, hosted.*on this machine/],
     [{ 'painting.md': text => text.replace('description: Paints a picture', 'description: Mixes with mix_sound. Paints a picture') }, /the resource makersmcp:\/\/playbooks\/painting's title and description, local, paintkit alone: names mix_sound/],
     // A word written beside a variable part is a word of the kit's own message.
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> then could not be read as a picture"') }, /the error "<file> then could not be read as a picture" is in no kit's files/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> then could not be read as a picture"') }, /the error "<file> then could not be read as a picture" is in no kit's code/],
+    // A quote's words in a kit's comment or in a Markdown file beside its code are prose, not a message of the kit.
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> is cut down to its widest side first"') }, /the error "<file> is cut down to its widest side first" is in no kit's code/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> keeps the last good copy of a picture"') }, /the error "<file> keeps the last good copy of a picture" is in no kit's code/],
     // A topic named in code, or as one to read, is one the server offers.
     [{ 'painting.md': text => text.replace('3. No sound kit is on here, so the picture stays silent.', '3. The `sound` topic has the rest.') }, /painting\.md, .*paintkit alone: names the sound topic, which this server does not offer/],
     [{ 'painting.md': text => text.replace('3. No sound kit is on here, so the picture stays silent.', '3. Read `sound` for a sound.') }, /painting\.md, .*paintkit alone: names the sound topic, which this server does not offer/],
@@ -1118,12 +1206,12 @@ test('the kits in kits/ and the topics in playbooks/ pass every check of the lin
   const corpus = [
     ...definitions.flatMap(kit => {
       const installed = resolveKit(kit);
-      return installed.dir ? textFiles(installed.dir) : [];
+      return installed.dir ? codeTexts(installed.dir) : [];
     }),
-    ...textFiles(path.join(here, '..', 'src')),
+    ...codeTexts(path.join(here, '..', 'src')),
     ...readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors.map(entry => entry.text),
     // The schema's refusals and an unknown tool, as the SDK and zod word them.
-    ...['@modelcontextprotocol/sdk/server/mcp.js', 'zod/v4/locales/en.js'].map(name => readFileSync(requireHere.resolve(name), 'utf8')),
+    ...['@modelcontextprotocol/sdk/server/mcp.js', 'zod/v4/locales/en.js'].map(name => withoutComments(readFileSync(requireHere.resolve(name), 'utf8'))),
   ];
   // The SDK puts a schema's refusal together from two of its files: the tool in mcp.js, each reason with its place in zod-compat.js.
   const sdk = name => readFileSync(requireHere.resolve(`@modelcontextprotocol/sdk/server/${name}`), 'utf8');
