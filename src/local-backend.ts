@@ -1,4 +1,4 @@
-import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readSync, realpathSync, type BigIntStats } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readSync, realpathSync, type BigIntStats, type Stats } from 'node:fs';
 import path from 'node:path';
 import { ArgumentError, buildCommand, expandHome } from './args.js';
 import {
@@ -53,20 +53,21 @@ function resolved(folder: string): string | undefined {
 }
 
 /**
- * The files in a folder, relative to it, at most MAX_FILES: a folder's own files in
- * name order before the files in its subfolders. With `since`, only the files changed
- * from then on, which for a job are the files it saved, whatever the folder held before.
- * Links are left out, and no folder is entered through one. With `within`, for a folder
- * a kit wrote under confine, a folder that leads out of `within`, like one a kit swapped
- * for a link, is not looked in: given such a folder, it lists nothing.
+ * Visits each file in a folder, a folder's own files in name order before the files in its
+ * subfolders, with its path relative to the folder and what the disk says of it, until
+ * `visit` returns false. Hidden files and node_modules are left out, and so are links, and
+ * no folder is entered through one. With `within`, for a folder a kit wrote under confine,
+ * a folder that leads out of `within`, like one a kit swapped for a link, is not looked
+ * in: given such a folder, it visits nothing. Gives whether it looked at every entry,
+ * which it does not once it has looked at MAX_ENTRIES.
  */
-export function listFiles(folder: string, since?: number, within?: string): JobFile[] {
-  const files: JobFile[] = [];
+function eachFile(folder: string, within: string | undefined, visit: (relative: string, stat: Stats) => boolean): boolean {
   const root = within === undefined ? undefined : resolved(within);
-  if (within !== undefined && root === undefined) return files;
+  if (within !== undefined && root === undefined) return true;
   const queue = [folder];
   let seen = 0;
-  while (queue.length && files.length < MAX_FILES && seen < MAX_ENTRIES) {
+  while (queue.length) {
+    if (seen >= MAX_ENTRIES) return false;
     const dir = queue.shift()!;
     if (root !== undefined) {
       const real = resolved(dir);
@@ -80,7 +81,7 @@ export function listFiles(folder: string, since?: number, within?: string): JobF
     }
     const sorted = entries.filter(entry => !skipped(entry.name)).sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of sorted) {
-      if (files.length >= MAX_FILES || ++seen > MAX_ENTRIES) break;
+      if (++seen > MAX_ENTRIES) return false;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         queue.push(full);
@@ -95,11 +96,57 @@ export function listFiles(folder: string, since?: number, within?: string): JobF
         // Gone since the folder was read, like a lock file or a kit's work file.
         continue;
       }
-      if (!stat.isFile()) continue;
-      if (since !== undefined && stat.mtimeMs < since - MTIME_SLACK_MS) continue;
-      files.push({ path: path.relative(folder, full), bytes: stat.size });
+      if (stat.isFile() && !visit(path.relative(folder, full), stat)) return true;
     }
   }
+  return true;
+}
+
+/**
+ * What a file is as the disk tells it, its number on the disk, its size and the times it
+ * was written and changed, to tell whether a job wrote it.
+ */
+function stampOf(stat: Stats): string {
+  return `${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+}
+
+/** The files a folder holds as a job starts, by their path in it, to tell the files the job saves or changes there. */
+export interface FolderStamps {
+  stamps: Map<string, string>;
+  /** Whether every file was stamped: not when the folder holds more than MAX_ENTRIES entries. */
+  complete: boolean;
+}
+
+/** What each file in a folder is now, as listFiles looks at them. */
+export function folderStamps(folder: string, within?: string): FolderStamps {
+  const stamps = new Map<string, string>();
+  const complete = eachFile(folder, within, (relative, stat) => {
+    stamps.set(relative, stampOf(stat));
+    return true;
+  });
+  return { stamps, complete };
+}
+
+/**
+ * The files in a folder, relative to it, at most MAX_FILES: a folder's own files in name
+ * order before the files in its subfolders. With `before`, the folder's files as a job
+ * started (folderStamps), only the files that are new or that changed since, which are the
+ * files the job saved, whatever the folder held before; a file with no stamp in a folder
+ * too large to stamp whole counts only when it changed after `since`, the job's start.
+ * With `since` alone, only the files changed from then on. Links are left out, and no
+ * folder is entered through one. With `within`, for a folder a kit wrote under confine, a
+ * folder that leads out of `within`, like one a kit swapped for a link, is not looked in:
+ * given such a folder, it lists nothing.
+ */
+export function listFiles(folder: string, since?: number, within?: string, before?: FolderStamps): JobFile[] {
+  const files: JobFile[] = [];
+  const old = (stat: Stats) => since !== undefined && stat.mtimeMs < since - MTIME_SLACK_MS;
+  eachFile(folder, within, (relative, stat) => {
+    const was = before?.stamps.get(relative);
+    const unchanged = before === undefined ? old(stat) : was !== undefined ? was === stampOf(stat) : !before.complete && old(stat);
+    if (!unchanged) files.push({ path: relative, bytes: stat.size });
+    return files.length < MAX_FILES;
+  });
   return files;
 }
 
@@ -214,6 +261,36 @@ function toolSettings(kit: KitDefinition, tool: ToolDefinition, installed: Map<s
   return lists;
 }
 
+/** What a job that ended done saved in its folder, and its kit's notes there, as they were when it ended. */
+interface Saved {
+  files: JobFile[];
+  docs: JobDoc[];
+}
+
+const SAVED = new WeakMap<Job, Saved>();
+
+/**
+ * Keeps, as the job ends done, the files it saved or changed in its folder against what the
+ * folder held as it started (`before`), and its docs, so every later view of it gives that
+ * job's own result, even after a later job saved in that folder or in one inside it.
+ */
+function keepSaved(job: Job, before: FolderStamps | undefined): void {
+  const keep = () => {
+    const { spec } = job;
+    if (job.status !== 'done' || !spec.folder) return;
+    try {
+      SAVED.set(job, {
+        files: listFiles(spec.folder, job.startedAt, spec.within, before),
+        docs: readDocs(spec.folder, spec.docs, spec.within),
+      });
+    } catch {
+      // A view then lists the folder as it is (viewJob).
+    }
+  };
+  if (job.status === 'running') job.once('end', keep);
+  else keep();
+}
+
 /** A job of this machine as the tools show it. */
 export function viewJob(job: Job): JobView {
   const { spec } = job;
@@ -238,8 +315,10 @@ export function viewJob(job: Job): JobView {
     // What the kit said at the end: its summary on stdout, or its last lines when it writes only to stderr.
     view.summary = job.stdout.trim() || tail(job.stderr, 12);
     if (spec.folder) {
-      view.files = listFiles(spec.folder, job.startedAt, spec.within);
-      view.docs = readDocs(spec.folder, spec.docs, spec.within);
+      // As the job ended, when LocalBackend started it; a job started elsewhere lists its folder as it is.
+      const saved = SAVED.get(job);
+      view.files = saved ? [...saved.files] : listFiles(spec.folder, job.startedAt, spec.within);
+      view.docs = saved ? [...saved.docs] : readDocs(spec.folder, spec.docs, spec.within);
     }
   }
   return view;
@@ -333,8 +412,12 @@ export class LocalBackend implements KitBackend {
       );
     }
 
+    const within = this.confine ? this.baseDir : undefined;
+    // What the folder holds before the kit starts, so the job lists only the files it saves or changes.
+    const before = command.folder ? folderStamps(command.folder, within) : undefined;
+    let job: Job;
     try {
-      return viewJob(this.jobs.start({
+      job = this.jobs.start({
         kit: installed.definition.kit,
         tool: tool.name,
         title: tool.title,
@@ -347,9 +430,9 @@ export class LocalBackend implements KitBackend {
         report: tool.report,
         env,
         ...(this.launcher ? { launcher: this.launcher } : {}),
-        ...(this.confine ? { within: this.baseDir } : {}),
+        ...(within !== undefined ? { within } : {}),
         inputs: command.inputs,
-      }));
+      });
     } catch (error) {
       if (error instanceof FolderBusyError) {
         throw new NotStartedError(
@@ -359,6 +442,8 @@ export class LocalBackend implements KitBackend {
       }
       throw error;
     }
+    keepSaved(job, before);
+    return viewJob(job);
   }
 
   async wait(id: string, seconds: number, options: WaitOptions = {}): Promise<JobView | undefined> {

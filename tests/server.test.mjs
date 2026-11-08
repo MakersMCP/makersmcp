@@ -206,6 +206,35 @@ test('a job whose folder is inside a running job\'s folder, or holds it, is refu
   });
 });
 
+test('a job that ended keeps its own files and notes, so read again after later jobs saved in its folder, or in one inside it, it is still its own', async () => {
+  await withClient({}, async (client, outDir) => {
+    const call = async (name, args) => {
+      const result = await client.callTool({ name, arguments: { ...args, wait_seconds: 20 } });
+      assert.equal(result.structuredContent?.status, 'done', text(result));
+      return result.structuredContent;
+    };
+    const paths = job => job.files.map(file => file.path);
+    const first = await call('fake_make', { url: 'https://first.example.com', out_dir: 'film' });
+    assert.deepEqual(paths(first), ['REPORT.md', path.join('parts', 'data.json')]);
+    // Started a moment after the first ended, in the same folder: the first's parts/data.json is not its own.
+    const report = await call('fake_report', { url: 'https://good.example.com', out_dir: 'film' });
+    assert.deepEqual(paths(report), ['REPORT.md']);
+    const check = await call('fake_report', { url: 'https://good.example.com', out_dir: 'film/check' });
+    assert.deepEqual(paths(check), ['REPORT.md']);
+    await call('fake_make', { url: 'https://last.example.com', out_dir: 'film' });
+
+    const again = await client.callTool({ name: 'wait_for_job', arguments: { job_id: first.job_id } });
+    assert.deepEqual(paths(again.structuredContent), ['REPORT.md', path.join('parts', 'data.json')]);
+    assert.match(text(again), /### REPORT\.md\n\n# Report\n\nMade from https:\/\/first\.example\.com\./);
+    assert.doesNotMatch(text(again), /last\.example\.com/);
+    const reportAgain = await client.callTool({ name: 'wait_for_job', arguments: { job_id: report.job_id } });
+    assert.deepEqual(paths(reportAgain.structuredContent), ['REPORT.md']);
+    assert.match(text(reportAgain), /### REPORT\.md\n\n# PASS\n\nhttps:\/\/good\.example\.com/);
+    const listed = (await client.callTool({ name: 'list_jobs', arguments: {} })).structuredContent.jobs;
+    assert.deepEqual(listed.map(job => [job.tool, job.file_count]), [['fake_make', 2], ['fake_report', 1], ['fake_report', 1], ['fake_make', 2]]);
+  });
+});
+
 test('cancel_job stops a running job', async () => {
   await withClient({}, async client => {
     const started = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', wait_seconds: 0 } });

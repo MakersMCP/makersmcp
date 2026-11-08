@@ -90,7 +90,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 <!-- local -->
 - The brand, font and screenshot kits clear what an earlier run left in the folder as they start, so a run of theirs that fails or is canceled loses it too. musicfit, a render and a check replace their files only when they succeed. Before a run into a folder that holds a result the user wants, give another `out_dir`.
-- A result lists the files the job saved or changed in its folder, without hidden files: 40 in the text and up to 200 in `files`. The kit's notes come after them.
+- A result lists the files the job saved or changed in its folder, without hidden files: 40 in the text and up to 200 in `files`. The kit's notes come after them. The list and the notes stay as they were when the job ended: what a later job saves in that folder, or in one inside it, never shows under this one, though it may have replaced some of these files since.
 <!-- end -->
 
 <!-- hosted -->
