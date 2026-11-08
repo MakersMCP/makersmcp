@@ -44,9 +44,9 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- with easyscreenshotkit -->
   Screenshots canceled part way can leave some of the pictures without their manifest.json, and `take_screenshots` then refuses that folder: give the next run another `out_dir`.
 <!-- end -->
-- Jobs run side by side as far as the machine allows: four jobs that each opened Chrome have run at once. Two jobs never write into one folder, nor one into a folder inside the other's, since each would list the other's files as its own: the second is refused with "<job_id> (<tool>) is still writing to <folder>" and "Wait for it with wait_for_job (job_id <job_id>), or give another out_dir."
+- Jobs run side by side as far as the machine allows: four jobs that each opened Chrome have run at once. Two jobs never write into one folder, nor one into a folder inside the other's, since each would list the other's files as its own: the second is refused with "<job_id> (<tool>) is still writing to <folder>" and "Wait for it with wait_for_job (job_id <job_id>), or give another out_dir." A call that cannot save anywhere else gets "Wait for it with wait_for_job (job_id <job_id>), then call <tool> again." instead.
 <!-- with launch-film -->
-  A check of a film, which saves in check/ next to it, and pictures made from its film.json, which save in the film's folder, are such a pair: run them one after the other.
+  A check of a film, which saves in check/ next to it, and a render or pictures made from its film.json, which save in the film's folder, are such a pair: run them one after the other.
 <!-- end -->
 <!-- end -->
 <!-- hosted -->

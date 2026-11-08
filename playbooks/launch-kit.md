@@ -142,7 +142,7 @@ plan_launch_film {"url": "https://linear.app", "brand": "job:<job_id>/brand.json
 <!-- end -->
 4. Render each plan with `render_launch_film`.
 <!-- with check_video -->
-   Check each film at once with `check_video` and `expect` {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16. Its `CHECK.md` gives the film's length under its heading and each cut's time in its Cuts table, the logo close last.
+   Once each render is done, check its film with `check_video` and `expect` {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16. Its `CHECK.md` gives the film's length under its heading and each cut's time in its Cuts table, the logo close last.
 <!-- end -->
 <!-- local -->
 ```call

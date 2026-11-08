@@ -206,6 +206,34 @@ test('a job whose folder is inside a running job\'s folder, or holds it, is refu
   });
 });
 
+test('a job refused for a running job\'s folder is offered another out_dir only when it can take one, and is told to call again when its folder follows its file', async () => {
+  // A tool like render_launch_film, whose folder is the one its file is in and which takes no out_dir.
+  const kits = structuredClone(definitions);
+  kits[0].tools.push({
+    name: 'fake_render', title: 'Fake render', description: 'Renders a file where it is.', args: ['render', '{file}'],
+    out: { name: '{dir:file}' }, params: { file: { type: 'path', required: true, description: 'A file.' } },
+  });
+  await withClient({ definitions: kits }, async (client, outDir) => {
+    mkdirSync(path.join(outDir, 'film'));
+    writeFileSync(path.join(outDir, 'film', 'film.json'), '{}\n');
+    const film = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: 'film', wait_seconds: 0 } });
+    const jobId = film.structuredContent.job_id;
+    assert.ok(jobId, text(film));
+    const busy = (title, then) => `## ${title}: not started\n\n${jobId} (fake_make) is still writing to ${path.join(outDir, 'film')}. Wait for it with wait_for_job (job_id ${jobId}), ${then}`;
+    const render = await client.callTool({ name: 'fake_render', arguments: { file: 'film/film.json', out_dir: 'elsewhere', wait_seconds: 0 } });
+    assert.equal(text(render), busy('Fake render', 'then call fake_render again.'));
+    // Given a file, fake_file saves next to it and takes no other out_dir; given an address, it takes one.
+    const nextTo = await client.callTool({ name: 'fake_file', arguments: { file: 'film/film.json', wait_seconds: 0 } });
+    assert.equal(text(nextTo), busy('Fake file', 'then call fake_file again.'));
+    const address = await client.callTool({ name: 'fake_file', arguments: { file: 'https://slow.example.com', out_dir: 'film', wait_seconds: 0 } });
+    assert.equal(text(address), busy('Fake file', 'or give another out_dir.'));
+    const done = await client.callTool({ name: 'wait_for_job', arguments: { job_id: jobId, wait_seconds: 20 } });
+    assert.equal(done.structuredContent.status, 'done', text(done));
+    const again = await client.callTool({ name: 'fake_render', arguments: { file: 'film/film.json', wait_seconds: 20 } });
+    assert.equal(again.structuredContent.status, 'done', text(again));
+  });
+});
+
 test('a job that ended keeps its own files and notes, so read again after later jobs saved in its folder, or in one inside it, it is still its own', async () => {
   await withClient({}, async (client, outDir) => {
     const call = async (name, args) => {

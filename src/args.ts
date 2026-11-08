@@ -13,6 +13,11 @@ export interface BuiltCommand {
   args: string[];
   /** Where the kit writes, when it is known. */
   folder?: string;
+  /**
+   * Whether out_dir can give this call another folder: the tool takes one (out.flag), and
+   * the kit does not pick its folder from a file the call gave (out.otherwise).
+   */
+  movable: boolean;
   /** The files the call names, by parameter, as the kit gets them. */
   inputs: Record<string, string>;
 }
@@ -157,6 +162,7 @@ export function buildCommand(
   }
 
   let folder: string | undefined;
+  let movable = false;
   if (tool.out) {
     const given = typeof input.out_dir === 'string' && input.out_dir ? input.out_dir : undefined;
     const named = fill(tool.out.name, tool, values);
@@ -174,6 +180,7 @@ export function buildCommand(
       if (tool.out.flag) {
         refuseReplacing(tool, folder, values, files);
         args.push(tool.out.flag, folder);
+        movable = true;
       }
     }
     if (folder !== undefined) refuseRunFiles(tool, folder, inputs);
@@ -184,7 +191,7 @@ export function buildCommand(
     if (other) args.push(flag, other.script);
   }
 
-  return { args, folder, inputs };
+  return { args, folder, movable, inputs };
 }
 
 /**

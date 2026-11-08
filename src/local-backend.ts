@@ -435,10 +435,11 @@ export class LocalBackend implements KitBackend {
       });
     } catch (error) {
       if (error instanceof FolderBusyError) {
-        throw new NotStartedError(
-          `${error.message}. Wait for it with wait_for_job (job_id ${error.job.id}), or give another out_dir.`,
-          error.job.id,
-        );
+        // Another out_dir helps only a call that can take one: not one whose folder follows a file it gave.
+        const then = command.movable
+          ? `Wait for it with wait_for_job (job_id ${error.job.id}), or give another out_dir.`
+          : `Wait for it with wait_for_job (job_id ${error.job.id}), then call ${tool.name} again.`;
+        throw new NotStartedError(`${error.message}. ${then}`, error.job.id);
       }
       throw error;
     }
