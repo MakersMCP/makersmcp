@@ -48,7 +48,15 @@ make_brand_kit {"url": "https://linear.app", "facts": true}
    - The logo. "No logo found on the page." means the kit holds none.
    - The colors. A cookie wall, a login page or a loading screen gives colors that are not the brand's.
 3. Show `card.png` to the user: the name, the first screen, the logos, the colors and the fonts on one picture.
+<!-- local -->
 4. When the name, a logo or the colors are wrong, tell the user what came back and ask for the right page, the logo file or the colors. Never fill in a brand from a guess, since everything built on the kit would carry it.
+<!-- end -->
+<!-- hosted -->
+4. When the name, a logo or the colors are wrong, tell the user what came back and ask for the right page: no tool here takes a logo, colors or screens the user gives in place of the site's own. Never fill in a brand from a guess, since everything built on the kit would carry it.
+<!-- with launch-film -->
+   Before a film is made from this kit, ask whether to go on with it.
+<!-- end -->
+<!-- end -->
 
 ## What it writes
 
@@ -99,8 +107,11 @@ Each error as the result shows it, then the fix.
 
 <!-- local -->
 - "No Chrome, Chromium, Edge or Brave found. Install one, or point CHROME_PATH at its binary.": ask the user to install Chrome, or to set CHROME_PATH in this server's entry in the MCP client's settings and start the client again. A CHROME_PATH that `check_setup` lists as no program file, like a folder, stops the call before it starts with that same line, even when `check_setup` finds a browser elsewhere: ask the user to fix the setting, as the troubleshooting topic says.
-<!-- end -->
 - "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": ask the user for the logo file and the main colors.
+<!-- end -->
+<!-- hosted -->
+- "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": tell the user, and ask for a page that shows the brand, since no tool here takes a logo or colors the user gives.
+<!-- end -->
 - "<url> still shows no content after 30 s, so nothing was read. Try again, or check the page in a browser.": run once more with `timeout_seconds` {fact:easybrandkit.slow_timeout}, then ask the user to check the page.
 - "Could not open <url>: <reason>": the address does not answer, as with net::ERR_NAME_NOT_RESOLVED. Check it with the user.
 - "<url> is a page on <host>, not the brand's own site. Give the brand's website, or its App Store or Google Play listing.": find the product's own site, or ask for it.
@@ -111,7 +122,12 @@ Each error as the result shows it, then the fix.
 
 Notes in a finished result:
 
+<!-- local -->
 - "No logo was found on the page itself.": tell the user, and ask for the logo file.
+<!-- end -->
+<!-- hosted -->
+- "No logo was found on the page itself.": tell the user, and ask for a page that shows the logo, since no tool here takes a logo the user gives.
+<!-- end -->
 - "<url> is not the home page, so <home> was read instead: the home page carries the brand's own header and colors.": nothing to fix.
 - "<url> is a store listing that names no website, so only the listing was read: the kit has the app icon and screenshots but no logos, colors or fonts. Give the product's website for those.": make the kit again from the website.
 - A note that starts "Did not read" names a fact page left out. With "the site's robots.txt asks tools not to read it", the kit kept to robots.txt, so `FACTS.md` holds nothing from that page. With "the run ran out of time; give timeout_seconds more seconds", run again with a longer `timeout_seconds`.

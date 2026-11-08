@@ -59,7 +59,7 @@ check_video {"film": "job:<job_id>/film.mp4", "expect": "{fact:launch-film.size_
 | clipping | the sound never reaches full scale or sits flat on its peak |
 | cuts on beats | each hard cut is within {fact:launch-film.check_beat_frames} frame of a beat in `cues`; within {fact:launch-film.check_near_beat_frames} is a warning |
 
-A longer stretch is a warning to look at, not a failure. Black or silent stretches that add up to {fact:launch-film.check_most} of the film or more fail it, while a film mostly still only warns. The stretches given in `allow` count as meant. A steady frame rate and square pixels are checked too, as warnings.
+A longer stretch is a warning to look at, not a failure. Black or silent stretches that add up to {fact:launch-film.check_most} of the film or more fail it, except a sound that is silent throughout, which only warns, with "the sound is silent throughout", unless `lufs` is given; a film mostly still only warns. The stretches given in `allow` count as meant. A steady frame rate and square pixels are checked too, as warnings.
 
 ## Cuts
 
@@ -112,7 +112,7 @@ check_video {"film": "https://example.com/with-music.mp4", "cues": "https://exam
 
 ## A launch film's own numbers
 
-Its sound is normalized to {fact:launch-film.lufs_target} LUFS under a {fact:launch-film.true_peak} dBTP ceiling before it is encoded, and the film comes out louder: about {fact:launch-film.lufs} LUFS here, with a true peak that sometimes passes {fact:launch-film.check_true_peak} dBTP. A loudness or true peak failure on a launch film is how it was rendered: tell the user the measurement, and never render it again for that, since a render gives the same. A launch film planned with `music` false fails the silence check until a track is under it; with `sfx` false too it is silent throughout, which passes with the warning "the sound is silent throughout" unless `lufs` is given.
+Its sound is normalized to {fact:launch-film.lufs_target} LUFS under a {fact:launch-film.true_peak} dBTP ceiling before it is encoded, and the film comes out louder: about {fact:launch-film.lufs} LUFS here, with a true peak that sometimes passes {fact:launch-film.check_true_peak} dBTP. A loudness or true peak failure on a launch film is how it was rendered: tell the user the measurement, and never render it again for that, since a render gives the same. A launch film planned with `music` false fails the silence check until a track is under it; with `sfx` false too it is silent throughout, which only warns, as above.
 
 ## When the check cannot run
 

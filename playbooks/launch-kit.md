@@ -107,7 +107,7 @@ record_demo_video {"url": "https://linear.app", "wait_seconds": 0}
 <!-- with easyscreenshotkit -->
 2. Show `sheet.png`, and check that every page the places need is there.
 <!-- end -->
-3. Plan the film with `plan_launch_film`, so its words can be read before it renders. Give the `look` (`launch_film_guide` with topic looks says what each suits), `seconds` from {fact:launch-film.length_min} to {fact:launch-film.length_max} and the `aspect`, and `music` false when the user's track goes under the film. The plan never stretches a clip, so the film can come out several seconds short, most when the page has little to show; the render's film.timeline.json has its length. For the other shape, plan again with `words` set to the first plan's words.json and the other `aspect`, so both films say the same.
+3. Plan the film with `plan_launch_film`, so its words can be read before it renders. Give the `look` (`launch_film_guide` with topic looks says what each suits), `seconds` from {fact:launch-film.length_min} to {fact:launch-film.length_max} and the `aspect`, and `music` false when the user's track goes under the film. The plan never stretches a clip, so the film can end several seconds away from `seconds`, often short, most when the page has little to show; the render's film.timeline.json has its length. For the other shape, plan again with `words` set to the first plan's words.json and the other `aspect`, so both films say the same.
 <!-- without easybrandkit -->
    The plan reads the brand itself: check the name, logo and colors in its brand/BRAND.md before the render.
 <!-- local -->
