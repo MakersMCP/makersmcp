@@ -122,7 +122,7 @@ Check the film itself: its cuts against the track's beats come out the same, whi
 check_video {"film": "job:<film_job_id>/film.mp4", "expect": "{fact:launch-film.size_16_9}@{fact:launch-film.fps}", "cues": "job:<fit_job_id>/cues.json"}
 ```
 <!-- end -->
-- A film planned by `plan_launch_film` with `music` false fails the silence check until a track is under it.
+- A film planned by `plan_launch_film` with `music` false fails the silence check until a track is under it; with `sfx` false too it is silent throughout, which passes with the warning "the sound is silent throughout" unless `lufs` is given.
 - A track with no steady beat has empty `beats`, which `check_video` refuses.
 <!-- with easyscreenshotkit -->
 - For a demo, give `cuts` the clicks' `pressedAt` in seconds, like "2.25,4.632,7.017": `steps.json` is no cuts file.

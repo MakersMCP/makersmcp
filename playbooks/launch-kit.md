@@ -96,7 +96,13 @@ record_demo_video {"url": "https://linear.app", "wait_seconds": 0}
 <!-- end -->
 <!-- end -->
 <!-- with easybrandkit -->
-2. Show the user `card.png` and check the brand's name, logo and colors in `BRAND.md` before building on them. The kit takes the name from the page, or from the host when the page gives no short one, and the film shows that name. When the brand is wrong, as with a cookie wall, a login page or no logo, tell the user what came back and ask for the logo and colors before going on.
+2. Show the user `card.png` and check the brand's name, logo and colors in `BRAND.md` before building on them. The kit takes the name from the page, or from the host when the page gives no short one, and the film shows that name.
+<!-- local -->
+   When the brand is wrong, as with a cookie wall, a login page or no logo, tell the user what came back and ask for the logo and colors before going on.
+<!-- end -->
+<!-- hosted -->
+   When the brand is wrong, as with a cookie wall, a login page or no logo, tell the user what came back: no tool here takes a logo or colors the user gives, so ask whether to go on with it. For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, closes on the app's icon.
+<!-- end -->
 <!-- end -->
 <!-- with easyscreenshotkit -->
 2. Show `sheet.png`, and check that every page the places need is there.
@@ -210,7 +216,7 @@ fit_music {"track": "https://example.com/track.mp3", "length": "24", "hit": "18.
    - Give the user each picture and each film with what to look for: words cut off, text on text and a wrong logo. Nothing here checks a film or shows you a picture, so say the films were not checked.
 <!-- end -->
 <!-- with check_video -->
-   - A film planned with `music` false fails the silence check of `check_video` until a track is under it; its size, frame rate and cuts are still measured right.
+   - A film planned with `music` false fails the silence check of `check_video` until a track is under it; with `sfx` false too it is silent throughout, which passes with the warning "the sound is silent throughout" unless `lufs` is given. Its size, frame rate and cuts are still measured right.
 <!-- end -->
 
 <!-- local -->

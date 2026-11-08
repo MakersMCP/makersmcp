@@ -1,5 +1,5 @@
 {
-  "about": "The errors a hosted MakersMCP gives that no kit says, as a tool result shows them, with <...> for the variable parts. A playbook may quote these; tests/playbooks.test.mjs checks every error a topic quotes against the kits, makersmcp's src and this list. Each entry names where its text is made; MakersMCP-Api's and MakersMCP-Server's tests can keep this list true. Read from MakersMCP-Api c4e0afd and MakersMCP-Server e1c7fd6.",
+  "about": "The errors a hosted MakersMCP gives that no kit says, as a tool result shows them, with <...> for the variable parts. A playbook may quote these; tests/playbooks.test.mjs checks every error a topic quotes against the kits, makersmcp's src and this list. Each entry names where its text is made; MakersMCP-Api's and MakersMCP-Server's tests can keep this list true. Read from MakersMCP-Api origin/main bd34f07 and MakersMCP-Server origin/main 54ed753, and from their local mains where an entry names a commit not pushed yet, by its subject.",
   "errors": [
     { "text": "<tool> has no argument <name>.", "from": "MakersMCP-Api helpers/kits/kit-service.js inputProblem, a 400 from Kits/Start" },
     { "text": "<name> is required.", "from": "MakersMCP-Api helpers/kits/kit-service.js inputProblem" },
@@ -17,7 +17,7 @@
     { "text": "<name> must be text.", "from": "MakersMCP-Api helpers/kits/kit-service.js inputProblem" },
     { "text": "There is no tool <tool> in <kit>.", "from": "MakersMCP-Api helpers/kits/kit-service.js, a 404 from Kits/Start" },
     { "text": "<kit> is not running on makersmcp.com right now. Try again later.", "from": "MakersMCP-Api helpers/kits/kit-service.js, a 404 from Kits/Start" },
-    { "text": "<tool> is not available on makersmcp.com right now. Try again later.", "from": "MakersMCP-Api helpers/kits/kit-service.js, a 404 from Kits/Start" },
+    { "text": "<tool> is not available on makersmcp.com right now. Try again later.", "from": "MakersMCP-Api helpers/kits/kit-service.js, a 404 from Kits/Start (the local commit \"Kits catalog: a tool its ffmpeg cannot run is not offered (check_video, fit_music on 4.4.2)\")" },
     { "text": "You have <n> jobs running or waiting. Wait for one of them to end. Try again in 30 seconds.", "from": "MakersMCP-Api helpers/kits/kit-service.js, a 429 from Kits/Start, with MakersMCP-Server src/api-backend.ts tryAgain" },
     { "text": "You have used today's <n> jobs. Try again in <time>, after <date> UTC.", "from": "MakersMCP-Api helpers/kits/kit-service.js, a 429 from Kits/Start, with MakersMCP-Server src/api-backend.ts tryAgain" },
     { "text": "There is no job <job_id>. list_jobs shows your jobs.", "from": "MakersMCP-Api helpers/kits/kit-service.js, a 404 from Kits/Wait and Kits/Cancel" },
@@ -50,10 +50,11 @@
     { "text": "The job's folder holds too many files to check.", "from": "MakersMCP-Api helpers/kits/containment.js" },
     { "text": "The job's JSON documents hold too much text to check.", "from": "MakersMCP-Api helpers/kits/containment.js" },
     { "text": "A JSON document in the job nests too deep to check.", "from": "MakersMCP-Api helpers/kits/containment.js" },
-    { "text": "<name> has a visit to <address>, which is not an http or https address. A demo may only open web pages, not a file on the server or any other address.", "from": "MakersMCP-Api helpers/kits/steps-visits.js" },
-    { "text": "<name>: <why>.", "from": "MakersMCP-Api helpers/kits/steps-visits.js, a steps file it could not read" },
+    { "text": "<name> has a visit to <address>, which is not an http or https address. A demo may only open web pages, not a file on the server or any other address.", "from": "MakersMCP-Api helpers/kits/steps-visits.js (the local commit \"Kits containment: a demo's steps file may visit only http(s) pages, never a file: address\")" },
+    { "text": "<name>: <why>.", "from": "MakersMCP-Api helpers/kits/steps-visits.js, a steps file it could not read (the local commit \"Kits containment: a demo's steps file may visit only http(s) pages, never a file: address\")" },
     { "text": "The link's host <host> was not found.", "from": "MakersMCP-Api helpers/kits/fetch-input.js" },
     { "text": "The link's host <host> is not on the public internet.", "from": "MakersMCP-Api helpers/kits/fetch-input.js" },
+    { "text": "The link could not be opened: <reason>", "from": "MakersMCP-Api helpers/kits/fetch-input.js, a connection that fails, like a refused one or a TLS error" },
     { "text": "The link answered <status> instead of the file.", "from": "MakersMCP-Api helpers/kits/fetch-input.js" },
     { "text": "The file is over <n> MB.", "from": "MakersMCP-Api helpers/kits/fetch-input.js, 200 MB in production" },
     { "text": "The link took more than <n> minutes to send the file.", "from": "MakersMCP-Api helpers/kits/fetch-input.js, 5 minutes in production" },
@@ -62,13 +63,15 @@
     { "text": "Only http and https links work.", "from": "MakersMCP-Api helpers/kits/fetch-input.js" },
     { "text": "A link with a user name or password in it is not allowed.", "from": "MakersMCP-Api helpers/kits/fetch-input.js" },
     { "text": "The link redirects too many times.", "from": "MakersMCP-Api helpers/kits/fetch-input.js" },
+    { "text": "The link redirects to an address that is not a link.", "from": "MakersMCP-Api helpers/kits/fetch-input.js (the local commit \"Kits inputs: a link whose name holds a stray % is downloaded, and an answer not saved is closed at once\")" },
+    { "text": "The download stopped: <reason>", "from": "MakersMCP-Api helpers/kits/fetch-input.js, a download the network ends part way" },
     { "text": "The download was stopped.", "from": "MakersMCP-Api helpers/kits/fetch-input.js" },
     { "text": "It ran longer than <n> minutes and was stopped.", "from": "MakersMCP-Api helpers/kits/worker-job.js, 15 minutes in production" },
     { "text": "The check could not run on this input.", "from": "MakersMCP-Api helpers/kits/worker-job.js" },
     { "text": "The kit stopped without saying why.", "from": "MakersMCP-Api helpers/kits/worker-job.js" },
     { "text": "Something went wrong on our side. Try again in a while.", "from": "MakersMCP-Api helpers/kits/worker-job.js" },
-    { "text": "The kits are not available right now. Try again later.", "from": "MakersMCP-Api controllers/kits/api-kits.js, a 503 from Kits/Start while the job store is down (194f743)" },
-    { "text": "Waiting for a free worker", "from": "MakersMCP-Api helpers/kits/kit-service.js, the last line of a queued job (194f743)" },
-    { "text": "Held back: <tool> (<why>).", "from": "MakersMCP-Server src/api-backend.ts setupReport, a tool the catalog holds back (8527d59)" }
+    { "text": "The kits are not available right now. Try again later.", "from": "MakersMCP-Api controllers/kits/api-kits.js, a 503 from Kits/Start while the job store is down" },
+    { "text": "Waiting for a free worker", "from": "MakersMCP-Api helpers/kits/kit-service.js, the last line of a queued job" },
+    { "text": "Held back: <tool> (<why>).", "from": "MakersMCP-Server src/api-backend.ts setupReport, a tool the catalog holds back (the local commit \"Catalog: name in check_setup the tools a worker holds back, and why\")" }
   ]
 }
