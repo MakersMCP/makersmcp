@@ -4,8 +4,10 @@
 // fail exits 3, slow takes 3 seconds, bad fails a check, broken cannot run its
 // check, usage is an argument error followed by the usage text, noisy fails at
 // the end of a long log, tree starts a process of its own, like a browser,
-// and runs until it is stopped, and links leaves its report as a link to the
-// secret.env two folders up, a file it was not given.
+// and runs until it is stopped, links leaves its report as a link to the
+// secret.env two folders up, a file it was not given, and clear deletes the
+// report an earlier run left in its folder as it starts, as the real kits clear
+// their files.
 const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -39,6 +41,7 @@ if (isCheck && /broken/.test(target)) {
   process.stderr.write(`fakekit: ${target} could not be read\n`);
   process.exit(1);
 }
+if (out && /clear/.test(target)) fs.rmSync(path.join(out, "REPORT.md"), { force: true });
 
 const finish = () => {
   if (isCheck) {

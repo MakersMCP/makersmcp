@@ -318,6 +318,52 @@ test('a call that gives a file from a running job\'s folder, or a film.json that
   });
 });
 
+test('a file a running job cleared to write it again, or has not written yet, is waited for as one of its files that is there, and a file no running job writes is not there', async () => {
+  const kits = structuredClone(definitions);
+  kits[0].tools.push(
+    // Like check_video: a check of a file, saved in check/ next to it unless out_dir says otherwise.
+    {
+      name: 'fake_look', title: 'Fake look', description: 'Checks a file.', args: ['check', '{file}'], check: true, report: 'REPORT.md',
+      out: { flag: '--out', name: '{dir:file}/check' }, docs: ['REPORT.md'],
+      params: {
+        file: { type: 'path', required: true, description: 'A file.' },
+        cues: { type: 'text_or_path', flag: '--cues', pattern: '\\d+(?:,\\d+)*', description: 'Seconds like 1,2, or a file of them.' },
+      },
+    },
+  );
+  await withClient({ definitions: kits }, async (client, outDir) => {
+    const at = (...parts) => path.join(outDir, ...parts);
+    const call = (name, args) => client.callTool({ name, arguments: { ...args, wait_seconds: 0 } });
+    const first = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', out_dir: 'film', wait_seconds: 20 } });
+    assert.equal(first.structuredContent.status, 'done', text(first));
+    assert.ok(existsSync(at('film', 'REPORT.md')));
+    // A run that clears the report an earlier run left, as record_demo_video clears demo.mp4 and demo.yaml.
+    const again = await call('fake_make', { url: 'https://slow-clear.example.com', out_dir: 'film' });
+    const jobId = again.structuredContent.job_id;
+    assert.ok(jobId, text(again));
+    for (let tries = 0; existsSync(at('film', 'REPORT.md')) && tries < 100; tries++) await sleep(50);
+    assert.ok(!existsSync(at('film', 'REPORT.md')), 'the kit did not clear its report');
+    const busy = (title, file, tool) => `## ${title}: not started\n\n${jobId} (fake_make) is still writing to ${at('film')}, which holds ${file}. Wait for it with wait_for_job (job_id ${jobId}), then call ${tool} again.`;
+    // Cleared by the running job, given in a folder of its own or next to it.
+    assert.equal(text(await call('fake_look', { file: 'film/REPORT.md', out_dir: 'elsewhere' })), busy('Fake look', at('film', 'REPORT.md'), 'fake_look'));
+    assert.equal(text(await call('fake_look', { file: 'film/REPORT.md' })), busy('Fake look', at('film', 'REPORT.md'), 'fake_look'));
+    // Not written yet, like the film.mp4 of a first render, by any parameter that takes a file.
+    assert.equal(text(await call('fake_look', { file: 'film/new.mp4', out_dir: 'elsewhere' })), busy('Fake look', at('film', 'new.mp4'), 'fake_look'));
+    writeFileSync(at('beside.mp4'), 'a film');
+    assert.equal(text(await call('fake_look', { file: 'beside.mp4', cues: 'film/parts/cues.json', out_dir: 'elsewhere' })), busy('Fake look', at('film', 'parts', 'cues.json'), 'fake_look'));
+    assert.equal(text(await call('fake_file', { file: 'film/plan.json' })), busy('Fake file', at('film', 'plan.json'), 'fake_file'));
+    // A file in no running job's folder is not there, however close its name, as before.
+    assert.equal(text(await call('fake_look', { file: 'film2/new.mp4', out_dir: 'elsewhere' })), `## Fake look: not started\n\nfile: there is nothing at ${at('film2', 'new.mp4')}`);
+
+    const done = await client.callTool({ name: 'wait_for_job', arguments: { job_id: jobId, wait_seconds: 20 } });
+    assert.equal(done.structuredContent.status, 'done', text(done));
+    // The job wrote its report again, so a check of it runs; a file it never wrote is not there.
+    const looked = await client.callTool({ name: 'fake_look', arguments: { file: 'film/REPORT.md', out_dir: 'elsewhere', wait_seconds: 20 } });
+    assert.equal(looked.structuredContent.status, 'done', text(looked));
+    assert.equal(text(await call('fake_look', { file: 'film/new.mp4', out_dir: 'elsewhere' })), `## Fake look: not started\n\nfile: there is nothing at ${at('film', 'new.mp4')}`);
+  });
+});
+
 test('the files a parameter reads come from the places of its JSON file, read from that file\'s folder, and nothing else', () => {
   const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-test-'));
   try {

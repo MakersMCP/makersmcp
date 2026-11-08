@@ -11,6 +11,16 @@ const SYSTEM_FILES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
 /** A tool call that cannot become a command, like a file that is not there. */
 export class ArgumentError extends Error {}
 
+/**
+ * A file the call gives that is not there, with the path it was looked for at: a running job
+ * may still write it there, or have cleared it to write it again (LocalBackend.start).
+ */
+export class MissingFileError extends ArgumentError {
+  constructor(message: string, readonly file: string) {
+    super(message);
+  }
+}
+
 export interface BuiltCommand {
   args: string[];
   /** Where the kit writes, when it is known. */
@@ -138,7 +148,7 @@ export function buildCommand(
           throw new ArgumentError(`${name}: the kit cannot read a link. Give the text itself, or a file. ${param.description}`);
         }
         value = resolve(name, text);
-        if (!existsSync(value as string)) throw new ArgumentError(nothingAt(name, param, value as string, text));
+        if (!existsSync(value as string)) throw new MissingFileError(nothingAt(name, param, value as string, text), value as string);
         if (asFile && !asFile.test(value as string)) {
           throw new ArgumentError(`${name}: the kit takes ${value as string} for an address, not for a file. ${param.description}`);
         }

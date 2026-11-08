@@ -294,22 +294,30 @@ export class JobManager {
 
   start(spec: JobSpec): Job {
     const { folder } = spec;
-    const writing = this.list().filter(job => job.status === 'running' && job.spec.folder !== undefined);
     // A job never reads a file in a folder a running job writes, or a folder one writes in,
     // wherever it saves itself: that job may still change it.
     for (const file of spec.reads ?? []) {
-      const busy = writing.find(job => overlap(job.spec.folder!, file));
+      const busy = this.writing(file);
       if (busy) throw new FolderBusyError(busy, file, true);
     }
     if (folder) {
       // Two jobs never write into one folder, nor one into a folder inside the other's.
-      const busy = writing.find(job => overlap(job.spec.folder!, folder));
+      const busy = this.writing(folder);
       if (busy) throw new FolderBusyError(busy, folder);
     }
     const job = new Job(`job_${randomBytes(4).toString('hex')}`, spec);
     this.jobs.set(job.id, job);
     this.prune();
     return job;
+  }
+
+  /**
+   * The running job whose folder is a path, holds it or lies inside it, as both are written,
+   * whether or not anything is there yet: that job may still write the path, or have cleared
+   * it to write it again, as a kit clears an earlier run's files when it starts.
+   */
+  writing(file: string): Job | undefined {
+    return this.list().find(job => job.status === 'running' && job.spec.folder !== undefined && overlap(job.spec.folder, file));
   }
 
   get(id: string): Job | undefined {

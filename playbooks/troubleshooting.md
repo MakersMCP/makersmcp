@@ -24,8 +24,8 @@ Read the result before anything else: its first line says what happened, and the
 ## Not started
 
 <!-- local -->
-- "<param>: there is nothing at <path>": no file is there. A relative path is read from {base_dir}, so give the path the earlier result listed, or an absolute one. An address needs its https://.
-- "<job_id> (<tool>) is still writing to <folder>", then "Wait for it with wait_for_job (job_id <job_id>), or give another out_dir.": wait for that job, or give this one another folder. A call that cannot save anywhere else, or that gives a file from that job's folder, ends "Wait for it with wait_for_job (job_id <job_id>), then call <tool> again." instead: wait for that job, then call it again. With ", which holds <path>" or ", inside <path>" after it, this job's folder, or a file or folder it was given, is inside that job's folder or holds it: run them one after the other.
+- "<param>: there is nothing at <path>": no file is there, and no job that is still running saves in its folder. A relative path is read from {base_dir}, so give the path the earlier result listed, or an absolute one. An address needs its https://.
+- "<job_id> (<tool>) is still writing to <folder>", then "Wait for it with wait_for_job (job_id <job_id>), or give another out_dir.": wait for that job, or give this one another folder. A call that cannot save anywhere else, or that gives a file from that job's folder, even one not there now, which that job may write later or have cleared to write it again, ends "Wait for it with wait_for_job (job_id <job_id>), then call <tool> again." instead: wait for that job, then call it again. With ", which holds <path>" or ", inside <path>" after it, this job's folder, or a file or folder it was given, is inside that job's folder or holds it: run them one after the other.
 <!-- with launch-film -->
   `render_launch_film`, `make_launch_stills` given a film.json, and a check of a film that job is writing, whatever its `out_dir`, get that second ending.
 <!-- end -->

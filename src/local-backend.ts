@@ -1,6 +1,6 @@
 import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readSync, realpathSync, type BigIntStats, type Stats } from 'node:fs';
 import path from 'node:path';
-import { ArgumentError, buildCommand, expandHome } from './args.js';
+import { ArgumentError, MissingFileError, buildCommand, expandHome } from './args.js';
 import {
   NotStartedError,
   type AvailableKit,
@@ -265,6 +265,19 @@ function toolSettings(kit: KitDefinition, tool: ToolDefinition, installed: Map<s
   return lists;
 }
 
+/**
+ * A call refused while a running job writes in a folder it would save in or read from. Another
+ * out_dir helps only a call that can take one (`movable`), and only when it reads no file that
+ * job may still change: not one whose folder follows a file it gave, nor a check of a film a
+ * render is still making.
+ */
+function busyRefusal(error: FolderBusyError, tool: ToolDefinition, movable: boolean): NotStartedError {
+  const then = movable && !error.reads
+    ? `Wait for it with wait_for_job (job_id ${error.job.id}), or give another out_dir.`
+    : `Wait for it with wait_for_job (job_id ${error.job.id}), then call ${tool.name} again.`;
+  return new NotStartedError(`${error.message}. ${then}`, error.job.id);
+}
+
 /** What a job that ended done saved in its folder, and its kit's notes there, as they were when it ended. */
 interface Saved {
   files: JobFile[];
@@ -395,6 +408,11 @@ export class LocalBackend implements KitBackend {
     try {
       command = buildCommand(tool, input, { baseDir: this.baseDir, installed: this.installed, confine: this.confine });
     } catch (error) {
+      // A file that is not there yet, or no longer, in a running job's folder: that job may still
+      // write it, as a render writes its film.mp4, or have cleared it to write it again, as a
+      // demo clears its demo.yaml. The call waits for that job, as for a file of it that is there.
+      const busy = error instanceof MissingFileError ? this.jobs.writing(error.file) : undefined;
+      if (busy) throw busyRefusal(new FolderBusyError(busy, (error as MissingFileError).file, true), tool, false);
       if (error instanceof ArgumentError) throw new NotStartedError(error.message);
       throw error;
     }
@@ -439,15 +457,7 @@ export class LocalBackend implements KitBackend {
         reads: command.reads,
       });
     } catch (error) {
-      if (error instanceof FolderBusyError) {
-        // Another out_dir helps only a call that can take one, and only when it reads no file that
-        // job may still change: not one whose folder follows a file it gave, nor a check of a film
-        // a render is still making.
-        const then = command.movable && !error.reads
-          ? `Wait for it with wait_for_job (job_id ${error.job.id}), or give another out_dir.`
-          : `Wait for it with wait_for_job (job_id ${error.job.id}), then call ${tool.name} again.`;
-        throw new NotStartedError(`${error.message}. ${then}`, error.job.id);
-      }
+      if (error instanceof FolderBusyError) throw busyRefusal(error, tool, command.movable);
       throw error;
     }
     keepSaved(job, before);
