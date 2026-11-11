@@ -1097,6 +1097,41 @@ test('given a brand kit, a tool replaces brand/ only when that holds a kit\'s ow
   });
 });
 
+test('a brand.json names a kit\'s own file only by a string at a place its kit file lists, never by a list, an object or a number there', () => {
+  // As easybrandkit's kitFiles and launch-film read one: a list on the way, like logos, item by item, and at the place
+  // itself, like logos.file, a name or nothing. A file only such a value names is not a kit's, so it would be lost.
+  const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-test-'));
+  try {
+    const write = (file, body = 'x') => {
+      mkdirSync(path.dirname(path.join(baseDir, file)), { recursive: true });
+      writeFileSync(path.join(baseDir, file), body);
+    };
+    write('kit/brand.json', JSON.stringify({ version: 1, name: 'Acme', logos: [{ file: 'logo-01.png' }] }));
+    const earlier = (dir, kit) => {
+      write(`${dir}/brand/brand.json`, JSON.stringify({ version: 1, name: 'Acme', ...kit }));
+      write(`${dir}/brand/logo-01.png`);
+      write(`${dir}/brand/notes.md`);
+    };
+    earlier('listed', { logos: [{ file: ['logo-01.png', 'notes.md'] }] });
+    earlier('object', { logos: [{ file: 'logo-01.png' }, { file: { name: 'notes.md' } }] });
+    earlier('number', { logos: [{ file: 'logo-01.png', svg: 7 }], card: { file: ['notes.md'] } });
+    earlier('stores', { logos: [{ file: 'logo-01.png', svg: ['notes.md'] }], stores: [{ assets: [{ file: 'notes.md' }] }] });
+    const context = { baseDir, installed: new Map() };
+    const call = input => buildCommand(tool('plan_launch_film'), { url: 'https://acme.com', ...input }, context);
+    assert.throws(() => call({ brand: 'kit', out_dir: 'listed' }), /listed\/brand holds logo-01\.png and notes\.md, which its brand\.json does not list and the copy would not bring back\./);
+    assert.throws(() => call({ brand: 'kit', out_dir: 'object' }), /object\/brand holds notes\.md, which its brand\.json does not list and the copy would not bring back\./);
+    assert.throws(() => call({ brand: 'kit', out_dir: 'number' }), /number\/brand holds notes\.md, which its brand\.json does not list and the copy would not bring back\./);
+    // A name at the place is the kit's, through the lists on the way, like each store's assets.
+    assert.ok(call({ brand: 'kit', out_dir: 'stores' }).args.includes('--brand'));
+    // From a website the kit makes brand/ again where it is, keeping what is not a kit's own: a file with a name the kit
+    // writes that only a list names would be written over, and one with any other name is kept.
+    assert.throws(() => call({ out_dir: 'listed' }), /listed\/brand holds logo-01\.png, which its brand\.json does not list\./);
+    assert.ok(call({ out_dir: 'object' }).args.includes('--out'));
+  } finally {
+    rmSync(baseDir, { recursive: true, force: true });
+  }
+});
+
 test('for an App Store page a tool deletes brand/, so it refuses one that holds files no kit made', () => {
   withBrandFolders(({ call }) => {
     const stills = tool('make_launch_stills');

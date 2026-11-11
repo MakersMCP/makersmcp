@@ -627,8 +627,12 @@ function sameEntry(file: string, copy: string): boolean {
 }
 
 /**
- * The names a marker lists at a place like logos.file, the file of each of its logos.
- * By name only, as the kits read them, so a marker cannot name a file elsewhere.
+ * The names a marker lists at a place like logos.file, the file of each of its logos. A
+ * list met on the way, like logos, is taken item by item, but the value at the place
+ * itself names a file only as a string, the way easybrandkit's kitFiles and launch-film
+ * read a brand.json: a list there, like an object or a number, names none, so a file it
+ * holds is not taken for a kit's own and lost with the folder. By name only, as the kits
+ * read them, so a marker cannot name a file elsewhere.
  */
 function listedIn(marker: unknown, where: string): string[] {
   const flat = (values: unknown[]) => values.flatMap(value => (Array.isArray(value) ? value : [value]));
@@ -638,7 +642,7 @@ function listedIn(marker: unknown, where: string): string[] {
       ? (value as Record<string, unknown>)[key]
       : undefined));
   }
-  return flat(found)
+  return found
     .filter((value): value is string => typeof value === 'string')
     .map(value => value.split(/[\\/]/).pop() ?? '')
     .filter(Boolean);
