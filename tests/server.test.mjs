@@ -12,9 +12,10 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { ArgumentError, buildCommand } from '../dist/args.js';
 import { DRAFT_2020_12 } from '../dist/schema-dialect.js';
 import {
-  LocalBackend, createMcpServer, expandHome, failureText, listFiles, loadKitDefinitions, readDocs, resolveKit, validateKitDefinition,
+  LocalBackend, createMcpServer, docEntry, docNames, expandHome, failureText, listFiles, loadKitDefinitions, readDocs, resolveKit, validateKitDefinition,
 } from '../dist/server.js';
 import { MAX_FILES, folderStamps } from '../dist/local-backend.js';
+import { SITE_NOTE } from '../dist/results.js';
 import { defaultOutDir } from '../dist/setup.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -128,6 +129,35 @@ test('a finished job returns its summary, folder, files and docs', async () => {
       'https://www.example.com/', '--deep', '--no-plain', '--sizes', 'a,b', '--page', '/x', '--page', '/y',
       '--theme', 'dark', '--count', '2', '--out', folder, '--with', path.join(fakekitDir, 'fake.js'),
     ]);
+  });
+});
+
+test('a docs entry that is neither a name nor { file, site } with a name in file names no doc, and the job still gives its result', async () => {
+  // A kit file names a doc as "REPORT.md" or { "file": "REPORT.md", "site": true }, and kits/ is checked for that as it
+  // loads; definitions a service passes are not, and neither is what readDocs is given. An entry of another kind used to
+  // reach path.join: { file: { ... } } stopped the result of a job that had ended done with "The "path" argument must
+  // be of type string. Received an instance of Object", the error of the eval's dry run on a dist built from 0.1.1.
+  const odd = [7, null, ['REPORT.md'], { site: true }, { file: 9 }, { file: { name: 'REPORT.md' } }, { file: ['REPORT.md'] }];
+  const make = { ...definitions[0].tools[0], docs: [...odd, { file: 'REPORT.md', site: true }, 'MISSING.md'] };
+  assert.deepEqual(docNames(make), ['REPORT.md', 'MISSING.md']);
+  assert.deepEqual(docEntry(make, 'REPORT.md'), { file: 'REPORT.md', site: true });
+  assert.deepEqual(docEntry(make, 'MISSING.md'), { file: 'MISSING.md' });
+  assert.equal(docEntry(make, '9'), undefined);
+  assert.deepEqual(docNames({ ...make, docs: { file: 'REPORT.md' } }), []);
+  for (const entry of odd) {
+    const kit = { ...definitions[0], tools: [{ ...make, docs: [entry] }] };
+    assert.throws(() => validateKitDefinition(kit), /fake_make\.docs: each entry is a file in the tool's folder, or \{ "file", "site" \}/, JSON.stringify(entry));
+  }
+  const kits = [{ ...definitions[0], tools: [make, ...definitions[0].tools.slice(1)] }, definitions[1]];
+  await withClient({ definitions: kits }, async (client, outDir) => {
+    const result = await client.callTool({ name: 'fake_make', arguments: { url: 'https://www.example.com/' } });
+    assert.notEqual(result.isError, true, text(result));
+    assert.equal(result.structuredContent.status, 'done');
+    assert.deepEqual(result.structuredContent.docs.map(doc => doc.name), ['REPORT.md']);
+    assert.match(text(result), new RegExp(`### REPORT\\.md\\n\\n${SITE_NOTE.replace(/\./g, '\\.')}\\n\\n# Report\\n`));
+    const folder = path.join(outDir, 'fakekit-example.com');
+    assert.deepEqual(readDocs(folder, [...odd, { file: 'REPORT.md', site: true }, 'parts/data.json']).map(doc => doc.name), ['REPORT.md', 'parts/data.json']);
+    assert.deepEqual(readDocs(folder, { file: 'REPORT.md' }), []);
   });
 });
 

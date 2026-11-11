@@ -287,16 +287,28 @@ const FACT_KEY = /^[a-z][a-z0-9_]*$/;
 const NEXT_STATES = ['done', 'passed', 'check_failed', 'failed', 'refused'] as const;
 const MAX_ASKS = 200;
 
+/**
+ * The file a docs entry names, as a kit file gives one: a name, or { file, site } with the
+ * name in file. Nothing for an entry of any other kind, like a number, a list or { file }
+ * with an object in it, which names no file: an older makersmcp handed such an entry to
+ * path.join and stopped the result of a job that had ended done.
+ */
+export function docFile(entry: unknown): string | undefined {
+  if (typeof entry === 'string') return entry;
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return undefined;
+  const file = (entry as { file?: unknown }).file;
+  return typeof file === 'string' ? file : undefined;
+}
+
 /** The name of each file a tool returns with its result, as its docs entries give them. */
 export function docNames(tool: ToolDefinition): string[] {
-  return (tool.docs ?? []).map(entry => (typeof entry === 'string' ? entry : entry.file));
+  return (Array.isArray(tool.docs) ? tool.docs : []).flatMap(entry => docFile(entry) ?? []);
 }
 
 /** A tool's docs entry for a file, or nothing. */
 export function docEntry(tool: ToolDefinition, name: string): DocEntry | undefined {
-  for (const entry of tool.docs ?? []) {
-    const file = typeof entry === 'string' ? entry : entry.file;
-    if (file === name) return typeof entry === 'string' ? { file } : entry;
+  for (const entry of Array.isArray(tool.docs) ? tool.docs : []) {
+    if (docFile(entry) === name) return typeof entry === 'string' ? { file: name } : entry;
   }
   return undefined;
 }
@@ -439,8 +451,8 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
       if (!Array.isArray(tool.docs)) fail(`${tool.name}.docs is a list`);
       const seen = new Set<string>();
       for (const entry of tool.docs) {
-        const file = typeof entry === 'string' ? entry : entry && typeof entry === 'object' ? entry.file : undefined;
-        if (typeof file !== 'string' || !staysInside(file)) fail(`${tool.name}.docs: each entry is a file in the tool's folder, or { "file", "site" }`);
+        const file = docFile(entry);
+        if (file === undefined || !staysInside(file)) fail(`${tool.name}.docs: each entry is a file in the tool's folder, or { "file", "site" }`);
         if (typeof entry === 'object' && entry.site !== undefined && typeof entry.site !== 'boolean') fail(`${tool.name}.docs: site is true or false`);
         if (seen.has(file!)) fail(`${tool.name}.docs names ${file} twice`);
         seen.add(file!);

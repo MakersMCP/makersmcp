@@ -14,7 +14,7 @@ import {
   type WaitOptions,
 } from './backend.js';
 import { FolderBusyError, JobManager, launcherProblem, type Job } from './jobs.js';
-import { docNames, isInstalled, resolveKit, type DocEntry, type InstalledKit, type KitDefinition, type MissingKit, type ToolDefinition } from './kits.js';
+import { docFile, docNames, isInstalled, resolveKit, type DocEntry, type InstalledKit, type KitDefinition, type MissingKit, type ToolDefinition } from './kits.js';
 import { kitEnvironment, settingProblems, settingsRead, setupReport } from './setup.js';
 
 /** The most files a job lists in `files`. */
@@ -208,12 +208,14 @@ function readDoc(file: string, within?: string): string | undefined {
  * each, the most one result shows of all its docs together (results.ts shares that among
  * them). A doc that is not a regular file with one name, like a link, a fifo or a hard
  * link, is left out as a missing one is, and so is one not reached from `within` through
- * folders, when that is given (readDoc).
+ * folders, when that is given (readDoc), and an entry that names no file the way a kit
+ * file names one (docFile).
  */
 export function readDocs(folder: string, entries: Array<string | DocEntry> = [], within?: string): JobDoc[] {
   const docs: JobDoc[] = [];
-  for (const entry of entries) {
-    const name = typeof entry === 'string' ? entry : entry.file;
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const name = docFile(entry);
+    if (name === undefined) continue;
     const file = path.join(folder, name);
     const text = readDoc(file, within);
     if (text === undefined) continue;
