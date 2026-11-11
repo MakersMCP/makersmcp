@@ -15,7 +15,7 @@ import {
   LocalBackend, createMcpServer, docEntry, docNames, expandHome, failureText, listFiles, loadKitDefinitions, readDocs, resolveKit, validateKitDefinition,
 } from '../dist/server.js';
 import { MAX_FILES, folderStamps } from '../dist/local-backend.js';
-import { SITE_NOTE } from '../dist/results.js';
+import { SITE_NOTE, jobResult } from '../dist/results.js';
 import { defaultOutDir } from '../dist/setup.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -159,6 +159,43 @@ test('a docs entry that is neither a name nor { file, site } with a name in file
     assert.deepEqual(readDocs(folder, [...odd, { file: 'REPORT.md', site: true }, 'parts/data.json']).map(doc => doc.name), ['REPORT.md', 'parts/data.json']);
     assert.deepEqual(readDocs(folder, { file: 'REPORT.md' }), []);
   });
+});
+
+test('a job\'s result leaves out a path or a text of its view that is of another type, and shows the rest', () => {
+  // As a hosted service's JSON may give them: a backend's view is not checked before the result reads it.
+  const view = {
+    id: 'job_1', kit: 'fakekit', tool: 'fake_make', title: 'Fake make', status: 'done', exitCode: 0, elapsedSeconds: 3,
+    folder: { path: '/work/fakekit-example.com' },
+    summary: ['Saved the report.'],
+    lastLine: 7,
+    inputs: { file: { path: '/work/a.png' }, list: ['/work/b.png'] },
+    files: [
+      { path: 'REPORT.md', bytes: 120 }, { path: { name: 'x.png' }, bytes: 1 }, { path: 7, bytes: 2 }, { path: ['y.png'], bytes: 3 },
+      null, 'loose.txt', { path: 'sized.png', bytes: '12' }, { path: '', bytes: 4 },
+    ],
+    docs: [
+      { name: 'REPORT.md', text: '# Report\n' }, { name: { file: 'X.md' }, text: 'x' }, { name: 'Y.md', text: 5 }, null, ['Z.md'],
+      { name: 'CUT.md', text: '# Cut\n', more: { file: 'CUT.md' } },
+    ],
+  };
+  const result = jobResult(view);
+  assert.notEqual(result.isError, true);
+  assert.equal(result.content[0].text, '## Fake make: done in 3 s\n\n- REPORT.md (120 B)\n\n### REPORT.md\n\n# Report\n\n### CUT.md\n\n# Cut');
+  assert.deepEqual(result.structuredContent, {
+    job_id: 'job_1', kit: 'fakekit', tool: 'fake_make', status: 'done', exit_code: 0, elapsed_seconds: 3,
+    files: [{ path: 'REPORT.md', bytes: 120 }], docs: [{ name: 'REPORT.md', path: 'REPORT.md' }, { name: 'CUT.md', path: 'CUT.md' }],
+  });
+  // A view of the right types is shown as it was.
+  const plain = { ...view, folder: '/work/fakekit-example.com', summary: 'Saved the report.', files: [view.files[0]], docs: [view.docs[0]] };
+  delete plain.lastLine;
+  delete plain.inputs;
+  assert.equal(jobResult(plain).content[0].text,
+    '## Fake make: done in 3 s\n\nSaved the report.\n\nFolder: /work/fakekit-example.com\n\n- REPORT.md (120 B)\n\n### REPORT.md\n\n# Report');
+  // A failed job's failure and exit code, and a running job's last line, the same way.
+  const failed = jobResult({ ...view, status: 'failed', exitCode: '2', failure: { text: 'no' } });
+  assert.equal(failed.isError, true);
+  assert.equal(failed.content[0].text, '## Fake make: failed after 3 s\n\nThe kit said nothing.\n\nJob ID: job_1');
+  assert.equal(jobResult({ ...view, status: 'running', exitCode: null }).content[0].text.split('\n\n')[1], 'Job ID: job_1');
 });
 
 test('out_dir puts the folder where the agent asks', async () => {

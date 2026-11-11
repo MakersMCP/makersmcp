@@ -6,7 +6,7 @@ import { textPattern } from './args.js';
 import { NotStartedError, type AvailableKit, type JobView, type KitBackend } from './backend.js';
 import type { ParamDefinition, ToolDefinition } from './kits.js';
 import { PLAYBOOK_TOOL } from './playbooks.js';
-import { checkNextLines, errorResult, jobListed, jobOutputSchema, jobResult, type ResultContext } from './results.js';
+import { checkNextLines, errorResult, jobListed, jobOutputSchema, jobResult, shownView, type ResultContext } from './results.js';
 import { BASE_DIR_IN_WORDS, fillText, inWords, templateInWords, TextError, WAIT_SECONDS, withoutUnlisted, type TextContext } from './texts.js';
 
 /** A kit tool this server lists, with the kit it is of. */
@@ -362,7 +362,8 @@ export function registerCoreTools(server: McpServer, context: ToolContext): void
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
-      const jobs = await backend.list();
+      // As a result shows them: a value of another type in a hosted view is left out (shownView).
+      const jobs = (await backend.list()).map(shownView);
       const lines = jobs.map(view => `- ${view.id}: ${view.tool}, ${view.status}, ${view.elapsedSeconds} s`
         + (view.folder ? `, ${view.folder}` : ''));
       return {

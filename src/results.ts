@@ -81,6 +81,57 @@ function until(expiresAt: number): string {
   return `${new Date(expiresAt * 1000).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+const isText = (value: unknown): value is string => typeof value === 'string';
+
+/**
+ * A job's view as a result shows it. A hosted service's view is the JSON it sent, which
+ * the server reads as it comes, so a value of another type than JobView gives, like an
+ * object, a number or a list where a path or a text goes, is left out and the rest is
+ * shown: a file needs a path and a size, and keeps its link only when that is text; a doc
+ * needs a name and a text; an input is kept only as a path; the folder, the summary, the
+ * failure and the last line only as text; and the time the links end only as a number.
+ * Each of them reaches path.join, a string's own methods or a date, where a value of
+ * another type throws and loses the result of a job that ran. A view of the right types
+ * keeps every value it has.
+ */
+export function shownView(view: JobView): JobView {
+  const shown: JobView = { ...view };
+  for (const key of ['folder', 'summary', 'failure', 'lastLine'] as const) {
+    if (shown[key] !== undefined && !isText(shown[key])) delete shown[key];
+  }
+  if (shown.exitCode !== null && !Number.isInteger(shown.exitCode)) shown.exitCode = null;
+  if (!Number.isFinite(shown.elapsedSeconds)) shown.elapsedSeconds = 0;
+  if (shown.expiresAt !== undefined && !Number.isFinite(shown.expiresAt)) delete shown.expiresAt;
+  const files: unknown = shown.files;
+  if (files !== undefined) {
+    if (!Array.isArray(files)) delete shown.files;
+    else {
+      shown.files = files.filter((file): file is JobFile => isRecord(file) && isText(file.path) && file.path !== ''
+        && typeof file.bytes === 'number' && Number.isFinite(file.bytes))
+        .map(file => (file.url === undefined || isText(file.url) ? file : { path: file.path, bytes: file.bytes }));
+    }
+  }
+  const docs: unknown = shown.docs;
+  if (docs !== undefined) {
+    if (!Array.isArray(docs)) delete shown.docs;
+    else {
+      shown.docs = docs.filter((doc): doc is JobDoc => isRecord(doc) && isText(doc.name) && doc.name !== '' && isText(doc.text))
+        .map(doc => (doc.more === undefined || isText(doc.more) ? doc : { name: doc.name, text: doc.text }));
+    }
+  }
+  const inputs: unknown = shown.inputs;
+  if (inputs !== undefined) {
+    const kept = isRecord(inputs) ? Object.entries(inputs).filter((entry): entry is [string, string] => isText(entry[1]) && entry[1] !== '') : [];
+    if (kept.length) shown.inputs = Object.fromEntries(kept);
+    else delete shown.inputs;
+  }
+  return shown;
+}
+
 export function jobStructured(view: JobView) {
   return {
     job_id: view.id,
@@ -102,7 +153,7 @@ export function jobStructured(view: JobView) {
 
 /** A job as list_jobs gives it: how many files it saved, not each one. */
 export function jobListed(view: JobView) {
-  const { files, ...rest } = jobStructured(view);
+  const { files, ...rest } = jobStructured(shownView(view));
   return { ...rest, ...(files ? { file_count: files.length } : {}) };
 }
 
@@ -394,6 +445,7 @@ function docsShown(view: JobView, context: ResultContext | undefined, budget: nu
 
 /** The tool result for a job in any state, with its Next line under the heading when the context gives one. */
 export function jobResult(view: JobView, context?: ResultContext): CallToolResult {
+  view = shownView(view);
   // The tool's own files first, for the list the text shows, the Next line and the docs.
   if (view.files && context?.tool) view = { ...view, files: orderedFiles(view.files, context.tool) };
   const seconds = `${view.elapsedSeconds} s`;

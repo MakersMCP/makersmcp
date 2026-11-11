@@ -82,8 +82,7 @@ class FakeHostedBackend {
   }
 }
 
-async function withHosted(callback, { kits = definitions, runs } = {}) {
-  const backend = new FakeHostedBackend({ runs });
+async function withHosted(callback, { kits = definitions, runs, backend = new FakeHostedBackend({ runs }) } = {}) {
   const server = createMcpServer({ definitions: kits, backend });
   const client = new Client({ name: 'test-client', version: '1.0.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -130,6 +129,50 @@ test('a hosted job returns links to its files and when they stop working', async
     assert.match(text(result), /### REPORT\.md\n\n# Report\n\nAll good\./);
     assert.doesNotMatch(text(result), /Folder:/);
   });
+});
+
+test('a hosted job whose view has a path or a text of another type gives its result and its line in list_jobs without it', async () => {
+  // A hosted service's view is its JSON, which the server reads as it comes: a value of another type where a path goes
+  // used to stop the job's result with a TypeError, and a time the links end that is no number stopped list_jobs too.
+  class OddBackend extends FakeHostedBackend {
+    async wait(id, seconds, options) {
+      const view = await super.wait(id, seconds, options);
+      return view?.status !== 'done' ? view : {
+        ...view,
+        folder: { name: 'fake_make job1' },
+        summary: ['Saved 2 files.'],
+        expiresAt: 'in three days',
+        inputs: { file: ['job:job0/film.json'] },
+        files: [
+          ...view.files, { path: { name: 'x.png' }, bytes: 1 }, { path: 7, bytes: 2 }, { path: ['y.png'], bytes: 3 }, null, 'loose.txt',
+          { path: 'sized.png', bytes: '12' }, { path: 'linked.png', bytes: 4, url: { href: 'https://files.example.com/linked.png' } },
+        ],
+        docs: [...view.docs, { name: { file: 'X.md' }, text: 'x' }, { name: 'Y.md', text: 5 }, null, { name: 'Z.md', text: '# Z', more: [] }],
+      };
+    }
+
+    async list() {
+      return Promise.all([...this.jobs.keys()].map(id => this.wait(id, 0)));
+    }
+  }
+  await withHosted(async (client) => {
+    // The client checks each result against the tool's outputSchema once it has listed the tools.
+    await client.listTools();
+    const result = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com/' } });
+    assert.notEqual(result.isError, true, text(result));
+    assert.equal(result.structuredContent.status, 'done');
+    assert.deepEqual(result.structuredContent.files.map(file => file.path), ['REPORT.md', 'logo.svg', 'linked.png']);
+    assert.equal(result.structuredContent.files[2].url, undefined);
+    assert.deepEqual(result.structuredContent.docs.map(doc => doc.name), ['REPORT.md', 'Z.md']);
+    assert.equal(result.structuredContent.folder, undefined);
+    assert.equal(result.structuredContent.expires_at, undefined);
+    assert.match(text(result), /^## Fake make: done in 12 s\n\nFiles:\n\n- REPORT\.md \(120 B\): https:\/\/files\.example\.com\/job1\/REPORT\.md\?s=1\n- logo\.svg \(2\.0 KB\): \S+\n- linked\.png \(4 B\)\n\n### REPORT\.md\n\n# Report\n\nAll good\.\n\n### Z\.md\n\n# Z$/);
+    assert.doesNotMatch(text(result), /object|undefined|NaN/);
+    const listed = await client.callTool({ name: 'list_jobs', arguments: {} });
+    assert.notEqual(listed.isError, true, text(listed));
+    assert.equal(text(listed), '## Jobs\n\n- job1: fake_make, done, 12 s');
+    assert.equal(listed.structuredContent.jobs[0].file_count, 3);
+  }, { backend: new OddBackend() });
 });
 
 test('a hosted file param refuses a local path, and a job the service refuses is not started', async () => {
