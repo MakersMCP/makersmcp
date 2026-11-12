@@ -2363,6 +2363,11 @@ test('a kit tool whose own topic the server does not offer points to getting-sta
       await session.close();
     }
   }
+  // docs/kits.md says where each points while the topic is not offered: the description to getting-started, a failed job
+  // whose tool gives no Next line to troubleshooting.
+  const doc = readFileSync(path.join(here, '..', 'docs', 'kits.md'), 'utf8').split('\n').find(line => line.startsWith('- `playbook`:'));
+  assert.ok(doc.endsWith(' The description points to it while the server offers it, and to getting-started while it does not; a failed job\'s Next line '
+    + 'points to it when the tool gives none, and to troubleshooting while the topic is not offered.'), doc);
 });
 
 test('with launch-film\'s film tools held back, no topic of a film, its film.json or a launch kit is offered, named or given as an example, no text names a film.json, and launch_film_guide has its own line in getting-started and troubleshooting', async () => {
