@@ -251,5 +251,5 @@ The film's cuts fall on the bars of its look's own music: launch at {fact:launch
 
 List every file by place: the file, its size, and what it is for. Then say what was checked, with each verdict, and what is left to the user: laying a track under a film when that was not done, uploading to each place, and any place no tool here makes for.
 <!-- hosted -->
-Give the links with the time they stop working, which each result states.
+Give each file its own link from its result, with the time it stops working: no link opens a folder.
 <!-- end -->

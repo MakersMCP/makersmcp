@@ -98,5 +98,5 @@ Read the reason in a failed result and change the call before trying again, sinc
 
 Say where each file is, what it is for and, where a place asks, its size. Say what was checked and what was not: a picture nobody looked at, a failed check, a step left to the user such as laying in a track or uploading.
 <!-- hosted -->
-Give the links with the time they stop working.
+Give each file its own link from its result, with the time it stops working: no link opens a folder.
 <!-- end -->

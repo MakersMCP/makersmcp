@@ -126,6 +126,8 @@ test('a hosted job returns links to its files and when they stop working', async
     assert.equal(result.structuredContent.expires_at, '2026-11-08T12:30:00.000Z');
     assert.equal(result.structuredContent.files[1].url, 'https://files.example.com/job1/logo.svg?s=1');
     assert.match(text(result), /Files, to download until 2026-11-08 12:30 UTC:\n\n- REPORT\.md \(120 B\): https:\/\/files\.example\.com\/job1\/REPORT\.md\?s=1/);
+    // Under the links, that each opens one file: a folder has none, and a link made up from a file's leads nowhere.
+    assert.match(text(result), /logo\.svg\?s=1\n\nEach link opens only the file it names, and none opens a folder: hand each file over with its own link\.\n\n### REPORT\.md/);
     assert.match(text(result), /### REPORT\.md\n\n# Report\n\nAll good\./);
     assert.doesNotMatch(text(result), /Folder:/);
   });
@@ -166,7 +168,7 @@ test('a hosted job whose view has a path or a text of another type gives its res
     assert.deepEqual(result.structuredContent.docs.map(doc => doc.name), ['REPORT.md', 'Z.md']);
     assert.equal(result.structuredContent.folder, undefined);
     assert.equal(result.structuredContent.expires_at, undefined);
-    assert.match(text(result), /^## Fake make: done in 12 s\n\nFiles:\n\n- REPORT\.md \(120 B\): https:\/\/files\.example\.com\/job1\/REPORT\.md\?s=1\n- logo\.svg \(2\.0 KB\): \S+\n- linked\.png \(4 B\)\n\n### REPORT\.md\n\n# Report\n\nAll good\.\n\n### Z\.md\n\n# Z$/);
+    assert.match(text(result), /^## Fake make: done in 12 s\n\nFiles:\n\n- REPORT\.md \(120 B\): https:\/\/files\.example\.com\/job1\/REPORT\.md\?s=1\n- logo\.svg \(2\.0 KB\): \S+\n- linked\.png \(4 B\)\n\nEach link opens only the file it names, and none opens a folder: hand each file over with its own link\.\n\n### REPORT\.md\n\n# Report\n\nAll good\.\n\n### Z\.md\n\n# Z$/);
     assert.doesNotMatch(text(result), /object|undefined|NaN/);
     const listed = await client.callTool({ name: 'list_jobs', arguments: {} });
     assert.notEqual(listed.isError, true, text(listed));

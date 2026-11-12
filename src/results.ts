@@ -29,6 +29,8 @@ export const FALLBACK_TOPIC = 'troubleshooting';
  * Only for a tool that writes files: a guide's or a manifest check's result is all in its text.
  */
 export const FILES_GONE_NEXT = "This job's files are gone: run the tool again to make them anew.";
+/** What a result that lists links says under them, so each file goes to the user with its own. */
+export const LINKS_NOTE = 'Each link opens only the file it names, and none opens a folder: hand each file over with its own link.';
 // A doc's heading, its site note, its fence and where the rest is, at most.
 const DOC_OVERHEAD = 400;
 
@@ -501,7 +503,9 @@ export function jobResult(view: JobView, context?: ResultContext): CallToolResul
     const where = links
       ? `Files${view.expiresAt && view.files.length ? `, to download until ${until(view.expiresAt)}` : ''}:`
       : view.folder ? `Folder: ${view.folder}` : '';
-    filesPart = [where, listed.join('\n') || 'No files.'].filter(Boolean).join('\n\n');
+    // A job's folder has no link, and one an assistant makes up from a file's leads nowhere.
+    const note = view.files.some(file => file.url) ? [LINKS_NOTE] : [];
+    filesPart = [where, listed.join('\n') || 'No files.', ...note].filter(Boolean).join('\n\n');
   }
 
   // What is left of the budget after the heading, the Next line and the files goes to the

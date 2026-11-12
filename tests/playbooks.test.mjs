@@ -1961,9 +1961,23 @@ test('hosted, a doc cut short points to its link above, and a job with no folder
       const body = text(await none.client.callTool({ name: 'paint_picture', arguments: { url: 'https://example.com' } }));
       assert.doesNotMatch(body, /Folder: undefined|Folder:/, where);
       assert.match(body, where === 'hosted' ? /Files:\n\nNo files\./ : /\n\nNo files\./, where);
+      // A result with no link says nothing of links.
+      assert.doesNotMatch(body, /Each link opens/, where);
     } finally {
       await none.close();
     }
+  }
+});
+
+test('hosted, getting-started and launch-kit hand each file over with its own link, as no link opens a folder', async () => {
+  const session = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits: LIMITS });
+  try {
+    for (const topic of ['getting-started', 'launch-kit']) {
+      const read = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [topic] } }));
+      assert.match(read, /\n## Hand over\n[^#]*\nGive each file its own link from its result, with the time it stops working: no link opens a folder\.$/, topic);
+    }
+  } finally {
+    await session.close();
   }
 });
 
