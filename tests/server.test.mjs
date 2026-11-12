@@ -263,8 +263,13 @@ test('a slow job returns a job_id, and wait_for_job returns its result', async (
     const busy = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', wait_seconds: 0 } });
     assert.equal(busy.isError, true);
     assert.match(text(busy), new RegExp(`${jobId}.*still writing to`));
-    // In its default folder, with no out_dir given, it can still save in another.
-    assert.ok(text(busy).endsWith(`Wait for it with wait_for_job (job_id ${jobId}), or give another out_dir.`), text(busy));
+    // The same call again: that job is its own, so it is told to wait for it and never offered another out_dir.
+    assert.match(text(busy), new RegExp(`\\. That is the job an identical call started \\d+ s ago: wait for it with wait_for_job \\(job_id ${jobId}\\), and do not call fake_make again for it\\.$`));
+    assert.doesNotMatch(text(busy), /out_dir/);
+    // A call with other arguments, in its default folder with no out_dir given, can still save in another.
+    const other = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', deep: true, wait_seconds: 0 } });
+    assert.equal(other.isError, true);
+    assert.ok(text(other).endsWith(`Wait for it with wait_for_job (job_id ${jobId}), or give another out_dir.`), text(other));
 
     const progress = [];
     const done = await client.callTool(
@@ -289,8 +294,14 @@ test('a job whose folder is inside a running job\'s folder, or holds it, is refu
     assert.equal(text(inside), busy('Fake report', `, which holds ${path.join(outDir, 'film', 'check')}`));
     const around = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: '.', wait_seconds: 0 } });
     assert.equal(text(around), busy('Fake make', `, inside ${outDir}`));
+    // The same call again is told that the job is its own.
     const same = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: 'film', wait_seconds: 0 } });
-    assert.equal(text(same), busy('Fake make', ''));
+    const own = `## Fake make: not started\n\n${jobId} (fake_make) is still writing to ${path.join(outDir, 'film')}. That is the job an identical call started `;
+    assert.ok(text(same).startsWith(own), text(same));
+    assert.match(text(same).slice(own.length), new RegExp(`^\\d+ s ago: wait for it with wait_for_job \\(job_id ${jobId}\\), and do not call fake_make again for it\\.$`));
+    // The same tool and folder with other arguments is offered another out_dir.
+    const other = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: 'film', deep: true, wait_seconds: 0 } });
+    assert.equal(text(other), busy('Fake make', ''));
     // A folder beside it, even one whose name starts the same, is no part of it.
     const beside = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', out_dir: 'film2', wait_seconds: 0 } });
     assert.equal(beside.structuredContent.status, 'running', text(beside));
@@ -331,6 +342,27 @@ test('a job refused for a running job\'s folder is offered another out_dir only 
     assert.equal(done.structuredContent.status, 'done', text(done));
     const again = await client.callTool({ name: 'fake_render', arguments: { file: 'film/film.json', wait_seconds: 20 } });
     assert.equal(again.structuredContent.status, 'done', text(again));
+  });
+});
+
+test('an identical call refused for a file its own running job may still change is told that job is its own', async () => {
+  // Like render_launch_film: it saves next to the film.json it reads, so the same call again would read a file the first one writes beside.
+  const kits = structuredClone(definitions);
+  kits[0].tools.push({
+    name: 'fake_render', title: 'Fake render', description: 'Renders a file where it is.', args: ['{file}'],
+    out: { name: '{dir:file}' }, params: { file: { type: 'path', required: true, description: 'A film.json.' } },
+  });
+  await withClient({ definitions: kits }, async (client, outDir) => {
+    mkdirSync(path.join(outDir, 'slow'));
+    writeFileSync(path.join(outDir, 'slow', 'film.json'), '{}\n');
+    const first = await client.callTool({ name: 'fake_render', arguments: { file: 'slow/film.json', wait_seconds: 0 } });
+    const jobId = first.structuredContent.job_id;
+    assert.ok(jobId, text(first));
+    const again = await client.callTool({ name: 'fake_render', arguments: { file: 'slow/film.json', wait_seconds: 0 } });
+    assert.equal(again.isError, true);
+    assert.match(text(again), new RegExp(`That is the job an identical call started \\d+ s ago: wait for it with wait_for_job \\(job_id ${jobId}\\), and do not call fake_render again for it\\.$`));
+    const done = await client.callTool({ name: 'wait_for_job', arguments: { job_id: jobId, wait_seconds: 20 } });
+    assert.equal(done.structuredContent.status, 'done', text(done));
   });
 });
 

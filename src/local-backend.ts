@@ -267,17 +267,32 @@ function toolSettings(kit: KitDefinition, tool: ToolDefinition, installed: Map<s
   return lists;
 }
 
+/** Whether a running job was started by a call identical to this one: the same tool, run with the same arguments. */
+function sameCall(job: Job, tool: ToolDefinition, args: string[] | undefined): boolean {
+  const { spec } = job;
+  return args !== undefined && spec.tool === tool.name && spec.args.length === args.length && spec.args.every((arg, i) => arg === args[i]);
+}
+
 /**
- * A call refused while a running job writes in a folder it would save in or read from. Another
- * out_dir helps only a call that can take one (`movable`), and only when it reads no file that
- * job may still change: not one whose folder follows a file it gave, nor a check of a film a
- * render is still making.
+ * A call refused while a running job writes in a folder it would save in or read from. A job
+ * an identical call started (`args`, as the kit would get them) is this call's own, so it is
+ * told to wait for that one, and never offered another out_dir, which would start the same
+ * work twice. Otherwise another out_dir helps only a call that can take one (`movable`), and
+ * only when it reads no file that job may still change: not one whose folder follows a file it
+ * gave, nor a check of a film a render is still making.
  */
-function busyRefusal(error: FolderBusyError, tool: ToolDefinition, movable: boolean): NotStartedError {
+function busyRefusal(error: FolderBusyError, tool: ToolDefinition, movable: boolean, args?: string[]): NotStartedError {
+  const { job } = error;
+  if (sameCall(job, tool, args)) {
+    return new NotStartedError(
+      `${error.message}. That is the job an identical call started ${job.elapsedSeconds} s ago: wait for it with wait_for_job (job_id ${job.id}), and do not call ${tool.name} again for it.`,
+      job.id,
+    );
+  }
   const then = movable && !error.reads
-    ? `Wait for it with wait_for_job (job_id ${error.job.id}), or give another out_dir.`
-    : `Wait for it with wait_for_job (job_id ${error.job.id}), then call ${tool.name} again.`;
-  return new NotStartedError(`${error.message}. ${then}`, error.job.id);
+    ? `Wait for it with wait_for_job (job_id ${job.id}), or give another out_dir.`
+    : `Wait for it with wait_for_job (job_id ${job.id}), then call ${tool.name} again.`;
+  return new NotStartedError(`${error.message}. ${then}`, job.id);
 }
 
 /** What a job that ended done saved in its folder, and its kit's notes there, as they were when it ended. */
@@ -459,7 +474,7 @@ export class LocalBackend implements KitBackend {
         reads: command.reads,
       });
     } catch (error) {
-      if (error instanceof FolderBusyError) throw busyRefusal(error, tool, command.movable);
+      if (error instanceof FolderBusyError) throw busyRefusal(error, tool, command.movable, command.args);
       throw error;
     }
     keepSaved(job, before);
