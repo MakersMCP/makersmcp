@@ -2,13 +2,25 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.EminBudak/makersmcp",
   "title": "MakersMCP",
-  "description": "Free kits for makers: brand kits, fonts, screenshots, demo videos, films and music, run locally.",
+  "description": "Free kits for makers: brand kits, fonts, screenshots, demo videos, films and music.",
   "repository": {
     "url": "https://github.com/EminBudak/makersmcp",
     "source": "github"
   },
   "websiteUrl": "https://makersmcp.com",
   "version": "0.1.1",
+  "icons": [
+    {
+      "src": "https://makersmcp.com/assets/favicon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": ["any"]
+    },
+    {
+      "src": "https://makersmcp.com/assets/apple-touch-icon.png",
+      "mimeType": "image/png",
+      "sizes": ["180x180"]
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
@@ -16,7 +28,50 @@
       "version": "0.1.1",
       "transport": {
         "type": "stdio"
-      }
+      },
+      "environmentVariables": [
+        {
+          "name": "MAKERSMCP_OUT",
+          "description": "Where the kits save their folders; ~ is your home folder. Leave it out for the folder makersmcp starts in, or ~/makersmcp when it cannot write there.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "MAKERSMCP_KITS",
+          "description": "The kits to turn on, with commas between them, like easybrandkit,launch-film. Leave it out, or give all, for every kit.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "MAKERSMCP_KIT_PATHS",
+          "description": "A kit's checkout to run instead of the package that comes with makersmcp, as kit=folder, with commas between several.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "CHROME_PATH",
+          "description": "The Chrome, Chromium, Edge or Brave the kits use, by its path or a command name on PATH, when makersmcp does not find one.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "FFMPEG_PATH",
+          "description": "The ffmpeg the video and music kits use, by its path or a command name on PATH, when makersmcp does not find one.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.makersmcp.com/v1"
     }
   ]
 }

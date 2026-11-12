@@ -25,3 +25,19 @@ test('the MCP configs and the README run the release in package.json', () => {
   assert.deepEqual([...new Set(pinned)], [version]);
   assert.doesNotMatch(readme, /npx -y makersmcp(?!@)/, 'every npx in the README pins the version');
 });
+
+test('server.json, which the MCP Registry gets, names only settings makersmcp reads, none secret or needed, and the hosted endpoint', () => {
+  const server = read('server.json');
+  // The registry takes a description of at most 100 characters.
+  assert.ok(server.description.length <= 100, `${server.description.length} characters`);
+  const code = ['index.ts', 'setup.ts'].map(file => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')).join('\n');
+  const settings = server.packages[0].environmentVariables;
+  assert.deepEqual(settings.map(setting => setting.name), ['MAKERSMCP_OUT', 'MAKERSMCP_KITS', 'MAKERSMCP_KIT_PATHS', 'CHROME_PATH', 'FFMPEG_PATH']);
+  for (const setting of settings) {
+    assert.ok(code.includes(`'${setting.name}'`), `makersmcp reads ${setting.name}`);
+    assert.equal(setting.isSecret, false, setting.name);
+    assert.equal(setting.isRequired, false, setting.name);
+  }
+  // mcp.makersmcp.com signs in with OAuth, so the remote takes no header.
+  assert.deepEqual(server.remotes, [{ type: 'streamable-http', url: 'https://mcp.makersmcp.com/v1' }]);
+});
