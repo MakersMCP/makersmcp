@@ -2078,6 +2078,39 @@ test('locally, the film tools say a host name needs a dot, so localhost on its o
   }
 });
 
+test('locally, music for a launch film is fitted into a folder inside the film\'s, as fit_music\'s description and the topics that fit one say, and hosted, where no call takes out_dir, nothing says so', async () => {
+  const sentence = "and give out_dir a folder inside the film's, like its music/, so the film's folder holds its track.";
+  const local = await connect({ definitions: loadKitDefinitions() });
+  try {
+    assert.ok(local.tools.find(tool => tool.name === 'fit_music').description.includes(` lay this track in afterwards, ${sentence} fps should`));
+    const read = async topic => text(await local.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [topic] } }));
+    const music = await read('music');
+    assert.match(music, /\n {3}Give `out_dir` a folder inside the film's, like its music\/, so the film's folder holds its track\.\n```call\nfit_music \{[^\n]*"out_dir": "launch\/film-16x9\/music"\}\n```/);
+    assert.match(music, /"cues": "launch\/film-16x9\/music\/cues\.json"/);
+    for (const topic of ['launch-film', 'launch-kit']) {
+      assert.match(await read(topic), /Give `fit_music` an `out_dir` inside the film's folder, like its music\/, so that folder holds the film's track\./, topic);
+    }
+    assert.match(await read('launch-kit'), /\nfit_music \{[^\n]*"out_dir": "launch\/film-16x9\/music"\}\n[\s\S]*\n- launch\/film-16x9\/music, the fitted track, inside the film's folder\n/);
+  } finally {
+    await local.close();
+  }
+  // Without launch-film the sentence, which names plan_launch_film, is left out with it.
+  const alone = await connect({ definitions: loadKitDefinitions(), kits: ['musicfit'] });
+  try {
+    assert.doesNotMatch(alone.tools.find(tool => tool.name === 'fit_music').description, /out_dir|film's folder/);
+  } finally {
+    await alone.close();
+  }
+  const hosted = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits: LIMITS });
+  try {
+    const fit = hosted.tools.find(tool => tool.name === 'fit_music').description;
+    assert.match(fit, /A film from plan_launch_film takes no music file, so plan it with music false to lay this track in afterwards\. fps should/);
+    assert.doesNotMatch(fit, /out_dir|film's folder/);
+  } finally {
+    await hosted.close();
+  }
+});
+
 test('hosted, a Next line from next leaves out a sentence with {folder}', async () => {
   const kits = fixtureKits();
   delete kits[0].tools.find(tool => tool.name === 'paint_picture').hostedNext;

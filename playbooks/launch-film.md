@@ -33,6 +33,9 @@ launch_film_guide {"topic": "looks"}
 - The sound is the look's own bed and sound effects, made in code. `film.json` takes no track: a file named in its music field is ignored without a word. For the user's own track, plan with `music` false.
 <!-- with fit_music -->
   The music topic fits the track to the film.
+<!-- local -->
+  Give `fit_music` an `out_dir` inside the film's folder, like its music/, so that folder holds the film's track.
+<!-- end -->
 <!-- end -->
 <!-- with easybrandkit -->
 <!-- local -->

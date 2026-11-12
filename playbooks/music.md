@@ -56,8 +56,9 @@ analyze_music {"track": "https://example.com/track.mp3"}
 <!-- with launch-film -->
    For a launch film, `length` is its `seconds`, `hit` its logo `start` and `fps` {fact:launch-film.fps}.
 <!-- local -->
+   Give `out_dir` a folder inside the film's, like its music/, so the film's folder holds its track.
 ```call
-fit_music {"track": "music/track.mp3", "length": "29.333", "hit": "24", "fps": {fact:launch-film.fps}, "lufs": -16, "out_dir": "launch/music"}
+fit_music {"track": "music/track.mp3", "length": "29.333", "hit": "24", "fps": {fact:launch-film.fps}, "lufs": -16, "out_dir": "launch/film-16x9/music"}
 ```
 <!-- end -->
 <!-- hosted -->
@@ -113,7 +114,7 @@ Tell the user to put `fitted.wav`, or `mix.wav` with a voice, under the whole vi
 <!-- local -->
 For `with-music.mp4`, give `cuts` the film's `film.timeline.json`, which `check_video` finds by itself only beside `film.mp4`, and an `out_dir` of its own, since check/ next to it holds the film's report. Without a file that has the track, check `film.mp4` with `cues` alone.
 ```call
-check_video {"film": "launch/film-16x9/with-music.mp4", "expect": "{fact:launch-film.size_16_9}@{fact:launch-film.fps}", "cues": "launch/music/cues.json", "cuts": "launch/film-16x9/film.timeline.json", "out_dir": "launch/film-16x9/check-music"}
+check_video {"film": "launch/film-16x9/with-music.mp4", "expect": "{fact:launch-film.size_16_9}@{fact:launch-film.fps}", "cues": "launch/film-16x9/music/cues.json", "cuts": "launch/film-16x9/film.timeline.json", "out_dir": "launch/film-16x9/check-music"}
 ```
 <!-- end -->
 <!-- hosted -->

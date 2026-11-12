@@ -182,8 +182,9 @@ make_launch_stills {"source": "job:<job_id>/film.json", "for": ["ph", "og", "x"]
 <!-- with fit_music -->
 6. For the user's track, follow the music topic: `analyze_music`, then `fit_music` with `length` the film's length and `hit` the time of its logo close, both from its film.timeline.json, and `fps` {fact:launch-film.fps}. `fit_music` writes the sound only.
 <!-- local -->
+   Give `fit_music` an `out_dir` inside the film's folder, like its music/, so that folder holds the film's track.
 ```call
-fit_music {"track": "music/track.mp3", "length": "24", "hit": "18.667", "fps": {fact:launch-film.fps}, "out_dir": "launch/music"}
+fit_music {"track": "music/track.mp3", "length": "24", "hit": "18.667", "fps": {fact:launch-film.fps}, "out_dir": "launch/film-16x9/music"}
 ```
    The music topic says how to lay it under the film when you can run commands. Then check the new file with `check_video`, `cues` set to the fitted track's cues.json, `cuts` to the film's film.timeline.json, which a file under another name does not find by itself, and an `out_dir` of its own, since check/ next to it holds the film's report.
 <!-- end -->
@@ -234,7 +235,7 @@ Give each piece its own folder under one launch folder, so no run replaces anoth
 <!-- end -->
 - launch/film-16x9 and launch/film-9x16, one for each plan
 <!-- with musicfit -->
-- launch/music, the fitted track
+- launch/film-16x9/music, the fitted track, inside the film's folder
 <!-- end -->
 
 A new plan in a folder that holds a render leaves that film.mp4, film.timeline.json, frames/ and stills/ beside the new film.json, which no longer match it, so give a second plan or a new look a new folder.
