@@ -196,6 +196,7 @@
       "hostedDescription": "Renders the film.json of an earlier make_launch_film or plan_launch_film job into film.mp4, as it was planned, and writes film.timeline.json, each clip's start and length, which the result shows. The film is {fact:launch-film.fps} frames a second. It renders one clip at a time here, so a 30 second film takes longer than the {fact:launch-film.render_minutes} it takes with two clips at a time.",
       "args": ["render", "{film}"],
       "out": { "name": "{dir:film}" },
+      "destructive": true,
       "params": {
         "film": { "type": "path", "required": true, "reads": ["brand", "clips.image", "clips.images", "clips.logo", "clips.icon"], "description": "The film.json to render. film.mp4 and film.timeline.json go next to it.", "hostedDescription": "The film.json an earlier job saved, as job:<job_id>/film.json, so the brand and screens it names come with it." },
         "jobs": { "type": "integer", "flag": "--jobs", "min": 1, "max": 4, "default": 2, "hostedDefault": 1, "where": "local", "description": "Clips rendered at once (default {default:render_launch_film.jobs}). 1 suits a slow machine." },
@@ -287,6 +288,7 @@
       "args": ["check", "{film}"],
       "needs": ["ffmpeg"],
       "out": { "flag": "--out", "name": "{dir:film}/check" },
+      "destructive": true,
       "check": true,
       "report": "CHECK.md",
       "params": {

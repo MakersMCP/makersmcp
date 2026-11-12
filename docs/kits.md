@@ -21,6 +21,7 @@ A kit is a command line tool with its own repository and npm package. makersmcp 
       "description": "Reads a website in a headless browser ... card.png is the picture to show first.",
       "args": ["{url}"],
       "out": { "flag": "--out", "name": "easybrandkit-{host}", "ownOnly": true },
+      "destructive": true,
       "params": {
         "url": { "type": "url", "required": true, "description": "The website, like https://linear.app" },
         "facts": { "type": "boolean", "flag": "--facts", "default": false, "description": "Also read what the site claims about itself." },
@@ -86,7 +87,7 @@ A kit is a command line tool with its own repository and npm package. makersmcp 
 - `usesUnless`: parameters that take a file, given which the kit runs none of the kits in `uses`, like `["brand"]` for `plan_launch_film`, which copies the brand kit it is given and runs no easybrandkit, or `["source"]` for `make_launch_stills`, which given a film.json makes the pictures from it. For a call that gives a file by one of them, the settings of the kits in `uses` do not count.
 - `needs`: the programs the tool runs, when it runs fewer than its kit's `needs`, like `["chrome"]` for `take_screenshots` or `[]` for a tool that runs none, so a setting for a program it never runs does not stop it.
 - `readOnly`: the tool writes nothing.
-- `destructive`: the tool may delete or replace files already in its folder, so a client may ask before it runs. It is about the folder on this machine: on a hosted server every job writes a folder of its own, so no kit tool is marked destructive there.
+- `destructive`: the tool may delete or replace files already in its folder, so a client that asks before a destructive tool asks before it. In MCP a tool that is not destructive only adds, and every kit tool that writes deletes or replaces what an earlier run left in its folder: an `ownOnly` tool deletes it as it starts, a tool with `replaces` deletes those folders, and the others save their files over it. So each tool is `readOnly` or `destructive`, and `npm test` holds the files in `kits/` to that. It is about the folder on this machine: on a hosted server every job writes a folder of its own, so no kit tool is marked destructive there.
 
 A description, or a parameter's text, leaves out each sentence that names a tool the server does not list, so write the pointer to another kit's tool as a sentence of its own, like "For font files, use make_font_kit instead.", and never make the rest of the text need it.
 

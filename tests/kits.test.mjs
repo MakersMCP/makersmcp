@@ -50,9 +50,12 @@ test('every number has its bounds, and every address an example with https://', 
   }
 });
 
-test('a tool that replaces folders in its own says it is destructive', () => {
+test('every tool that writes says it is destructive, as each deletes or replaces what an earlier run left in its folder', () => {
+  // In MCP a tool that is not destructive only adds. An ownOnly tool deletes the earlier run as it starts, a tool with
+  // replaces deletes those folders, and every other tool that writes saves its files over an earlier run's.
   for (const kit of kits) {
     for (const tool of kit.tools) {
+      assert.equal(tool.destructive === true, tool.readOnly !== true, `${tool.name} is ${tool.readOnly ? 'read only' : 'not read only'}`);
       if (tool.out?.replaces) assert.equal(tool.destructive, true, tool.name);
     }
   }
@@ -237,7 +240,8 @@ test('plan_launch_film never deletes a brand folder of the user\'s, and the tool
       ), name);
     }
     assert.match(tools.find(item => item.name === 'plan_launch_film').inputSchema.properties.out_dir.description, / To use that brand\/ folder where it is, give brand as out_dir with \/brand added, written the same way\.$/);
-    assert.equal(tools.find(item => item.name === 'check_video').annotations.destructiveHint, false);
+    // A check writes its report over an earlier one's in the same folder.
+    assert.equal(tools.find(item => item.name === 'check_video').annotations.destructiveHint, true);
   });
 });
 

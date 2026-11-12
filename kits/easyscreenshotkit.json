@@ -28,6 +28,7 @@
       "args": ["{url}"],
       "needs": ["chrome"],
       "out": { "flag": "--out", "name": "easyscreenshotkit-{host}", "ownOnly": true },
+      "destructive": true,
       "params": {
         "url": { "type": "url", "required": true, "description": "The website, like https://linear.app, or a page of it. A #route in it is dropped, so a view an app shows behind one is not reached." },
         "pages": { "type": "integer", "flag": "--pages", "min": 1, "max": 12, "default": 5, "description": "How many pages, the home page included (default {default:take_screenshots.pages}). Above 1 the site's root comes first, then url when it is a deeper page, then each page, then pages from the site's menu. With 1, only url is taken, though a page that is not of the site still stops the run." },
@@ -75,6 +76,7 @@
       "description": "Records a short demo video of a website: a tour of the pages worth showing, or the steps in a file. The page plays in a browser window on a backdrop, with a visible pointer, smooth scrolling and a zoom on each click; cookie banners and chat bubbles are hidden, never clicked. Saves demo.mp4 ({fact:easyscreenshotkit.demo.size}, H.264, no sound), demo.gif, poster.png, the picture to show first, and steps.json: each step's start and end, and each click's moment as pressedAt, which music and captions are timed from. A steps file's targets are CSS selectors or text=<words>, and pages and page are for a tour only. A tour gives a page about {fact:easyscreenshotkit.tour.page_seconds} seconds. For still screenshots, use take_screenshots instead.",
       "args": ["demo", "{url}"],
       "out": { "flag": "--out", "name": "easyscreenshotkit-demo-{host}", "ownOnly": true, "runFiles": ["demo.mp4", "demo.gif", "poster.png", "steps.json"] },
+      "destructive": true,
       "params": {
         "url": { "type": "url", "required": true, "description": "The website, like https://linear.app. It replaces a steps file's url line and starts a file whose first step is no visit; a visit to a whole address, as every visit in a tour's demo.yaml, still opens that address." },
         "steps": { "type": "path", "flag": "--steps", "description": "A YAML or JSON file of steps to follow instead of a tour, one action a step: visit, scroll, click, type, key, hover or wait. A target is a CSS selector or text=<words>, and a selector that starts with # goes in quotes. demo.yaml from an earlier tour is one to start from. Not with pages or page.", "hostedDescription": "A YAML or JSON file of steps to follow instead of a tour, used as it is, like the demo.yaml of a tour an earlier job recorded. One action a step: visit, scroll, click, type, key, hover or wait; a target is a CSS selector or text=<words>. Not with pages or page. Give an https link to the file, or job:<job_id>/<path> for a file an earlier job saved." },

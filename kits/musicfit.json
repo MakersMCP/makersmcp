@@ -25,6 +25,7 @@
       "hostedDescription": "Fits a music track to a video cut: makes it exactly the given length by cutting or looping whole bars, lands its drop on the hit, ends it on a beat, ducks it under a voice and sets its loudness, without changing its tempo or pitch. Writes fitted.wav, mix.wav with a voice (the voice over the ducked music), cues.json (every beat, bar, seam and the hit, in seconds and in frames at fps), seams.png (the picture to show the user) and FIT.md (what was done and where to listen). It makes the sound only: no tool here lays it under a video. A film from plan_launch_film takes no music file, so plan it with music false to lay this track in afterwards. fps should be the video's, {fact:launch-film.fps} for a launch film. Give cues.json to check_video to check the cuts land on the beat. To read a track's tempo, drop and ending without fitting it, use analyze_music instead.",
       "args": ["{track}"],
       "out": { "flag": "--out", "name": "musicfit-{stem:track}" },
+      "destructive": true,
       "params": {
         "track": { "type": "path", "required": true, "description": "The music file, or a video whose sound to use; anything ffmpeg reads. An instrumental a little longer than the video fits best." },
         "length": { "type": "string", "flag": "--length", "required": true, "description": "The video's exact length, as text: seconds like \"29.333\" or \"32s\", frames at fps like \"733f\", or \"1:05\"; from {fact:musicfit.length_min} to {fact:musicfit.length_max} seconds. A launch film's is seconds in its film.timeline.json, a demo's video.duration in its steps.json." },
@@ -65,6 +66,7 @@
       "hostedDescription": "Reads a music track's tempo, beats, bars, drop and ending, and writes FIT.md (the tempo, the drop and the other drop candidates, where sections start, how it ends and any warning), cues.json (beats and bars in seconds, and as frames at {fact:musicfit.analyze_fps} a second) and seams.png (the track with its bars). It changes no track. Its tempo tells which launch film look the track suits. Use it before fit_music to pick hit and drop. To fit the track, use fit_music instead.",
       "args": ["{track}", "--analyze"],
       "out": { "flag": "--out", "name": "musicfit-{stem:track}" },
+      "destructive": true,
       "params": {
         "track": { "type": "path", "required": true, "description": "The music file, or a video whose sound to read." },
         "bpm": { "type": "number", "flag": "--bpm", "min": 40, "max": 250, "description": "The tempo, when the one found is half or double the real one; FIT.md warns when it could be (default: found)." },

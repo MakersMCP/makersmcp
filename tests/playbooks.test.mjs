@@ -1702,7 +1702,11 @@ test('with the kits in kits/, a number for a text parameter reaches the kit as t
           assert.equal(byName[tool.name].annotations.destructiveHint, where === 'local' && tool.destructive === true, `${tool.name} ${where}`);
         }
       }
-      assert.equal(byName.check_video.annotations.destructiveHint, false);
+      // Locally a check writes its report over an earlier one's; hosted each job has a folder of its own.
+      assert.equal(byName.check_video.annotations.destructiveHint, where === 'local');
+      for (const name of ['make_brand_kit', 'make_font_kit', 'take_screenshots', 'record_demo_video', 'render_launch_film', 'fit_music', 'analyze_music']) {
+        assert.equal(byName[name].annotations.destructiveHint, where === 'local', `${name} ${where}`);
+      }
     } finally {
       await session.close();
     }
