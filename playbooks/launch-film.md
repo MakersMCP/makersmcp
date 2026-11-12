@@ -130,7 +130,7 @@ make_launch_film {"url": "https://linear.app", "aspect": "9:16", "wait_seconds":
 - `jobs` is the number of clips `make_launch_film` and `render_launch_film` render at once, {default:render_launch_film.jobs} unless given; 1 suits a slow machine.
 <!-- end -->
 <!-- hosted -->
-- `jobs` is the number of clips `make_launch_film` and `render_launch_film` render at once, {default:render_launch_film.jobs} here unless given. Leave it out: more at once can run out of the memory a job has here.
+- `make_launch_film` and `render_launch_film` render one clip at a time here: more at once can run out of the memory a job has.
 <!-- end -->
 - `make_launch_stills` takes `source`, a `film.json` or the site's address, and `for`, the places.
 <!-- local -->

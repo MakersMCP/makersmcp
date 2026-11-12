@@ -643,11 +643,14 @@ function sideProblems(label, content, where) {
 }
 
 /** A view of a job of this tool in a state, with a file for each of its writes and a text for each doc. */
+/** The flag of the tool's first parameter with one that the tool takes on this side: a hosted tool takes no local parameter, whose flag stays as the kit wrote it. */
+const sideFlag = (tool, where) => Object.values(tool.params).find(param => param.flag && !(where === 'hosted' && param.where === 'local'))?.flag;
+
 function fakeView(tool, kit, state, id, where, { files = true } = {}) {
   const folder = where === 'local' ? path.join(LOCAL_DIR, `${tool.name}-out`) : `${tool.name} ${id}`;
   const names = (tool.writes ?? []).map(entry => sample(entry).replace(/x1/g, 'one'));
   const list = files ? names.map(name => ({ path: name, bytes: 10, ...(where === 'hosted' ? { url: `https://files.example.com/${id}/${name}?s=1` } : {}) })) : [];
-  const flag = Object.values(tool.params).find(param => param.flag)?.flag ?? '--out';
+  const flag = sideFlag(tool, where) ?? '--out';
   const failed = state === 'failed' || state === 'refused';
   // The files the call gave, by parameter, as a local job knows them, for a Next line's {input:<param>}.
   const inputs = Object.fromEntries(Object.entries(tool.params).filter(([, param]) => ['path', 'url_or_path', 'text_or_path'].includes(param.type))
@@ -1104,7 +1107,7 @@ async function resultProblems(definitions, dir, config, tool, view, state, topic
       }
       if (!result.structuredContent?.docs && tool.docs?.length) problems.push(`${label}: no docs in the structured content`);
     }
-    const flag = Object.values(tool.params).find(param => param.flag)?.flag;
+    const flag = sideFlag(tool, config.where);
     if (flag && new RegExp(`(?<![\\w"-])${flag}(?![\\w"-])`).test(parts.slice(2).join('\n\n'))) problems.push(`${label}: the kit's ${flag} is not written as its parameter`);
   } finally {
     await session.close();
@@ -1557,7 +1560,8 @@ test('a kit file\'s new fields are checked when it is read', () => {
   }
   const hostedDefaultDoc = readFileSync(path.join(here, '..', 'docs', 'kits.md'), 'utf8').split('\n').find(line => line.trimStart().startsWith('- `hostedDefault`:'));
   assert.match(hostedDefaultDoc, /a boolean, one of its `values` or, for a `string`, a text, .*; a parameter that takes a file, an address or a list has none\.$/);
-  assert.throws(broken((kit, tool) => { tool.params.keep.hostedDefault = true; }), /paint_picture\.keep: hostedDefault is for a parameter a call may leave out on a hosted server/);
+  // A local parameter, which the hosted tools leave out, may have one: every hosted call has it then.
+  broken((kit, tool) => { tool.params.keep.hostedDefault = true; })();
   assert.throws(broken((kit, tool) => { tool.params.url.hostedDefault = 'https://example.com'; }), /paint_picture\.url: hostedDefault is for a parameter a call may leave out on a hosted server/);
   broken((kit, tool) => Object.assign(tool.params, {
     width: { ...tool.params.width, hostedDefault: 600 }, hue: { ...tool.params.hue, hostedDefault: 'cool' },
@@ -1566,34 +1570,63 @@ test('a kit file\'s new fields are checked when it is read', () => {
   broken(() => {})();
 });
 
-test('hosted, launch-film renders one clip at a time unless the call says otherwise, as jobs\' hosted default, which its schema and texts show, while the kit\'s own default holds locally', async () => {
+test('hosted, launch-film renders one clip at a time, as jobs is no parameter there and every call has its hosted default, while locally the kit\'s own default holds and a call may give another', async () => {
+  // Two clips at once ran out of a hosted job's memory in four of six renders, so a call there cannot ask for more than one.
   for (const where of ['local', 'hosted']) {
     const session = await connect({ definitions: loadKitDefinitions(), where, limits: where === 'hosted' ? LIMITS : undefined });
     try {
       const film = where === 'local' ? 'film.json' : 'job:job0/film.json';
-      for (const [args, jobs] of [[{}, where === 'hosted' ? 1 : undefined], [{ jobs: 3 }, 3]]) {
+      for (const [args, jobs] of [[{}, where === 'hosted' ? 1 : undefined], [{ jobs: 3 }, where === 'hosted' ? 1 : 3]]) {
         const result = await session.client.callTool({ name: 'render_launch_film', arguments: { film, ...args, wait_seconds: 0 } });
         assert.notEqual(result.isError, true, text(result));
         assert.equal(session.backend.started.at(-1).input.jobs, jobs, `${where} ${JSON.stringify(args)}`);
       }
-      await session.client.callTool({ name: 'make_launch_film', arguments: { url: 'https://example.com', wait_seconds: 0 } });
-      assert.equal(session.backend.started.at(-1).input.jobs, where === 'hosted' ? 1 : undefined, `${where} make_launch_film`);
+      for (const args of [{}, { jobs: 2 }]) {
+        await session.client.callTool({ name: 'make_launch_film', arguments: { url: 'https://example.com', ...args, wait_seconds: 0 } });
+        assert.equal(session.backend.started.at(-1).input.jobs, where === 'hosted' ? 1 : args.jobs, `${where} make_launch_film ${JSON.stringify(args)}`);
+      }
       for (const name of ['make_launch_film', 'render_launch_film']) {
         const jobs = session.tools.find(tool => tool.name === name).inputSchema.properties.jobs;
-        assert.equal(jobs.default, where === 'hosted' ? 1 : undefined, `${where} ${name}`);
-        assert.equal(jobs.description, where === 'hosted'
-          ? 'Clips rendered at once (default 1 here). Leave it out: more at once can run out of the memory a job has here.'
-          : 'Clips rendered at once (default 2). 1 suits a slow machine.');
-        assert.ok(!session.tools.find(tool => tool.name === name).inputSchema.required?.includes('jobs'));
+        if (where === 'hosted') assert.equal(jobs, undefined, name);
+        else assert.equal(jobs.description, 'Clips rendered at once (default 2). 1 suits a slow machine.');
       }
       const topic = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['launch-film'] } }));
       assert.match(topic, where === 'hosted'
-        ? /\n- `jobs` is the number of clips `make_launch_film` and `render_launch_film` render at once, 1 here unless given\. Leave it out: more at once can run out of the memory a job has here\.\n/
+        ? /\n- `make_launch_film` and `render_launch_film` render one clip at a time here: more at once can run out of the memory a job has\.\n/
         : /\n- `jobs` is the number of clips `make_launch_film` and `render_launch_film` render at once, 2 unless given; 1 suits a slow machine\.\n/);
+      if (where === 'hosted') assert.doesNotMatch(topic, /`jobs`/);
     } finally {
       await session.close();
     }
   }
+  // "one clip at a time" is that hosted default in words.
+  for (const name of ['make_launch_film', 'render_launch_film']) {
+    const { jobs } = loadKitDefinitions().find(kit => kit.kit === 'launch-film').tools.find(tool => tool.name === name).params;
+    assert.deepEqual([jobs.where, jobs.hostedDefault], ['local', 1], name);
+  }
+});
+
+test('a local parameter with a hosted default is no parameter of the hosted tool, and every hosted call has that value, whatever the call gives', async () => {
+  const kits = fixtureKits();
+  kits[0].tools[0].params.keep.hostedDefault = true;
+  for (const where of ['local', 'hosted']) {
+    const session = await connect({ definitions: kits, playbooks: path.join(FIXTURES, 'topics'), where });
+    try {
+      const url = 'https://example.com';
+      for (const [args, keep] of [[{}, where === 'hosted' ? true : undefined], [{ keep: false }, where === 'hosted' ? true : false]]) {
+        const result = await session.client.callTool({ name: 'paint_picture', arguments: { url, ...args, wait_seconds: 0 } });
+        assert.notEqual(result.isError, true, text(result));
+        assert.equal(session.backend.started.at(-1).input.keep, keep, `${where} ${JSON.stringify(args)}`);
+      }
+      assert.equal('keep' in session.tools.find(tool => tool.name === 'paint_picture').inputSchema.properties, where === 'local');
+    } finally {
+      await session.close();
+    }
+  }
+  // docs/kits.md says so, and that only makersmcp's server gives the value, so a service that starts a job another way does not.
+  const doc = readFileSync(path.join(here, '..', 'docs', 'kits.md'), 'utf8').split('\n').find(line => line.trimStart().startsWith('- `hostedDefault`:'));
+  assert.ok(doc.includes(' On a local parameter, which the hosted tools leave out, every hosted call has it, '), doc);
+  assert.ok(doc.includes(" Only makersmcp's server gives it: a service whose MCP server runs an older makersmcp, or that starts a job another way, runs the kit's own default. "), doc);
 });
 
 test('a number given for a parameter the kit reads as text reaches it as text, and a local parameter is left out hosted', async () => {

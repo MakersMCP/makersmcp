@@ -67,13 +67,17 @@ export interface ParamDefinition {
    */
   default?: unknown;
   /**
-   * The value a hosted server gives the parameter when a call leaves it out, like 1 for
-   * launch-film's jobs, since two clips at once can run a hosted job out of its memory: its
-   * schema there shows it as the default, the call reaches the backend with it, and
-   * {default:<tool>.<param>} shows it in a hosted text. `default` stays the kit's own, here.
+   * The value a hosted server gives the parameter when a call leaves it out: its schema there
+   * shows it as the default, the call reaches the backend with it, and {default:<tool>.<param>}
+   * shows it in a hosted text. `default` stays the kit's own, here. On a local parameter, which
+   * the hosted tools leave out, every hosted call has it, like 1 for launch-film's jobs, since
+   * two clips at once can run a hosted job out of its memory.
    */
   hostedDefault?: unknown;
-  /** "local": the parameter is left out of the tools a hosted server lists, like keep, whose files a hosted job sweeps away. */
+  /**
+   * "local": the parameter is left out of the tools a hosted server lists, like keep, whose
+   * files a hosted job sweeps away, or jobs, which a hosted job always gets as its hostedDefault.
+   */
   where?: 'local';
 }
 
@@ -497,7 +501,7 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
         if (param.required || tool.args.includes(`{${name}}`)) fail(`${tool.name}.${name}: a local parameter cannot be required`);
       }
       if (param.hostedDefault !== undefined) {
-        if (param.required || param.where === 'local') fail(`${tool.name}.${name}: hostedDefault is for a parameter a call may leave out on a hosted server`);
+        if (param.required) fail(`${tool.name}.${name}: hostedDefault is for a parameter a call may leave out on a hosted server`);
         if (!takesValue(param, param.hostedDefault)) {
           fail(`${tool.name}.${name}: hostedDefault is a value the parameter takes as it is: a number inside its min and max, a boolean, one of its values or, for a string parameter, a text; a parameter that takes a file, an address or a list has none`);
         }

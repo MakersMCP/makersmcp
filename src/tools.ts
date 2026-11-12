@@ -155,8 +155,8 @@ function paramSchema(tool: ToolDefinition, name: string, param: ParamDefinition,
       schema = number ? z.union([z.string().min(1), z.number()], { error: 'text, or a number' }) : z.string().min(1);
   }
   if (param.required) return schema.describe(description);
-  // A hosted server gives the parameter its hosted default when a call leaves it out, like
-  // jobs 1 for a launch film, and its schema shows it, as wait_seconds' shows its own.
+  // A hosted server gives the parameter its hosted default when a call leaves it out, and its
+  // schema shows it, as wait_seconds' shows its own.
   if (hosted && param.hostedDefault !== undefined) return schema.default(param.hostedDefault).describe(description);
   return schema.describe(description).optional();
 }
@@ -298,6 +298,8 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
     },
     async (input: Record<string, unknown>, extra: Extra) => {
       const { wait_seconds: wait, ...args } = input;
+      // A local parameter with a hosted default is no parameter of the tool here, and every call has that value, like jobs 1 for a launch film.
+      if (hosted) for (const [name, param] of Object.entries(tool.params)) if (param.where === 'local' && param.hostedDefault !== undefined) args[name] = param.hostedDefault;
       // The kit, and a hosted service, check text: a number given for one is written as text.
       for (const name of numbers) if (typeof args[name] === 'number') args[name] = String(args[name]);
       let view: JobView;
