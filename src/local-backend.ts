@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readSync, realpathSync, type BigIntStats, type Stats } from 'node:fs';
 import path from 'node:path';
 import { ArgumentError, MissingFileError, buildCommand, expandHome } from './args.js';
@@ -390,6 +391,8 @@ export class LocalBackend implements KitBackend {
   readonly where = 'local';
   readonly place = 'on this machine';
   readonly baseDir: string;
+  /** Its own: its jobs are in its own JobManager, which no other backend reaches. */
+  readonly identity = `local:${randomUUID()}`;
   readonly jobs = new JobManager();
   private readonly kitPaths?: Record<string, string>;
   private readonly env?: NodeJS.ProcessEnv;

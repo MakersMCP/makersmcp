@@ -75,6 +75,7 @@ export const jobOutputSchema = {
     arguments: z.record(z.string(), z.unknown()),
   }).optional(),
   next: z.string().optional().describe('What to do next, as the Next line says.'),
+  continued: z.boolean().optional().describe('True when this call continued the job of an identical call whose answer did not reach the client, instead of starting another.'),
   docs: z.array(z.object({
     name: z.string(),
     path: z.string().optional(),
@@ -544,6 +545,26 @@ export function jobResult(view: JobView, context?: ResultContext): CallToolResul
       ...(docs.length ? { docs: docs.map(({ name, path: at, url }) => ({ name, ...(at ? { path: at } : {}), ...(url ? { url } : {}) })) } : {}),
     },
   };
+}
+
+/** How long ago in words: seconds under a minute and a half, then minutes. */
+function ago(ms: number): string {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  if (seconds < 90) return `${seconds} second${seconds === 1 ? '' : 's'}`;
+  const minutes = Math.round(seconds / 60);
+  return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+}
+
+/**
+ * The result of a call that continued the job of an identical earlier call whose answer did
+ * not reach the client: a note of makersmcp's own above it, which says so and how to make a
+ * separate run (`separate`), and continued in the structured content.
+ */
+export function continuedResult(result: CallToolResult, jobId: string, ageMs: number, separate: string): CallToolResult {
+  const note = `This call continued job ${jobId}, which an identical call started ${ago(ageMs)} ago and whose answer did not reach you, instead of starting a second job. ${separate}`;
+  const [first, ...rest] = result.content;
+  const content: CallToolResult['content'] = first?.type === 'text' ? [{ ...first, text: `${note}\n\n${first.text}` }, ...rest] : [{ type: 'text', text: note }, ...result.content];
+  return { ...result, content, ...(result.structuredContent ? { structuredContent: { ...result.structuredContent, continued: true } } : {}) };
 }
 
 export function errorResult(text: string): CallToolResult {

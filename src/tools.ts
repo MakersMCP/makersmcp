@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
@@ -7,7 +8,8 @@ import { NotStartedError, type AvailableKit, type JobView, type KitBackend } fro
 import { strictInput } from './input.js';
 import type { ParamDefinition, ToolDefinition } from './kits.js';
 import { PLAYBOOK_TOOL } from './playbooks.js';
-import { checkNextLines, errorResult, jobListed, jobOutputSchema, jobResult, shownView, type ResultContext } from './results.js';
+import { callKey, type CallOutcome, type RepeatTiming, type StartLedger, type StartOutcome, type StartRecord } from './repeats.js';
+import { checkNextLines, continuedResult, errorResult, jobListed, jobOutputSchema, jobResult, shownView, type ResultContext } from './results.js';
 import { BASE_DIR_IN_WORDS, fillText, inWords, templateInWords, TextError, WAIT_SECONDS, withoutUnlisted, type TextContext } from './texts.js';
 
 /** A kit tool this server lists, with the kit it is of. */
@@ -29,6 +31,9 @@ export interface ToolContext {
   topics: Set<string>;
   /** The kit tools registered so far, by name, for the results of wait_for_job and cancel_job. */
   tools: Map<string, RegisteredKitTool>;
+  /** The starts of kit tool calls an identical call may continue, and for how long. */
+  ledger: StartLedger;
+  repeatTiming: RepeatTiming;
 }
 
 type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
@@ -319,21 +324,95 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
       if (hosted) for (const [name, param] of Object.entries(tool.params)) if (param.where === 'local' && param.hostedDefault !== undefined) args[name] = param.hostedDefault;
       // The kit, and a hosted service, check text: a number given for one is written as text.
       for (const name of numbers) if (typeof args[name] === 'number') args[name] = String(args[name]);
-      let view: JobView;
+
+      // An identical call whose answer did not reach the client, or one still waiting since
+      // retryAfterMs, is this call's own: it continues that job instead of starting another.
+      // A backend without an identity gets a key no other call shares.
+      const { ledger, repeatTiming: timing } = context;
+      const identity = typeof backend.identity === 'string' && backend.identity ? backend.identity : undefined;
+      const key = identity ? callKey(identity, tool.name, args) : `call:${randomUUID()}`;
+      let match = identity ? ledger.find(key, timing, calledAt) : undefined;
+      let record: StartRecord | undefined;
+      let outcome: CallOutcome = 'failed';
+      let replaced = false;
+      // A cancel or a closed connection means this call's answer will not arrive, so an
+      // identical call right after it continues its job.
+      const onAbort = () => {
+        if (record) ledger.markUnanswered(record);
+      };
+      extra.signal.addEventListener('abort', onAbort);
       try {
-        view = await backend.start({ kit, tool, input: args });
+        // Twice at most: a continued job that failed, was canceled or is gone is replaced by
+        // a new one, as if no earlier call had been made.
+        for (;;) {
+          const continued = match;
+          match = undefined;
+          record = continued ?? ledger.start(key, () => backend.start({ kit, tool, input: args }));
+          ledger.attach(record);
+          // The start is not tied to this call's signal: once asked, the backend may start the
+          // job whether or not this call still waits, and an identical call after it needs it.
+          const settled = record.settled ?? await untilAborted(record.started, extra.signal);
+          if (!settled.ok) {
+            if (continued && !replaced) {
+              replaced = true;
+              ledger.release(record, 'failed');
+              record = undefined;
+              continue;
+            }
+            const { error } = settled;
+            // A local refusal may quote a parameter's text, whose placeholders are filled here too.
+            if (error instanceof NotStartedError) return errorResult(`## ${tool.title}: not started\n\n${filledMessage(error.message, context)}`);
+            throw error;
+          }
+          let view: JobView | undefined = settled.view;
+          // A continued job is waited for as it is now, which may be ended.
+          if (view.status === 'running' || continued) {
+            const left = Math.max(0, Number(wait ?? WAIT_SECONDS.default) - (Date.now() - calledAt) / 1000);
+            view = (await waitFor(context, view.id, left, extra)) ?? (continued ? undefined : view);
+          }
+          if (continued && !replaced && (!view || view.status === 'failed' || view.status === 'canceled')) {
+            replaced = true;
+            ledger.release(record, 'failed');
+            record = undefined;
+            continue;
+          }
+          outcome = 'answered';
+          const result = jobResult(view!, resultContext(context, entry));
+          if (!continued) return result;
+          const separate = hosted || !inputSchema['out_dir'] ? 'For a separate run, change an argument.' : 'For a separate run, give another out_dir.';
+          return continuedResult(result, view!.id, calledAt - continued.startedAt, separate);
+        }
       } catch (error) {
-        // A local refusal may quote a parameter's text, whose placeholders are filled here too.
-        if (error instanceof NotStartedError) return errorResult(`## ${tool.title}: not started\n\n${filledMessage(error.message, context)}`);
+        // Only a cancel ends up here, or an error of the backend's that no answer can hide.
+        if (extra.signal.aborted) return errorResult(`## ${tool.title}: canceled\n\nThe call was cancelled; its job keeps running, and list_jobs shows it.`);
         throw error;
+      } finally {
+        extra.signal.removeEventListener('abort', onAbort);
+        if (record) ledger.release(record, extra.signal.aborted ? 'unanswered' : outcome);
       }
-      if (view.status === 'running') {
-        const left = Math.max(0, Number(wait ?? WAIT_SECONDS.default) - (Date.now() - calledAt) / 1000);
-        view = (await waitFor(context, view.id, left, extra)) ?? view;
-      }
-      return jobResult(view, resultContext(context, entry));
     },
   );
+}
+
+/** A start's outcome, or an abort error once the call's signal ends first. */
+function untilAborted(started: Promise<StartOutcome>, signal: AbortSignal): Promise<StartOutcome> {
+  return new Promise((resolve, reject) => {
+    const aborted = () => {
+      const error = new Error('The call was cancelled');
+      error.name = 'AbortError';
+      return error;
+    };
+    if (signal.aborted) {
+      reject(aborted());
+      return;
+    }
+    const onAbort = () => reject(aborted());
+    signal.addEventListener('abort', onAbort, { once: true });
+    void started.then(settled => {
+      signal.removeEventListener('abort', onAbort);
+      resolve(settled);
+    });
+  });
 }
 
 export function registerCoreTools(server: McpServer, context: ToolContext): void {

@@ -132,6 +132,13 @@ export interface KitBackend {
   readonly limits?: HostedLimits;
   /** A local backend's folder, which relative paths are read from: {base_dir} in the playbooks. */
   readonly baseDir?: string;
+  /**
+   * Whose jobs these are, the same for every backend whose wait and cancel reach the same
+   * jobs, like a hosted service's user: a kit tool call identical to an earlier one of the same
+   * identity, whose answer did not reach the client, continues that call's job instead of
+   * starting another (repeats.ts). A backend without one starts a job for every call.
+   */
+  readonly identity?: string;
   /** For each definition, the kit as it runs here, or why it cannot. */
   available(definitions: KitDefinition[]): Array<AvailableKit | UnavailableKit>;
   start(request: StartRequest): Promise<JobView>;

@@ -15,6 +15,7 @@ import {
   registerPlaybookTool,
   type Playbooks,
 } from './playbooks.js';
+import { REPEAT_TIMING, startLedger, type RepeatTiming } from './repeats.js';
 import { withDraft2020 } from './schema-dialect.js';
 import { defaultOutDir } from './setup.js';
 import { onNames, type TextContext } from './texts.js';
@@ -55,6 +56,8 @@ export type { BuiltCommand, CommandContext } from './args.js';
 export { LocalBackend, failureText, listFiles, readDocs, viewJob } from './local-backend.js';
 export type { LocalBackendOptions } from './local-backend.js';
 export { NotStartedError, isAvailable } from './backend.js';
+export { REPEAT_TIMING } from './repeats.js';
+export type { RepeatTiming } from './repeats.js';
 export type {
   AvailableKit,
   HostedLimits,
@@ -97,6 +100,13 @@ export interface MakersMcpOptions {
    * arguments are checked. Default: 10,000; Infinity turns the check off.
    */
   maxToolInputElements?: number;
+  /**
+   * When a kit tool call identical to an earlier one of the same backend identity continues
+   * that call's job instead of starting another: within unansweredWindowMs of that call ending
+   * with no answer that reached its client, or while it still waits, once retryAfterMs have
+   * passed since it began. Default: REPEAT_TIMING, 10 minutes and 10 seconds.
+   */
+  repeatTiming?: Partial<RepeatTiming>;
 }
 
 /** maxToolInputElements when the options give none. No kit tool takes a list near it. */
@@ -179,7 +189,7 @@ export async function describeSetup(options: MakersMcpOptions = {}): Promise<str
 }
 
 /** The tools' and the playbooks' context: the side, the kits on, their versions and texts, and the topics offered. */
-function toolContext(prepared: Prepared, playbooks: Playbooks): ToolContext {
+function toolContext(prepared: Prepared, playbooks: Playbooks, repeatTiming: Partial<RepeatTiming> = {}): ToolContext {
   const { backend, definitions, available, enabled, listed } = prepared;
   const hosted = backend.where === 'hosted';
   const baseDir = backend.baseDir;
@@ -210,6 +220,8 @@ function toolContext(prepared: Prepared, playbooks: Playbooks): ToolContext {
     text,
     topics: new Set(offeredTopics(playbooks, onNames(text)).map(topic => topic.name)),
     tools: new Map(),
+    ledger: startLedger,
+    repeatTiming: { ...REPEAT_TIMING, ...repeatTiming },
   };
 }
 
@@ -224,7 +236,7 @@ function toolContext(prepared: Prepared, playbooks: Playbooks): ToolContext {
 export function createMcpServer(options: MakersMcpOptions = {}): McpServer {
   const prepared = prepare(options);
   const playbooks = typeof options.playbooks === 'object' ? options.playbooks : loadPlaybooks(options.playbooks);
-  const context = toolContext(prepared, playbooks);
+  const context = toolContext(prepared, playbooks, options.repeatTiming);
   const server = new McpServer(
     { name: 'makersmcp', title: 'MakersMCP', version, websiteUrl: 'https://makersmcp.com' },
     {
