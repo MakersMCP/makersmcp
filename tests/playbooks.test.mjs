@@ -2123,6 +2123,27 @@ test('a tool MakersMCP-Server holds back is not listed and no text names it, whi
   }
 });
 
+test('a kit tool whose own topic the server does not offer points to getting-started, which lists what it fits there, and one whose topic it offers to that topic', async () => {
+  const sides = [
+    // With fit_music held back the music topic is not offered, and getting-started has analyze_music's line of its own.
+    [{ where: 'hosted', limits: LIMITS, held: ['check_video', 'fit_music'] }, 'The getting-started playbook (makersmcp_playbook) says which requests it fits here.'],
+    [{ where: 'hosted', limits: LIMITS }, 'The music playbook (makersmcp_playbook) has the whole job.'],
+    [{}, 'The music playbook (makersmcp_playbook) has the whole job.'],
+  ];
+  for (const [options, pointer] of sides) {
+    const session = await connect({ definitions: loadKitDefinitions(), ...options });
+    try {
+      const description = name => session.tools.find(tool => tool.name === name).description;
+      const analyze = description('analyze_music');
+      assert.ok(analyze.endsWith(` ${pointer} (musicfit 9.9.9, ${session.backend.place}.)`), `${JSON.stringify(options)}: ${analyze}`);
+      assert.equal(analyze.match(/playbook \(makersmcp_playbook\)/g).length, 1, analyze);
+      assert.match(description('render_launch_film'), / The launch-film playbook \(makersmcp_playbook\) has the whole job\. \(launch-film 9\.9\.9, /);
+    } finally {
+      await session.close();
+    }
+  }
+});
+
 test('a sentence that holds only while a tool is held back or off is not there while it is listed, and one that needs a tool is there only with it', async () => {
   const read = async (options, topics) => {
     const session = await connect({ definitions: loadKitDefinitions(), ...options });

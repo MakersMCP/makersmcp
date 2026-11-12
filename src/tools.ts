@@ -220,10 +220,15 @@ function outDirHelp(tool: ToolDefinition, baseDir: string | undefined): string {
   return help;
 }
 
+/** The topic that says which request each tool the server lists fits, which every server offers. */
+const STARTED_TOPIC = 'getting-started';
+
 /**
  * A kit tool's description as the client gets it: when to use it in the user's words
  * (asks), what it makes (the kit file's description, or hostedDescription on a hosted
  * server), the topic that has the whole job, and last the kit, its version and where it runs.
+ * A tool whose own topic the server does not offer, like analyze_music while fit_music is
+ * held back, points to getting-started, which lists what it fits then.
  */
 export function kitToolDescription(context: ToolContext, kit: AvailableKit, tool: ToolDefinition): string {
   const hosted = context.backend.where === 'hosted';
@@ -232,6 +237,7 @@ export function kitToolDescription(context: ToolContext, kit: AvailableKit, tool
   if (tool.asks) parts.push(`Use it when the user wants ${kitText(tool.asks, context, `${tool.name}.asks`)}.`);
   parts.push(kitText(hosted && tool.hostedDescription ? tool.hostedDescription : tool.description, context, tool.name));
   if (tool.playbook && context.topics.has(tool.playbook)) parts.push(`The ${tool.playbook} playbook (${PLAYBOOK_TOOL}) has the whole job.`);
+  else if (tool.playbook && context.topics.has(STARTED_TOPIC)) parts.push(`The ${STARTED_TOPIC} playbook (${PLAYBOOK_TOOL}) says which requests it fits here.`);
   parts.push(`(${kit.definition.kit} ${kit.version}, ${place}.)`);
   return parts.join(' ');
 }
