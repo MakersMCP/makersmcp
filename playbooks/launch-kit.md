@@ -249,7 +249,7 @@ The film's cuts fall on the bars of its look's own music: launch at {fact:launch
 
 ## Hand over
 
-List every file by place: the file, its size, and what it is for. Then say what was checked, with each verdict, and what is left to the user: laying a track under a film when that was not done, uploading to each place, and any place no tool here makes for.
+List every file by place: the file, its size, and what it is for. Say what you chose where the user left it open, like the places and the film's shape. Then say what was checked, with each verdict, and what is left to the user: laying a track under a film when that was not done, uploading to each place, and any place no tool here makes for.
 <!-- hosted -->
 Give each file its own link from its result, with the time it stops working: no link opens a folder.
 <!-- end -->

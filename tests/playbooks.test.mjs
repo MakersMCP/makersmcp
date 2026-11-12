@@ -1981,6 +1981,20 @@ test('hosted, getting-started and launch-kit hand each file over with its own li
   }
 });
 
+test('launch-kit\'s hand over says what was chosen where the user left it open, as its Decide first asks, on both sides', async () => {
+  for (const options of [{}, { where: 'hosted', limits: LIMITS, held: ['check_video', 'fit_music'] }]) {
+    const session = await connect({ definitions: loadKitDefinitions(), ...options });
+    try {
+      const read = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['launch-kit'] } }));
+      assert.match(read, /\nWhen the user leaves these open, choose, go on, and list the choices in the hand over\.\n/);
+      const handOver = read.slice(read.indexOf('\n## Hand over\n'));
+      assert.match(handOver, /\nList every file by place: the file, its size, and what it is for\. Say what you chose where the user left it open, like the places and the film's shape\. Then say what was checked/, JSON.stringify(options));
+    } finally {
+      await session.close();
+    }
+  }
+});
+
 test('hosted, a Next line from next leaves out a sentence with {folder}', async () => {
   const kits = fixtureKits();
   delete kits[0].tools.find(tool => tool.name === 'paint_picture').hostedNext;
