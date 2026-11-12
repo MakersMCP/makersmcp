@@ -2023,6 +2023,21 @@ test('a brand kit made with facts says in its Next line that a kind FACTS.md lis
   }
 });
 
+test('locally, the film tools say a host name needs a dot, so localhost on its own is refused, not a name under .localhost', async () => {
+  // launch-film reads any host name with a dot, like brightmoss.localhost: two assistants in the eval's trial told the user
+  // the film tools refuse such an address. A hosted service refuses every .localhost address, and its texts say only the dot.
+  const session = await connect({ definitions: loadKitDefinitions() });
+  try {
+    const byName = Object.fromEntries(session.tools.map(tool => [tool.name, tool]));
+    const sentence = 'The address needs a dot in its host name, so localhost on its own is refused.';
+    assert.ok(byName.make_launch_film.description.includes(sentence), byName.make_launch_film.description);
+    assert.ok(byName.make_launch_stills.inputSchema.properties.source.description.includes(sentence));
+    for (const tool of session.tools) assert.doesNotMatch(JSON.stringify(tool), /so localhost is refused/, tool.name);
+  } finally {
+    await session.close();
+  }
+});
+
 test('hosted, a Next line from next leaves out a sentence with {folder}', async () => {
   const kits = fixtureKits();
   delete kits[0].tools.find(tool => tool.name === 'paint_picture').hostedNext;
