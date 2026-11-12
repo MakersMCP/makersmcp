@@ -2427,6 +2427,9 @@ test('with launch-film\'s film tools held back, no topic of a film, its film.jso
   } finally {
     await listed.close();
   }
+  // The texts take the four as held back together, as the lint renders them: docs/kits.md says a block for two stands for all four.
+  const doc = readFileSync(path.join(here, '..', 'docs', 'kits.md'), 'utf8').split('\n').find(line => line.startsWith('A hosted service may run a kit without some of its tools'));
+  assert.ok(doc.includes(' goes in a `<!-- with make_launch_film, plan_launch_film -->` block, which stands for all four, as MakersMCP-Server holds them back together; '), doc);
 });
 
 test('a sentence that holds only while a tool is held back or off is not there while it is listed, and one that needs a tool is there only with it', async () => {
