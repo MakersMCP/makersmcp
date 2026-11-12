@@ -1995,6 +1995,34 @@ test('launch-kit\'s hand over says what was chosen where the user left it open, 
   }
 });
 
+test('a brand kit made with facts says in its Next line that a kind FACTS.md lists under Not found may still be on the site, and one without FACTS.md says nothing of facts', async () => {
+  // In the eval's trial an assistant told the user the site had no rating or testimonial, which the kit had missed.
+  const caveat = 'a kind it lists under Not found was not on the pages read, which does not mean the site has none, so ask the user.';
+  for (const where of ['local', 'hosted']) {
+    const id = where === 'local' ? 'job_1a2b3c4d' : '0f5c2e9a-1b2c-4d3e-8f90-123456789abc';
+    for (const facts of [true, false]) {
+      const names = ['BRAND.md', 'brand.json', 'card.png', ...(facts ? ['FACTS.md', 'facts.json'] : [])];
+      const session = await connect({
+        definitions: loadKitDefinitions(), where, ...(where === 'hosted' ? { limits: LIMITS } : {}),
+        view: () => ({
+          id, kit: 'easybrandkit', tool: 'make_brand_kit', title: 'Brand kit from a website', status: 'done', exitCode: 0, elapsedSeconds: 30,
+          folder: where === 'local' ? `${LOCAL_DIR}/easybrandkit-example.com` : `make_brand_kit ${id}`,
+          files: names.map(name => ({ path: name, bytes: 10, ...(where === 'hosted' ? { url: `https://files.example.com/${id}/${name}?s=1` } : {}) })),
+          ...(where === 'hosted' ? { expiresAt: 1800000000 } : {}),
+        }),
+      });
+      try {
+        const result = await session.client.callTool({ name: 'make_brand_kit', arguments: { url: 'https://example.com', ...(facts ? { facts: true } : {}) } });
+        const next = result.structuredContent.next;
+        if (facts) assert.ok(next.includes(` with the page each one is on; ${caveat}`), `${where}: ${next}`);
+        else assert.doesNotMatch(next, /Not found|FACTS\.md/, `${where}: ${next}`);
+      } finally {
+        await session.close();
+      }
+    }
+  }
+});
+
 test('hosted, a Next line from next leaves out a sentence with {folder}', async () => {
   const kits = fixtureKits();
   delete kits[0].tools.find(tool => tool.name === 'paint_picture').hostedNext;
