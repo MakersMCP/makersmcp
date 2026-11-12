@@ -9,6 +9,7 @@ import { TOPIC_NAME } from './kits.js';
 import {
   fillText,
   HOSTED_ONLY,
+  inWords,
   listedTools,
   LOCAL_ONLY,
   onNames,
@@ -59,9 +60,25 @@ const isName = (name: string) => KIT_ID.test(name) || TOOL_NAME.test(name);
 const KEYS = ['name', 'title', 'index', 'description', 'kit', 'requires', 'any', 'optional', 'order'] as const;
 const LIST_KEYS = new Set(['requires', 'any', 'optional']);
 const REQUIRED_KEYS = ['name', 'title', 'index', 'description', 'kit', 'order'];
-const INDEX_HEAD = "Returns MakersMCP's playbooks. Each covers one kind of job for the kits on this server: the order of calls, "
-  + 'the arguments that matter, what to check and what to hand over. Use it before a job with more than one step, or when '
-  + 'unsure which tool fits a request. Each topic is complete for its job, and up to three can be read in one call. Topics:';
+/**
+ * Jobs of more than one step the index names as examples, each while its topic is offered, so a
+ * held tool's job, like music fitted to a video while fit_music is held back, is never one.
+ */
+const EXAMPLE_JOBS: Array<[string, string]> = [['launch-film', 'a launch film'], ['music', 'music fitted to a video'], ['launch-kit', 'a launch kit']];
+
+/**
+ * The head of makersmcp_playbook's description: what a topic holds, and that a job of more than
+ * one step reads its topic, and waits for it, before any other call, since a client may send a
+ * kit tool's call beside the playbook's and choose it without the topic.
+ */
+function indexHead(offered: Topic[]): string {
+  const jobs = EXAMPLE_JOBS.filter(([name]) => offered.some(topic => topic.name === name)).map(([, job]) => job);
+  const like = jobs.length ? `, like ${inWords(jobs, 'or')}` : '';
+  return "Returns MakersMCP's playbooks. Each covers one kind of job for the kits on this server: the order of calls, "
+    + `the arguments that matter, what to check and what to hand over. Before a job with more than one step${like}, `
+    + "or when unsure which tool fits a request, read its topic and wait for it before any other call: the topic can change the job's first call. "
+    + 'Each topic is complete for its job, and up to three can be read in one call. Topics:';
+}
 
 /** A playbook file that cannot be used, with where and why. */
 export class PlaybookError extends Error {}
@@ -472,9 +489,9 @@ export function instructionsText(playbooks: Playbooks, context: TextContext): st
 /** makersmcp_playbook's description: what it returns, then each offered topic's index line, in order. */
 export function indexText(playbooks: Playbooks, context: TextContext): string {
   return cached(cacheKey('index', playbooks, context), () => {
-    const lines = offeredTopics(playbooks, onNames(context))
-      .map(topic => rendering(path.basename(topic.file), () => `- ${topic.name}: ${fillText(topic.index, context, { kind: 'kit' })}`));
-    return `${INDEX_HEAD}\n${lines.join('\n')}`;
+    const offered = offeredTopics(playbooks, onNames(context));
+    const lines = offered.map(topic => rendering(path.basename(topic.file), () => `- ${topic.name}: ${fillText(topic.index, context, { kind: 'kit' })}`));
+    return `${indexHead(offered)}\n${lines.join('\n')}`;
   });
 }
 

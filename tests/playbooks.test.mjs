@@ -2007,7 +2007,7 @@ test('each side\'s instructions are held whole: where the kits run, the rules, w
   // rule and check_setup; hosted, how a job's files go in, that a link goes only where a parameter takes one, and how long
   // links work and for whom.
   const rules = [
-    'Before a job with more than one step, call makersmcp_playbook with its topic and follow it.',
+    'Before a job with more than one step, like a launch film or a launch kit, call makersmcp_playbook with its topic, wait for it and follow it.',
     'A tool still working after wait_seconds returns a job_id: call wait_for_job with it, never the same tool again, which would start a second job.',
     'A call that ended with no result may still have started one: call list_jobs before trying again.',
     "From a website or a file, the kits make a website's brand kit, a page's fonts with their licenses, screenshots, demo videos, launch films, launch pictures, "
@@ -2039,6 +2039,37 @@ test('each side\'s instructions are held whole: where the kits run, the rules, w
       await session.close();
     }
   }
+  // Without launch-film the first rule names no job as an example, as no launch film or launch kit can be made then.
+  for (const options of [{ kits: ['easybrandkit'] }, { where: 'hosted', limits: LIMITS, kits: ['musicfit'] }]) {
+    const session = await connect({ definitions: loadKitDefinitions(), ...options });
+    try {
+      assert.match(session.instructions, /^MakersMCP runs open source kits [^.]+\. Before a job with more than one step, call makersmcp_playbook with its topic, wait for it and follow it\. A tool still working after wait_seconds/, JSON.stringify(options));
+    } finally {
+      await session.close();
+    }
+  }
+});
+
+test('the index names as examples the jobs of more than one step whose topics are offered, and asks to read the topic and wait for it before any other call', async () => {
+  // A client may send a kit tool's call beside makersmcp_playbook's, from the same response, and so choose it without the topic.
+  const rule = like => `Before a job with more than one step${like}, or when unsure which tool fits a request, read its topic and wait for it before any other call: the topic can change the job's first call.`;
+  const cases = [
+    [{}, ', like a launch film, music fitted to a video or a launch kit'],
+    [{ where: 'hosted', limits: LIMITS }, ', like a launch film, music fitted to a video or a launch kit'],
+    // With fit_music held back no music topic is offered, so the index names no music job.
+    [{ where: 'hosted', limits: LIMITS, held: ['check_video', 'fit_music'] }, ', like a launch film or a launch kit'],
+    [{ kits: ['musicfit'] }, ', like music fitted to a video'],
+    [{ kits: ['easybrandkit'] }, ''],
+  ];
+  for (const [options, like] of cases) {
+    const session = await connect({ definitions: loadKitDefinitions(), ...options });
+    try {
+      const index = session.tools.find(tool => tool.name === 'makersmcp_playbook').description;
+      assert.ok(index.includes(` ${rule(like)} Each topic is complete for its job`), `${JSON.stringify(options)}: ${index.slice(0, 700)}`);
+    } finally {
+      await session.close();
+    }
+  }
 });
 
 test('a tool MakersMCP-Server holds back is not listed and no text names it, while its defaults still fill', async () => {
@@ -2055,6 +2086,7 @@ test('a tool MakersMCP-Server holds back is not listed and no text names it, whi
     assert.equal(read.content.length, 3);
     assert.doesNotMatch(text(read), /check_video|fit_music/);
     assert.doesNotMatch(session.instructions, /a check of any video|music fitted to a video/);
+    assert.doesNotMatch(session.tools.find(tool => tool.name === 'makersmcp_playbook').description, /music fitted to a video/);
     for (const tool of session.tools) assert.doesNotMatch(JSON.stringify(tool), /check_video|fit_music/, tool.name);
     // A render's Next line has its sentences that need no check, the one that gives the user the film to watch among them.
     session.backend.view = (request, id) => ({ id, kit: 'launch-film', tool: 'render_launch_film', title: 'Render a launch film', status: 'done', exitCode: 0, elapsedSeconds: 60,
