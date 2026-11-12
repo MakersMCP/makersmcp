@@ -1543,15 +1543,22 @@ test('a kit file\'s new fields are checked when it is read', () => {
   assert.throws(broken((kit, tool) => { tool.params.keep.where = 'hosted'; }), /where is "local"/);
   assert.throws(broken((kit, tool) => { tool.params.keep.required = true; }), /a local parameter cannot be required/);
   assert.throws(broken((kit, tool, check) => { check.out.ownOnly = true; delete check.out.flag; }), /out\.ownOnly is true or false, for a tool whose folder the agent gives with out\.flag/);
-  // A hosted default is a value the parameter takes as it is, for one a call may leave out there.
-  for (const [param, value] of [['width', 9000], ['width', 600.5], ['width', '600'], ['hue', 'red'], ['clean', 'no'], ['sketch', 'sketch.png'], ['length', '']]) {
-    assert.throws(broken((kit, tool) => { tool.params[param].hostedDefault = value; }), new RegExp(`paint_picture\\.${param}: hostedDefault is a value the parameter takes as it is`), `${param} ${value}`);
+  // A hosted default is a value the parameter takes as it is, for one a call may leave out there: a text only for a string, a
+  // number for a string or a digit enum not at all, and nothing for a parameter that takes a file, an address or a list, so
+  // not the text a text_or_path's pattern takes either. The refusal and docs/kits.md say so.
+  const rule = 'a number inside its min and max, a boolean, one of its values or, for a string parameter, a text; a parameter that takes a file, an address or a list has none';
+  for (const [param, value] of [['width', 9000], ['width', 600.5], ['width', '600'], ['hue', 'red'], ['clean', 'no'], ['sketch', 'sketch.png'], ['marks', '1.5,3'],
+    ['length', ''], ['length', 2], ['layers', 2]]) {
+    assert.throws(broken((kit, tool) => { tool.params[param].hostedDefault = value; }),
+      error => error.message === `paintkit: paint_picture.${param}: hostedDefault is a value the parameter takes as it is: ${rule}`, `${param} ${value}`);
   }
+  const hostedDefaultDoc = readFileSync(path.join(here, '..', 'docs', 'kits.md'), 'utf8').split('\n').find(line => line.trimStart().startsWith('- `hostedDefault`:'));
+  assert.match(hostedDefaultDoc, /a boolean, one of its `values` or, for a `string`, a text, .*; a parameter that takes a file, an address or a list has none\.$/);
   assert.throws(broken((kit, tool) => { tool.params.keep.hostedDefault = true; }), /paint_picture\.keep: hostedDefault is for a parameter a call may leave out on a hosted server/);
   assert.throws(broken((kit, tool) => { tool.params.url.hostedDefault = 'https://example.com'; }), /paint_picture\.url: hostedDefault is for a parameter a call may leave out on a hosted server/);
   broken((kit, tool) => Object.assign(tool.params, {
     width: { ...tool.params.width, hostedDefault: 600 }, hue: { ...tool.params.hue, hostedDefault: 'cool' },
-    clean: { ...tool.params.clean, hostedDefault: false }, length: { ...tool.params.length, hostedDefault: '2s' },
+    clean: { ...tool.params.clean, hostedDefault: false }, length: { ...tool.params.length, hostedDefault: '2s' }, layers: { ...tool.params.layers, hostedDefault: '2' },
   }))();
   broken(() => {})();
 });

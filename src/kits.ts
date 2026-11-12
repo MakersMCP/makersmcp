@@ -328,7 +328,11 @@ function staysInside(relative: string): boolean {
   return Boolean(relative) && !path.isAbsolute(relative) && !relative.split(/[\\/]/).includes('..');
 }
 
-/** Whether the parameter takes a value as it is: a number inside its bounds, a boolean, one of an enum's values, or a text. */
+/**
+ * Whether the parameter takes a value as it is, for its hostedDefault: a number inside its bounds,
+ * a boolean, one of an enum's values, or a text for a string. A parameter that takes a file, an
+ * address or a list takes none, so neither does a text_or_path for a text its pattern matches.
+ */
 function takesValue(param: ParamDefinition, value: unknown): boolean {
   switch (param.type) {
     case 'integer':
@@ -495,7 +499,7 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
       if (param.hostedDefault !== undefined) {
         if (param.required || param.where === 'local') fail(`${tool.name}.${name}: hostedDefault is for a parameter a call may leave out on a hosted server`);
         if (!takesValue(param, param.hostedDefault)) {
-          fail(`${tool.name}.${name}: hostedDefault is a value the parameter takes as it is: a number inside its min and max, a boolean, one of its values or a text`);
+          fail(`${tool.name}.${name}: hostedDefault is a value the parameter takes as it is: a number inside its min and max, a boolean, one of its values or, for a string parameter, a text; a parameter that takes a file, an address or a list has none`);
         }
       }
       if (param.type === 'enum' && !param.values?.length) fail(`${tool.name}.${name}: an enum needs values`);
