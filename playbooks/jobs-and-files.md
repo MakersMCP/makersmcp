@@ -5,7 +5,7 @@ index: long jobs, calls that end early, cancelling, folders, passing one job's f
 description: Explains how a MakersMCP job runs and ends, how to wait for a long one, what to do after a call that ended with no result, what cancel_job and list_jobs do, where each job's files go and, locally, what a new run replaces, and how one job's files go into the next. Use it before running jobs side by side, after a call ended early, before reusing a folder, or when a file from one job has to go into another.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music, make_launch_film, plan_launch_film]
 order: 80
 ---
 # Jobs, waits and files
@@ -102,7 +102,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- with easybrandkit -->
   A brand kit goes in as job:<job_id>/brand.json, with its logo files.
 <!-- end -->
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
   A plan goes in as job:<job_id>/film.json, with the brand and the screens it names.
 <!-- end -->
 <!-- with easyscreenshotkit -->
@@ -117,22 +117,22 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 ## Passing files from job to job
 
 <!-- with easybrandkit -->
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
 - The brand kit of `make_brand_kit` goes to `brand` of `plan_launch_film` and `make_launch_film`.
 <!-- end -->
 <!-- end -->
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
 - film.json of `plan_launch_film` or `make_launch_film` goes to `film` of `render_launch_film` and `source` of `make_launch_stills`, and words.json to `words` of the next plan, which then does not read the page again.
-<!-- end -->
 <!-- with check_video -->
 - film.mp4 goes to `film` of `check_video`, which finds film.timeline.json beside it, under that name only.
+<!-- end -->
 <!-- end -->
 <!-- with easyscreenshotkit -->
 - pwa/manifest-screenshots.json of `take_screenshots` with `pwa` goes to `manifest` of `check_pwa_screenshots`, and demo.yaml of a `record_demo_video` tour to its `steps`, to record that tour again.
 <!-- end -->
 <!-- with fit_music -->
 - `length` and `hit` of `fit_music` come from the video.
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
   A launch film's length and its logo close's start are in its film.timeline.json.
 <!-- end -->
 <!-- with check_video -->
@@ -146,7 +146,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 <!-- end -->
 
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
 <!-- local -->
 Give a file by its path, as the earlier result lists it:
 

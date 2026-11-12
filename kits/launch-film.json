@@ -326,10 +326,10 @@
     {
       "name": "launch_film_guide",
       "title": "Launch film looks and scene types",
-      "asks": "the looks of a launch film, or the scene types film.json takes",
+      "asks": "the looks of a launch film, or the scene types its plan takes",
       "playbook": "launch-film",
-      "description": "Lists launch-film's looks and what each one suits (topic looks), or its scene types with their main fields (topic types), for picking a look or writing film.json. The clip kinds, each type's other fields and the rules for the words on screen are in the film-json playbook.",
-      "hostedDescription": "Lists launch-film's looks and what each one suits (topic looks), or its scene types with their main fields (topic types), for picking a look or reading a film.json. The clip kinds and each type's other fields are in the film-json playbook.",
+      "description": "Lists launch-film's looks and what each one suits (topic looks), or its scene types with their main fields (topic types). It is for picking the look of plan_launch_film or make_launch_film, or for writing film.json, whose clip kinds, each type's other fields and the rules for the words on screen are in the film-json playbook.",
+      "hostedDescription": "Lists launch-film's looks and what each one suits (topic looks), or its scene types with their main fields (topic types). It is for picking the look of plan_launch_film or make_launch_film, or for reading the film.json of a plan, whose clip kinds and each type's other fields are in the film-json playbook.",
       "args": ["{topic}"],
       "needs": [],
       "readOnly": true,

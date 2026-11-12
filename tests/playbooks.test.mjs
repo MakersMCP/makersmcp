@@ -1253,8 +1253,11 @@ test('the kits in kits/ and the topics in playbooks/ pass every check of the lin
   assert.ok(sdk('zod-compat.js').includes('`${i.message} at ${getDotPath(i.path)}`'), 'the SDK words a refusal\'s place another way now');
   corpus.push('Input validation error: Invalid arguments for tool <tool>: <reason> at <path>');
   // MakersMCP-Server's workers hold these back where their ffmpeg cannot run them, both now, and each alone once one kit's release
-  // runs on that ffmpeg before the other's.
-  const problems = await lint({ definitions, dir: PLAYBOOKS_DIR, corpus, extraNames: launchFilmNames(), held: [['check_video', 'fit_music'], ['fit_music'], ['check_video']] });
+  // runs on that ffmpeg before the other's. It holds launch-film's four film tools until launch-film's security fix is on
+  // makersmcp.com (KITS_HELD_TOOLS in Inferne-Deploy's setup/makersmcp-env.js), alone and beside the first two.
+  const filmTools = ['plan_launch_film', 'make_launch_film', 'render_launch_film', 'make_launch_stills'];
+  const problems = await lint({ definitions, dir: PLAYBOOKS_DIR, corpus, extraNames: launchFilmNames(),
+    held: [['check_video', 'fit_music'], ['fit_music'], ['check_video'], filmTools, [...filmTools, 'check_video', 'fit_music']] });
   // The size of each topic, so one past 8,000 characters is seen.
   try {
     const playbooks = loadPlaybooks();
@@ -2295,10 +2298,10 @@ test('a kit tool whose own topic the server does not offer points to getting-sta
   }
 });
 
-test('with launch-film\'s film tools held back, no topic of a film or a launch kit is offered, named or given as an example, and launch_film_guide has its own line in getting-started and troubleshooting', async () => {
+test('with launch-film\'s film tools held back, no topic of a film, its film.json or a launch kit is offered, named or given as an example, no text names a film.json, and launch_film_guide has its own line in getting-started and troubleshooting', async () => {
   // As MakersMCP-Server holds them until launch-film's security fix is on makersmcp.com, listing launch_film_guide and check_video.
   const held = ['plan_launch_film', 'make_launch_film', 'render_launch_film', 'make_launch_stills'];
-  const filmTopics = new Set(['launch-film', 'launch-kit']);
+  const filmTopics = new Set(['launch-film', 'launch-kit', 'film-json']);
   const guideLine = /^- `launch_film_guide`: it reads no site and runs no browser or ffmpeg, so a failed job of it is one of the cases above\.$/m;
   const session = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits: LIMITS, held });
   try {
@@ -2308,21 +2311,25 @@ test('with launch-film\'s film tools held back, no topic of a film or a launch k
     const offered = playbook.inputSchema.properties.topics.items.enum;
     assert.ok(!offered.some(name => filmTopics.has(name)), offered.join());
     const { resources } = await session.client.listResources();
-    assert.ok(!resources.some(resource => /\/launch-(?:film|kit)$/.test(resource.uri)), resources.map(resource => resource.uri).join());
+    assert.ok(!resources.some(resource => /\/(?:launch-film|launch-kit|film-json)$/.test(resource.uri)), resources.map(resource => resource.uri).join());
     // The index and the instructions give no film and no launch kit as an example of a job.
     assert.ok(playbook.description.includes(' Before a job with more than one step, like music fitted to a video, or when unsure '), playbook.description.slice(0, 700));
     assert.match(session.instructions, / Before a job with more than one step, call makersmcp_playbook with its topic, wait for it and follow it\. /);
     assert.doesNotMatch(`${session.instructions}\n${playbook.description}`, /like a launch film|a launch kit/);
-    // No text the client gets names either topic: the instructions, each tool with its parameters, and every topic offered.
+    // No text the client gets names one of those topics: the instructions, each tool with its parameters, and every topic offered.
     const texts = [session.instructions, ...session.tools.map(tool => JSON.stringify(tool))];
     for (const name of offered) texts.push(text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [name] } })));
     for (const content of texts) assert.deepEqual(topicsNamed(content, filmTopics), [], content.slice(0, 300));
+    // Nor a film.json, which only the film tools write and take: the hosted instructions say only how a file goes in.
+    for (const content of texts) assert.doesNotMatch(content, /\bfilm\.json\b/, content.slice(0, 300));
+    assert.match(session.instructions, / A file an earlier job saved goes in as job:<job_id>\/<path>, so the files it names come with it\. Other files go /);
     // launch_film_guide's own topic is not offered: its description points to getting-started, which lists it, and its
     // failed job to troubleshooting, which has a line for it.
-    assert.match(session.tools.find(tool => tool.name === 'launch_film_guide').description,
-      / The getting-started playbook \(makersmcp_playbook\) says which requests it fits here\. \(launch-film 9\.9\.9, on makersmcp\.com\.\)$/);
+    assert.equal(session.tools.find(tool => tool.name === 'launch_film_guide').description, 'Use it when the user wants the looks of a launch film, or the scene types its plan takes. '
+      + "Lists launch-film's looks and what each one suits (topic looks), or its scene types with their main fields (topic types). "
+      + 'The getting-started playbook (makersmcp_playbook) says which requests it fits here. (launch-film 9.9.9, on makersmcp.com.)');
     const started = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['getting-started'] } }));
-    assert.match(started, /^- `launch_film_guide`: the looks of a launch film, or the scene types film\.json takes\.$/m);
+    assert.match(started, /^- `launch_film_guide`: the looks of a launch film, or the scene types its plan takes\.$/m);
     session.backend.view = (request, id) => ({ id, kit: 'launch-film', tool: 'launch_film_guide', title: 'Launch film looks and scene types', status: 'failed', exitCode: 1,
       elapsedSeconds: 1, failure: 'Something went wrong on our side. Try again in a while.' });
     const failed = await session.client.callTool({ name: 'launch_film_guide', arguments: { topic: 'looks' } });
@@ -2331,13 +2338,17 @@ test('with launch-film\'s film tools held back, no topic of a film or a launch k
   } finally {
     await session.close();
   }
-  // With the film tools listed, both topics are offered and named as before, and launch_film_guide shares the film tools' line.
+  // With the film tools listed, the three topics are offered and named as before, launch_film_guide shares the film tools' line
+  // and points to film-json, and the instructions say how a film.json goes in.
   const listed = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits: LIMITS });
   try {
     const playbook = listed.tools.find(tool => tool.name === 'makersmcp_playbook');
     assert.ok([...filmTopics].every(name => playbook.inputSchema.properties.topics.items.enum.includes(name)));
     assert.match(listed.instructions, / Before a job with more than one step, like a launch film or a launch kit, call makersmcp_playbook/);
-    assert.match(listed.tools.find(tool => tool.name === 'launch_film_guide').description, / The launch-film playbook \(makersmcp_playbook\) has the whole job\. /);
+    assert.match(listed.instructions, / so the files it names come with it: give a film\.json or a brand kit that way\. /);
+    assert.match(listed.tools.find(tool => tool.name === 'launch_film_guide').description, new RegExp(' It is for picking the look of plan_launch_film or make_launch_film, '
+      + "or for reading the film\\.json of a plan, whose clip kinds and each type's other fields are in the film-json playbook\\. "
+      + 'The launch-film playbook \\(makersmcp_playbook\\) has the whole job\\. '));
     const troubleshooting = text(await listed.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['troubleshooting'] } }));
     assert.match(troubleshooting, /^- `make_launch_film`, `plan_launch_film`, `render_launch_film`, `make_launch_stills` and `launch_film_guide`: the launch-film topic/m);
     assert.doesNotMatch(troubleshooting, guideLine);

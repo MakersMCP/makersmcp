@@ -5,7 +5,7 @@ index: which tool fits which request, how jobs, waits and files work, and what t
 description: Explains what MakersMCP's kits make from a website or a file and what they never make, which tool answers which request, how a job runs and how to wait for it, where the files go, the rules for using what the kits made, and what to tell the user at the end. Use it when a request names no tool, when it is unclear whether these kits can do it, or before a first job.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music, analyze_music, make_launch_film, plan_launch_film]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, musicfit, check_video, fit_music, analyze_music, make_launch_film, plan_launch_film]
 order: 10
 ---
 # Getting started with MakersMCP
@@ -81,7 +81,7 @@ jobs-and-files has the rest.
 <!-- with check_video -->
 - Have a film's contact sheet looked at before handing it over: a measurement cannot read words.
 <!-- end -->
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
 <!-- without check_video -->
 - Nothing here checks a film, and a render draws no stills of it: give the user the film to watch with what to look for, and say it was not checked. Of a film from `make_launch_film`, `frames/sheet.jpg` shows two stills a clip.
 <!-- end -->

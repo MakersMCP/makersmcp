@@ -5,7 +5,7 @@ index: make_brand_kit: logo files, colors, fonts, first screen, store assets and
 description: Makes a product's brand kit from its website with easybrandkit: the logo files cut from the page, the colors with where the site uses each, the fonts, the first screen, a brand card, the icons and screenshots of the apps it links to, and with facts the site's own claims, each with its page. Use it before designing, building or animating anything for a product whose site is known, and when the user asks for a site's logo, colors or brand guidelines.
 kit: easybrandkit
 requires: [easybrandkit]
-optional: [launch-film, easyfontkit, make_launch_film, plan_launch_film]
+optional: [easyfontkit, make_launch_film, plan_launch_film]
 order: 30
 ---
 # Brand kits from a website
@@ -53,7 +53,7 @@ make_brand_kit {"url": "https://linear.app", "facts": true}
 <!-- end -->
 <!-- hosted -->
 4. When the name, a logo or the colors are wrong, tell the user what came back. No tool here takes a logo, colors or screens the user gives in place of the site's own, so ask for the product's own site when this address is not it, or whether to go on with this kit. A brand is read from the home page at a site's root, so a deeper page, like /pricing or /en/about, gives the same brand kit, while a home page in a language, like /de, /en/ or /pt-br, is read as it is, and so are /home and other paths of two letters, like /ai: when a site's root is a language or country chooser, ask for its home page in the user's language. Never fill in a brand from a guess, since everything built on the kit would carry it.
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
    For an app, a plan whose `url` is its App Store or Google Play listing, with no `brand`, closes on the app's icon.
 <!-- end -->
 <!-- end -->
@@ -111,7 +111,7 @@ Each error as the result shows it, then the fix.
 <!-- end -->
 <!-- hosted -->
 - "<url> answered with a bot check ("<title>") instead of its page, so no kit was made. Get the logo and colors from the site in a normal browser.": tell the user. No tool here takes a logo or colors the user gives in place of the site's own, and a deeper page of that site is read from the same home page, as step 4 says, so ask for the product's own site when this address is not it.
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
   From an App Store listing, a plan with no `brand` is made from the listing alone when the site the listing names cannot be read like this.
 <!-- end -->
 <!-- end -->

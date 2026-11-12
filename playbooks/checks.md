@@ -5,7 +5,7 @@ index: check_video: what to expect of each video, cuts on the beat, reading CHEC
 description: Measures a video's size, frame rate, length, black, still and silent stretches, loudness, true peak, clipping and cuts on the beat with launch-film's check, and says what to ask of a launch film, a demo or a copy with music laid in, how to read the report and its contact sheet, and what the check does not measure. Use it before handing over any video, or when the user asks whether a video meets a platform's limits.
 kit: launch-film
 requires: [launch-film, check_video]
-optional: [easyscreenshotkit, fit_music, analyze_music]
+optional: [easyscreenshotkit, fit_music, analyze_music, make_launch_film, plan_launch_film]
 order: 67
 ---
 # Checking a video before it goes out
@@ -19,7 +19,10 @@ order: 67
 <!-- with easyscreenshotkit -->
   A demo from `record_demo_video` is {fact:easyscreenshotkit.demo.size} at the `fps` it was recorded with, {default:record_demo_video.fps} unless given.
 <!-- end -->
-- `seconds` is text: "30" passes within {fact:launch-film.check_seconds_tolerance} seconds of 30, and "20-40" anything inside. A launch film's exact length is the seconds field of its `film.timeline.json`.
+- `seconds` is text: "30" passes within {fact:launch-film.check_seconds_tolerance} seconds of 30, and "20-40" anything inside.
+<!-- with make_launch_film, plan_launch_film -->
+  A launch film's exact length is the seconds field of its `film.timeline.json`.
+<!-- end -->
 - `lufs` is the integrated loudness to check, within {fact:launch-film.check_lufs_tolerance} LU. Give it only when the user needs a level. A launch film measures about {fact:launch-film.lufs} LUFS as it was rendered, and nothing here changes that. launch-film's own guide gives {fact:launch-film.lufs_social} as the level YouTube, X and most social apps play at.
 - `allow` lists stretches meant to hold still, black or silent, in seconds, like 27-30,0-0.5.
 
@@ -63,6 +66,7 @@ A longer stretch is a warning to look at, not a failure. Black or silent stretch
 
 ## Cuts
 
+<!-- with make_launch_film, plan_launch_film -->
 - `check_video` takes a launch film's cuts from the `film.timeline.json` next to it, found by the video's own name: film.mp4 takes film.timeline.json.
 <!-- local -->
 - A copy under another name, like one with music laid in, finds no timeline. Give `cuts` the film's `film.timeline.json`. A check saves in check/ next to the video, which every video in that folder shares, so give this one an `out_dir` of its own to keep the film's report:
@@ -73,7 +77,8 @@ check_video {"film": "launch/film-16x9/with-music.mp4", "cuts": "launch/film-16x
 <!-- hosted -->
 - A video given as a link comes alone, with no timeline beside it: give `cuts` the film's `film.timeline.json` as job:<job_id>/film.timeline.json.
 <!-- end -->
-- Other videos take `cuts` as seconds, like 3.2,7.5, or a JSON file of seconds, of frames with their fps, or a launch-film timeline. Without them, the check finds the hard cuts in the picture and lists soft changes, like crossfades, without judging them; "no cut to judge" then asks for `cuts`.
+<!-- end -->
+- A video without a timeline beside it takes `cuts` as seconds, like 3.2,7.5, or a JSON file of seconds, of frames with their fps, or a launch-film timeline. Without them, the check finds the hard cuts in the picture and lists soft changes, like crossfades, without judging them; "no cut to judge" then asks for `cuts`.
 <!-- with easyscreenshotkit -->
 - A demo's `steps.json` is no cuts file: give the `pressedAt` of its clicks as seconds.
 <!-- end -->
