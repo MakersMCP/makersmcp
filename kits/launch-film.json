@@ -110,7 +110,7 @@
           "Check the brand's name and every word on screen in film.json below against words.json and the site: a film.json cannot be changed here, so when one is wrong, tell the user instead of rendering it again.",
           "Then call check_video with film {file:film.mp4} and expect {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16.",
           "Give the user the {name:frames/sheet.jpg} link from the list below: two stills a clip.",
-          "Give the user the {name:film.mp4} link from the list below to watch before it goes out."
+          "Give the user the {name:film.mp4} link from the list below to watch before it goes out: nobody here has watched or heard it, so say what was checked and what was not."
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
@@ -216,7 +216,7 @@
         "done": [
           "Call check_video with film {file:film.mp4} and expect {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16, and give the user the link to the sheet.png it makes.",
           "film.timeline.json below has the film's length and each clip's start.",
-          "Give the user the {name:film.mp4} link from the list below to watch before it goes out."
+          "Give the user the {name:film.mp4} link from the list below to watch before it goes out: nobody here has watched or heard it, so say what was checked and what was not."
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes."

@@ -2088,11 +2088,18 @@ test('a tool MakersMCP-Server holds back is not listed and no text names it, whi
     assert.doesNotMatch(session.instructions, /a check of any video|music fitted to a video/);
     assert.doesNotMatch(session.tools.find(tool => tool.name === 'makersmcp_playbook').description, /music fitted to a video/);
     for (const tool of session.tools) assert.doesNotMatch(JSON.stringify(tool), /check_video|fit_music/, tool.name);
-    // A render's Next line has its sentences that need no check, the one that gives the user the film to watch among them.
+    // A render's Next line has its sentences that need no check, the one that gives the user the film to watch among them,
+    // which names no tool, so it stays and says that nobody here watched the film whatever the server lists.
+    const unwatched = 'Give the user the film.mp4 link from the list below to watch before it goes out: nobody here has watched or heard it, so say what was checked and what was not.';
     session.backend.view = (request, id) => ({ id, kit: 'launch-film', tool: 'render_launch_film', title: 'Render a launch film', status: 'done', exitCode: 0, elapsedSeconds: 60,
       folder: 'x', files: [{ path: 'film.mp4', bytes: 10, url: 'https://x/film.mp4' }, { path: 'film.timeline.json', bytes: 10, url: 'https://x/t' }], expiresAt: 1800000000 });
     const rendered = await session.client.callTool({ name: 'render_launch_film', arguments: { film: 'job:job0/film.json' } });
-    assert.equal(rendered.structuredContent.next, "film.timeline.json below has the film's length and each clip's start. Give the user the film.mp4 link from the list below to watch before it goes out.");
+    assert.equal(rendered.structuredContent.next, `film.timeline.json below has the film's length and each clip's start. ${unwatched}`);
+    // So does make_launch_film's, whose sentence that calls check_video is left out here.
+    session.backend.view = (request, id) => ({ id, kit: 'launch-film', tool: 'make_launch_film', title: 'Launch film from a website', status: 'done', exitCode: 0, elapsedSeconds: 90,
+      folder: 'x', files: ['film.json', 'words.json', 'film.mp4', 'film.timeline.json', 'frames/sheet.jpg'].map(file => ({ path: file, bytes: 10, url: `https://x/${file}` })), expiresAt: 1800000000 });
+    const made = await session.client.callTool({ name: 'make_launch_film', arguments: { url: 'https://example.com' } });
+    assert.ok(made.structuredContent.next.endsWith(`Give the user the frames/sheet.jpg link from the list below: two stills a clip. ${unwatched}`), made.structuredContent.next);
     // analyze_music, whose music topic is not offered, points at troubleshooting, which lists its errors then.
     session.backend.view = (request, id) => ({ id, kit: 'musicfit', tool: 'analyze_music', title: 'Read a track', status: 'failed', exitCode: 1, elapsedSeconds: 2,
       failure: 'musicfit: Cannot read in/x.mp3: ffmpeg does not know this format' });
