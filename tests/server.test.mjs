@@ -16,7 +16,7 @@ import {
 } from '../dist/server.js';
 import { MAX_FILES, folderStamps } from '../dist/local-backend.js';
 import { rightArgument, unknownArgumentsText } from '../dist/input.js';
-import { SITE_NOTE, jobResult } from '../dist/results.js';
+import { DOC_NOTE, FAILURE_NOTE, SITE_NOTE, SUMMARY_NOTE, jobResult } from '../dist/results.js';
 import { defaultOutDir } from '../dist/setup.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -47,6 +47,10 @@ async function withClient(options, callback) {
 }
 
 const text = result => result.content.map(item => item.text).join('\n');
+const escaped = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// How a result opens a doc of the kit's own notes, or what a failed kit said, as a pattern.
+const NOTES = escaped(`${DOC_NOTE}\n\`\`\`markdown\n`);
+const SAID = escaped(`${FAILURE_NOTE}\n\`\`\`text\n`);
 
 test('the kit definitions in kits/ are valid and their tool names are unique', () => {
   const kits = loadKitDefinitions();
@@ -123,7 +127,7 @@ test('a finished job returns its summary, folder, files and docs', async () => {
     // A folder's own files come before the files in its subfolders.
     assert.deepEqual(result.structuredContent.files.map(file => file.path), ['REPORT.md', path.join('parts', 'data.json')]);
     assert.match(text(result), /## Fake make: done in \d+ s/);
-    assert.match(text(result), /### REPORT\.md\n\n# Report\n\nMade from https:\/\/www\.example\.com\//);
+    assert.match(text(result), new RegExp(`### REPORT\\.md\\n\\n${NOTES}# Report\\n\\nMade from https://www\\.example\\.com/`));
     assert.doesNotMatch(text(result), /MISSING\.md/);
     const args = JSON.parse(/args: (.*)/.exec(text(result))[1]);
     assert.deepEqual(args, [
@@ -155,7 +159,7 @@ test('a docs entry that is neither a name nor { file, site } with a name in file
     assert.notEqual(result.isError, true, text(result));
     assert.equal(result.structuredContent.status, 'done');
     assert.deepEqual(result.structuredContent.docs.map(doc => doc.name), ['REPORT.md']);
-    assert.match(text(result), new RegExp(`### REPORT\\.md\\n\\n${SITE_NOTE.replace(/\./g, '\\.')}\\n\\n# Report\\n`));
+    assert.match(text(result), new RegExp(`### REPORT\\.md\\n\\n${escaped(SITE_NOTE)}\\n\`\`\`markdown\\n# Report\\n`));
     const folder = path.join(outDir, 'fakekit-example.com');
     assert.deepEqual(readDocs(folder, [...odd, { file: 'REPORT.md', site: true }, 'parts/data.json']).map(doc => doc.name), ['REPORT.md', 'parts/data.json']);
     assert.deepEqual(readDocs(folder, { file: 'REPORT.md' }), []);
@@ -181,7 +185,7 @@ test('a job\'s result leaves out a path or a text of its view that is of another
   };
   const result = jobResult(view);
   assert.notEqual(result.isError, true);
-  assert.equal(result.content[0].text, '## Fake make: done in 3 s\n\n- REPORT.md (120 B)\n\n### REPORT.md\n\n# Report\n\n### CUT.md\n\n# Cut');
+  assert.equal(result.content[0].text, `## Fake make: done in 3 s\n\n- REPORT.md (120 B)\n\n### REPORT.md\n\n${DOC_NOTE}\n\`\`\`markdown\n# Report\n\`\`\`\n\n### CUT.md\n\n${DOC_NOTE}\n\`\`\`markdown\n# Cut\n\`\`\``);
   assert.deepEqual(result.structuredContent, {
     job_id: 'job_1', kit: 'fakekit', tool: 'fake_make', status: 'done', exit_code: 0, elapsed_seconds: 3,
     files: [{ path: 'REPORT.md', bytes: 120 }], docs: [{ name: 'REPORT.md', path: 'REPORT.md' }, { name: 'CUT.md', path: 'CUT.md' }],
@@ -191,7 +195,7 @@ test('a job\'s result leaves out a path or a text of its view that is of another
   delete plain.lastLine;
   delete plain.inputs;
   assert.equal(jobResult(plain).content[0].text,
-    '## Fake make: done in 3 s\n\nSaved the report.\n\nFolder: /work/fakekit-example.com\n\n- REPORT.md (120 B)\n\n### REPORT.md\n\n# Report');
+    `## Fake make: done in 3 s\n\n${SUMMARY_NOTE}\n\`\`\`text\nSaved the report.\n\`\`\`\n\nFolder: /work/fakekit-example.com\n\n- REPORT.md (120 B)\n\n### REPORT.md\n\n${DOC_NOTE}\n\`\`\`markdown\n# Report\n\`\`\``);
   // A failed job's failure and exit code, and a running job's last line, the same way.
   const failed = jobResult({ ...view, status: 'failed', exitCode: '2', failure: { text: 'no' } });
   assert.equal(failed.isError, true);
@@ -685,11 +689,11 @@ test('a job that ended keeps its own files and notes, so read again after later 
 
     const again = await client.callTool({ name: 'wait_for_job', arguments: { job_id: first.job_id } });
     assert.deepEqual(paths(again.structuredContent), ['REPORT.md', path.join('parts', 'data.json')]);
-    assert.match(text(again), /### REPORT\.md\n\n# Report\n\nMade from https:\/\/first\.example\.com\./);
+    assert.match(text(again), new RegExp(`### REPORT\\.md\\n\\n${NOTES}# Report\\n\\nMade from https://first\\.example\\.com\\.`));
     assert.doesNotMatch(text(again), /last\.example\.com/);
     const reportAgain = await client.callTool({ name: 'wait_for_job', arguments: { job_id: report.job_id } });
     assert.deepEqual(paths(reportAgain.structuredContent), ['REPORT.md']);
-    assert.match(text(reportAgain), /### REPORT\.md\n\n# PASS\n\nhttps:\/\/good\.example\.com/);
+    assert.match(text(reportAgain), new RegExp(`### REPORT\\.md\\n\\n${NOTES}# PASS\\n\\nhttps://good\\.example\\.com`));
     const listed = (await client.callTool({ name: 'list_jobs', arguments: {} })).structuredContent.jobs;
     assert.deepEqual(listed.map(job => [job.tool, job.file_count]), [['fake_make', 2], ['fake_report', 1], ['fake_report', 1], ['fake_make', 2]]);
   });
@@ -870,7 +874,7 @@ test('an argument error keeps the kit\'s reason and leaves out its usage text', 
     const result = await client.callTool({ name: 'fake_make', arguments: { url: 'https://usage.example.com' } });
     assert.equal(result.isError, true);
     // The kit's --count is written as the tool's parameter, count.
-    assert.match(text(result), /failed after \d+ s \(exit code 2\)\n\nOpening https:\/\/usage\.example\.com\.\.\.\nfakekit: count takes 1 to 5\n\nJob ID/);
+    assert.match(text(result), new RegExp(`failed after \\d+ s \\(exit code 2\\)\\n\\n${SAID}Opening https://usage\\.example\\.com\\.\\.\\.\\nfakekit: count takes 1 to 5\\n\`\`\`\\n\\nJob ID`));
     assert.doesNotMatch(text(result), /Usage:|--option-/);
     assert.equal(result.structuredContent.last_line, undefined);
   });
@@ -914,7 +918,7 @@ test('a check with a report file counts only a report it wrote this run', async 
     const bad = await client.callTool({ name: 'fake_report', arguments: { url: 'https://bad.example.com' } });
     assert.notEqual(bad.isError, true);
     assert.equal(bad.structuredContent.passed, false);
-    assert.match(text(bad), /failed the check[\s\S]*### REPORT\.md\n\n# FAIL/);
+    assert.match(text(bad), new RegExp(`failed the check[\\s\\S]*### REPORT\\.md\\n\\n${NOTES}# FAIL`));
 
     const good = await client.callTool({ name: 'fake_report', arguments: { url: 'https://good.example.com' } });
     assert.equal(good.structuredContent.passed, true);

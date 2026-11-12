@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { NotStartedError, createMcpServer, loadKitDefinitions } from '../dist/server.js';
+import { DOC_NOTE } from '../dist/results.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixtures = path.join(here, 'fixtures');
@@ -102,6 +103,9 @@ async function withHosted(callback, { kits = definitions, runs, backend = new Fa
 const withRealKits = callback => withHosted(callback, { kits: loadKitDefinitions(), runs: 'all' });
 
 const text = result => result.content.map(item => item.text).join('\n');
+// A doc as a result shows it: under its heading and the line for the kit's notes, in a fence.
+const shownDoc = (name, body) => `### ${name}\n\n${DOC_NOTE}\n\`\`\`markdown\n${body}\n\`\`\``;
+const escaped = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('a hosted backend gets the kits it runs, no out_dir, and file params that take links', async () => {
   await withHosted(async (client) => {
@@ -129,7 +133,7 @@ test('a hosted job returns links to its files and when they stop working', async
     assert.match(text(result), /Files, to download until 2026-11-08 12:30 UTC:\n\n- REPORT\.md \(120 B\): https:\/\/files\.example\.com\/job1\/REPORT\.md\?s=1/);
     // Under the links, that each opens one file: a folder has none, and a link made up from a file's leads nowhere.
     assert.match(text(result), /logo\.svg\?s=1\n\nEach link opens only the file it names, and none opens a folder: hand each file over with its own link\.\n\n### REPORT\.md/);
-    assert.match(text(result), /### REPORT\.md\n\n# Report\n\nAll good\./);
+    assert.ok(text(result).endsWith(shownDoc('REPORT.md', '# Report\n\nAll good.')), text(result));
     assert.doesNotMatch(text(result), /Folder:/);
   });
 });
@@ -169,7 +173,9 @@ test('a hosted job whose view has a path or a text of another type gives its res
     assert.deepEqual(result.structuredContent.docs.map(doc => doc.name), ['REPORT.md', 'Z.md']);
     assert.equal(result.structuredContent.folder, undefined);
     assert.equal(result.structuredContent.expires_at, undefined);
-    assert.match(text(result), /^## Fake make: done in 12 s\n\nFiles:\n\n- REPORT\.md \(120 B\): https:\/\/files\.example\.com\/job1\/REPORT\.md\?s=1\n- logo\.svg \(2\.0 KB\): \S+\n- linked\.png \(4 B\)\n\nEach link opens only the file it names, and none opens a folder: hand each file over with its own link\.\n\n### REPORT\.md\n\n# Report\n\nAll good\.\n\n### Z\.md\n\n# Z$/);
+    assert.match(text(result), new RegExp('^## Fake make: done in 12 s\\n\\nFiles:\\n\\n- REPORT\\.md \\(120 B\\): https:\\/\\/files\\.example\\.com\\/job1\\/REPORT\\.md\\?s=1\\n- logo\\.svg \\(2\\.0 KB\\): \\S+\\n- linked\\.png \\(4 B\\)\\n\\n'
+      + 'Each link opens only the file it names, and none opens a folder: hand each file over with its own link\\.\\n\\n'
+      + `${escaped(shownDoc('REPORT.md', '# Report\n\nAll good.'))}\\n\\n${escaped(shownDoc('Z.md', '# Z'))}$`));
     assert.doesNotMatch(text(result), /object|undefined|NaN/);
     const listed = await client.callTool({ name: 'list_jobs', arguments: {} });
     assert.notEqual(listed.isError, true, text(listed));
