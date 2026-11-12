@@ -4,6 +4,7 @@ import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sd
 import { z } from 'zod';
 import { textPattern } from './args.js';
 import { NotStartedError, type AvailableKit, type JobView, type KitBackend } from './backend.js';
+import { strictInput } from './input.js';
 import type { ParamDefinition, ToolDefinition } from './kits.js';
 import { PLAYBOOK_TOOL } from './playbooks.js';
 import { checkNextLines, errorResult, jobListed, jobOutputSchema, jobResult, shownView, type ResultContext } from './results.js';
@@ -273,6 +274,17 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
   }
   inputSchema['wait_seconds'] = waitSeconds(context);
   const numbers = Object.entries(tool.params).filter(([, param]) => takesNumber(param)).map(([name]) => name);
+  // Hosted, a call with an argument only a local server takes is told why it is not taken here.
+  const hints: Record<string, string> = {};
+  if (hosted) {
+    hints['out_dir'] = 'Each job here saves in a folder of its own, so no tool here takes `out_dir`.';
+    for (const [name, param] of Object.entries(tool.params)) {
+      if (param.where !== 'local') continue;
+      hints[name] = param.hostedDefault !== undefined
+        ? `Every call here has \`${name}\` ${typeof param.hostedDefault === 'string' ? JSON.stringify(param.hostedDefault) : String(param.hostedDefault)}.`
+        : `Only makersmcp on the user's own machine takes \`${name}\`.`;
+    }
+  }
   const entry = { kit, tool };
   context.tools.set(tool.name, entry);
   // A Next sentence that cannot be filled stops the server, as a description does.
@@ -283,7 +295,7 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
     {
       title: tool.title,
       description: kitToolDescription(context, kit, tool),
-      inputSchema,
+      inputSchema: strictInput(inputSchema, { nothing: 'Nothing was started.', hints }),
       outputSchema: jobOutputSchema,
       annotations: {
         title: tool.title,
@@ -340,7 +352,7 @@ export function registerCoreTools(server: McpServer, context: ToolContext): void
       description: 'Waits for a job a makersmcp tool started and returns its result once it ends. It also returns a finished job\'s result again. '
         + 'If it is still running, call this again with the same job_id. Never start the original tool again to check on a job: that starts a second one. '
         + 'A call that ended with no result may still have started a job: list_jobs shows it.',
-      inputSchema: { job_id: jobId, wait_seconds: waitSeconds(context) },
+      inputSchema: strictInput({ job_id: jobId, wait_seconds: waitSeconds(context) }),
       outputSchema: jobOutputSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -357,7 +369,7 @@ export function registerCoreTools(server: McpServer, context: ToolContext): void
       description: local
         ? 'Stops a running job and the browser or ffmpeg it started. Files it already saved stay where they are.'
         : 'Stops a running job. Files it already saved are not kept.',
-      inputSchema: { job_id: jobId },
+      inputSchema: strictInput({ job_id: jobId }, { nothing: 'Nothing was canceled.' }),
       outputSchema: jobOutputSchema,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },

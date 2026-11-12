@@ -193,6 +193,17 @@ test('a hosted file param refuses a local path, and a job the service refuses is
   });
 });
 
+test('hosted, a call that gives out_dir is refused with why, and starts nothing', async () => {
+  await withHosted(async (client, backend) => {
+    const result = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', out_dir: 'mine' } });
+    assert.equal(result.isError, true);
+    assert.equal(text(result), 'MCP error -32602: Input validation error: Invalid arguments for tool fake_make: Unknown argument `out_dir`. '
+      + 'This tool takes `url`, `deep`, `plain`, `sizes`, `page`, `theme`, `count`, `wait_seconds`. Nothing was started. '
+      + 'Each job here saves in a folder of its own, so no tool here takes `out_dir`.');
+    assert.deepEqual(backend.started, []);
+  });
+});
+
 test('the core tools ask the hosted backend, and an unknown job says where to look', async () => {
   const backend = await withHosted(async (client, backend) => {
     await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com/', wait_seconds: 0 } });

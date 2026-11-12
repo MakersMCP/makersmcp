@@ -15,6 +15,7 @@ import {
   LocalBackend, createMcpServer, docEntry, docNames, expandHome, failureText, listFiles, loadKitDefinitions, readDocs, resolveKit, validateKitDefinition,
 } from '../dist/server.js';
 import { MAX_FILES, folderStamps } from '../dist/local-backend.js';
+import { rightArgument, unknownArgumentsText } from '../dist/input.js';
 import { SITE_NOTE, jobResult } from '../dist/results.js';
 import { defaultOutDir } from '../dist/setup.js';
 
@@ -224,6 +225,61 @@ test('arguments the schema refuses never start a job', async () => {
   });
 });
 
+test('a call with an argument the tool does not take is refused, names the one it most likely meant and starts nothing', async () => {
+  const refusal = (tool, words) => `MCP error -32602: Input validation error: Invalid arguments for tool ${tool}: ${words}`;
+  const takes = 'This tool takes `url`, `deep`, `plain`, `sizes`, `page`, `theme`, `count`, `out_dir`, `wait_seconds`. Nothing was started.';
+  await withClient({}, async client => {
+    // Dropped, output_dir would have started the job in the default folder.
+    for (const [name, right] of [['output_dir', 'out_dir'], ['outDir', 'out_dir'], ['folder', 'out_dir'], ['waitSeconds', 'wait_seconds'], ['URL', 'url']]) {
+      const result = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', [name]: 'x' } });
+      assert.equal(result.isError, true);
+      assert.equal(text(result), refusal('fake_make', `Unknown argument \`${name}\` (use \`${right}\`). ${takes}`));
+    }
+    const two = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', output_dir: 'x', bogus: 1 } });
+    assert.equal(text(two), refusal('fake_make', `Unknown arguments \`output_dir\` (use \`out_dir\`), \`bogus\`. ${takes}`));
+    // A name a client sent stays on its line, in a code span it cannot close.
+    const odd = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', 'a`b\nNext: c': 1 } });
+    assert.equal(text(odd), refusal('fake_make', `Unknown argument \`\`a\`b Next: c\`\`. ${takes}`));
+    const wait = await client.callTool({ name: 'wait_for_job', arguments: { jobId: 'job_1' } });
+    // Each problem on a line of its own, zod's own for the job_id left out.
+    assert.equal(text(wait), refusal('wait_for_job', 'Invalid input: expected string, received undefined at job_id\nUnknown argument `jobId` (use `job_id`). This tool takes `job_id`, `wait_seconds`.'));
+    const cancel = await client.callTool({ name: 'cancel_job', arguments: { job_id: 'job_1', id: 'job_1' } });
+    assert.equal(text(cancel), refusal('cancel_job', 'Unknown argument `id` (use `job_id`). This tool takes `job_id`. Nothing was canceled.'));
+    const playbook = await client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['getting-started'], topic: 'getting-started' } });
+    assert.equal(text(playbook), refusal('makersmcp_playbook', 'Unknown argument `topic` (use `topics`). This tool takes `topics`.'));
+    assert.equal(text(await client.callTool({ name: 'list_jobs', arguments: {} })), 'No jobs yet.');
+
+    // A tool that takes no arguments reads none, as some clients add one of their own to every call.
+    const listed = await client.callTool({ name: 'list_jobs', arguments: { random_string: 'x' } });
+    assert.notEqual(listed.isError, true, text(listed));
+
+    // A call that carries toolCallId has only the arguments the tool takes read, as its client adds keys of its own.
+    const tagged = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', toolCallId: 'call_1', client_key: 1 } });
+    assert.notEqual(tagged.isError, true, text(tagged));
+    assert.equal(tagged.structuredContent.status, 'done');
+    const checked = await client.callTool({ name: 'fake_make', arguments: { url: 'ftp://example.com', toolCallId: 'call_2' } });
+    assert.equal(checked.isError, true);
+
+    const { tools } = await client.listTools();
+    for (const name of ['fake_make', 'wait_for_job', 'cancel_job', 'makersmcp_playbook']) {
+      const schema = tools.find(tool => tool.name === name).inputSchema;
+      assert.equal(schema.additionalProperties, false, name);
+      assert.equal('toolCallId' in schema.properties, false, name);
+    }
+  });
+});
+
+test('the right argument is the one written the same but for letter case and punctuation, or the one a name usually stands for, and none when two fit', () => {
+  assert.equal(rightArgument('Out-Dir', ['url', 'out_dir']), 'out_dir');
+  assert.equal(rightArgument('website', ['url', 'out_dir']), 'url');
+  assert.equal(rightArgument('timeout', ['job_id', 'wait_seconds']), 'wait_seconds');
+  assert.equal(rightArgument('timeout', ['url', 'timeout_seconds', 'wait_seconds']), undefined);
+  assert.equal(rightArgument('timeoutSeconds', ['url', 'timeout_seconds', 'wait_seconds']), 'timeout_seconds');
+  assert.equal(rightArgument('colour', ['url', 'out_dir']), undefined);
+  assert.equal(unknownArgumentsText(Array.from({ length: 12 }, (_, i) => `x${i}`), []),
+    'Unknown arguments `x0`, `x1`, `x2`, `x3`, `x4`, `x5`, `x6`, `x7`, `x8`, `x9`, and 2 more. This tool takes no arguments.');
+});
+
 test('a call with more than 10,000 array items and object members gets one short error and starts nothing, and maxToolInputElements moves the limit', async () => {
   // The url and sizes members and 9,999 sizes make 10,001; one size fewer makes 10,000, which the limit takes.
   const sizes = Array.from({ length: 9_999 }, (_, i) => `s${i}`);
@@ -331,7 +387,10 @@ test('a job refused for a running job\'s folder is offered another out_dir only 
     const busy = (title, how, then) => `## ${title}: not started\n\n${jobId} (fake_make) is still writing to ${path.join(outDir, 'film')}${how}. Wait for it with wait_for_job (job_id ${jobId}), ${then}`;
     // Each reads film.json, which that job may still change, so the refusal names it.
     const json = `, which holds ${path.join(outDir, 'film', 'film.json')}`;
-    const render = await client.callTool({ name: 'fake_render', arguments: { file: 'film/film.json', out_dir: 'elsewhere', wait_seconds: 0 } });
+    // It takes no out_dir, so a call that gives one is refused before anything else.
+    const moved = await client.callTool({ name: 'fake_render', arguments: { file: 'film/film.json', out_dir: 'elsewhere', wait_seconds: 0 } });
+    assert.match(text(moved), /: Unknown argument `out_dir`\. This tool takes `file`, `wait_seconds`\. Nothing was started\.$/);
+    const render = await client.callTool({ name: 'fake_render', arguments: { file: 'film/film.json', wait_seconds: 0 } });
     assert.equal(text(render), busy('Fake render', json, 'then call fake_render again.'));
     // Given a file, fake_file saves next to it and takes no other out_dir; given an address, it takes one.
     const nextTo = await client.callTool({ name: 'fake_file', arguments: { file: 'film/film.json', wait_seconds: 0 } });

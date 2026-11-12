@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { strictInput } from './input.js';
 import { TOPIC_NAME } from './kits.js';
 import {
   fillText,
@@ -513,10 +514,10 @@ export function registerPlaybookTool(server: McpServer, playbooks: Playbooks, co
     {
       title: 'MakersMCP playbooks',
       description: indexText(playbooks, context),
-      inputSchema: {
+      inputSchema: strictInput({
         topics: z.array(z.enum(names as [string, ...string[]])).min(1).max(TOPICS_A_CALL)
           .describe(`One to three topics from this tool's list, like ["${example}"].`),
-      },
+      }),
       annotations: { title: 'MakersMCP playbooks', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
       // Claude Code lists it from the start instead of behind its tool search.
       _meta: { 'anthropic/alwaysLoad': true },

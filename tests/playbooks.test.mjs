@@ -1570,19 +1570,30 @@ test('a kit file\'s new fields are checked when it is read', () => {
   broken(() => {})();
 });
 
-test('hosted, launch-film renders one clip at a time, as jobs is no parameter there and every call has its hosted default, while locally the kit\'s own default holds and a call may give another', async () => {
+test('hosted, launch-film renders one clip at a time, as jobs is no parameter there, a call that gives it is refused, and every call has its hosted default, while locally the kit\'s own default holds and a call may give another', async () => {
   // Two clips at once ran out of a hosted job's memory in four of six renders, so a call there cannot ask for more than one.
   for (const where of ['local', 'hosted']) {
     const session = await connect({ definitions: loadKitDefinitions(), where, limits: where === 'hosted' ? LIMITS : undefined });
     try {
       const film = where === 'local' ? 'film.json' : 'job:job0/film.json';
-      for (const [args, jobs] of [[{}, where === 'hosted' ? 1 : undefined], [{ jobs: 3 }, where === 'hosted' ? 1 : 3]]) {
+      for (const [args, jobs] of [[{}, where === 'hosted' ? 1 : undefined], [{ jobs: 3 }, where === 'hosted' ? 'refused' : 3]]) {
+        const before = session.backend.started.length;
         const result = await session.client.callTool({ name: 'render_launch_film', arguments: { film, ...args, wait_seconds: 0 } });
+        if (jobs === 'refused') {
+          assert.equal(text(result), 'MCP error -32602: Input validation error: Invalid arguments for tool render_launch_film: '
+            + 'Unknown argument `jobs`. This tool takes `film`, `wait_seconds`. Nothing was started. Every call here has `jobs` 1.');
+          assert.equal(session.backend.started.length, before);
+          continue;
+        }
         assert.notEqual(result.isError, true, text(result));
         assert.equal(session.backend.started.at(-1).input.jobs, jobs, `${where} ${JSON.stringify(args)}`);
       }
       for (const args of [{}, { jobs: 2 }]) {
-        await session.client.callTool({ name: 'make_launch_film', arguments: { url: 'https://example.com', ...args, wait_seconds: 0 } });
+        const result = await session.client.callTool({ name: 'make_launch_film', arguments: { url: 'https://example.com', ...args, wait_seconds: 0 } });
+        if (where === 'hosted' && args.jobs) {
+          assert.match(text(result), /Unknown argument `jobs`\. This tool takes .*\. Nothing was started\. Every call here has `jobs` 1\.$/);
+          continue;
+        }
         assert.equal(session.backend.started.at(-1).input.jobs, where === 'hosted' ? 1 : args.jobs, `${where} make_launch_film ${JSON.stringify(args)}`);
       }
       for (const name of ['make_launch_film', 'render_launch_film']) {
@@ -1629,15 +1640,19 @@ test('a render\'s time is launch-film\'s own locally, and hosted, where clips re
   }
 });
 
-test('a local parameter with a hosted default is no parameter of the hosted tool, and every hosted call has that value, whatever the call gives', async () => {
+test('a local parameter with a hosted default is no parameter of the hosted tool, a hosted call that gives it is refused with that value, and every hosted call has it', async () => {
   const kits = fixtureKits();
   kits[0].tools[0].params.keep.hostedDefault = true;
   for (const where of ['local', 'hosted']) {
     const session = await connect({ definitions: kits, playbooks: path.join(FIXTURES, 'topics'), where });
     try {
       const url = 'https://example.com';
-      for (const [args, keep] of [[{}, where === 'hosted' ? true : undefined], [{ keep: false }, where === 'hosted' ? true : false]]) {
+      for (const [args, keep] of [[{}, where === 'hosted' ? true : undefined], [{ keep: false }, where === 'hosted' ? 'refused' : false]]) {
         const result = await session.client.callTool({ name: 'paint_picture', arguments: { url, ...args, wait_seconds: 0 } });
+        if (keep === 'refused') {
+          assert.match(text(result), /: Unknown argument `keep`\. This tool takes `url`, .*`wait_seconds`\. Nothing was started\. Every call here has `keep` true\.$/);
+          continue;
+        }
         assert.notEqual(result.isError, true, text(result));
         assert.equal(session.backend.started.at(-1).input.keep, keep, `${where} ${JSON.stringify(args)}`);
       }
@@ -1652,12 +1667,16 @@ test('a local parameter with a hosted default is no parameter of the hosted tool
   assert.ok(doc.includes(" Only makersmcp's server gives it: a service whose MCP server runs an older makersmcp, or that starts a job another way, runs the kit's own default. "), doc);
 });
 
-test('a number given for a parameter the kit reads as text reaches it as text, and a local parameter is left out hosted', async () => {
+test('a number given for a parameter the kit reads as text reaches it as text, and a local parameter is refused hosted', async () => {
   for (const where of ['local', 'hosted']) {
     const session = await connect({ definitions: fixtureKits(), playbooks: path.join(FIXTURES, 'topics'), where });
     try {
       const url = 'https://example.com';
-      const ok = await session.client.callTool({ name: 'paint_picture', arguments: { url, layers: 2, length: 3.5, marks: 1.5, keep: true, wait_seconds: 0 } });
+      if (where === 'hosted') {
+        const local = await session.client.callTool({ name: 'paint_picture', arguments: { url, keep: true } });
+        assert.match(text(local), /: Unknown argument `keep`\. This tool takes `url`, .*`wait_seconds`\. Nothing was started\. Only makersmcp on the user's own machine takes `keep`\.$/);
+      }
+      const ok = await session.client.callTool({ name: 'paint_picture', arguments: { url, layers: 2, length: 3.5, marks: 1.5, ...(where === 'local' ? { keep: true } : {}), wait_seconds: 0 } });
       assert.notEqual(ok.isError, true, text(ok));
       assert.deepEqual(session.backend.started[0].input, where === 'local'
         ? { url, layers: '2', length: '3.5', marks: '1.5', keep: true }
