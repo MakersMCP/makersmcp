@@ -45,7 +45,7 @@
         "done": [
           "Check the brand's name, logo and colors below before building on the kit, and ask the user when one is wrong.",
           "Show {file:card.png} to the user: the whole kit on one picture.",
-          "Use facts from {file:FACTS.md} only as quoted there, with the page each one is on; a kind it lists under Not found was not on the pages read, which does not mean the site has none, so ask the user.",
+          "Use facts from {file:FACTS.md} only as quoted there, with the page each one is on; a kind it lists under Not found is one the kit found none of on the pages read, which does not mean those pages or the site have none, so ask the user.",
           "For a launch film, give brand {folder} to plan_launch_film or make_launch_film."
         ],
         "failed": [
@@ -57,7 +57,7 @@
         "done": [
           "Check the brand's name, logo and colors below before building on the kit, and ask the user when one is wrong.",
           "Show the user the {name:card.png} link from the list below: the whole kit on one picture.",
-          "Use facts from {name:FACTS.md} below only as quoted there, with the page each one is on; a kind it lists under Not found was not on the pages read, which does not mean the site has none, so ask the user.",
+          "Use facts from {name:FACTS.md} below only as quoted there, with the page each one is on; a kind it lists under Not found is one the kit found none of on the pages read, which does not mean those pages or the site have none, so ask the user.",
           "For a launch film, give brand {file:brand.json} to plan_launch_film or make_launch_film."
         ],
         "failed": [

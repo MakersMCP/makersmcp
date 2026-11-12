@@ -2045,9 +2045,20 @@ test('launch-kit\'s hand over says what was chosen where the user left it open, 
   }
 });
 
-test('a brand kit made with facts says in its Next line that a kind FACTS.md lists under Not found may still be on the site, and one without FACTS.md says nothing of facts', async () => {
-  // In the eval's trial an assistant told the user the site had no rating or testimonial, which the kit had missed.
-  const caveat = 'a kind it lists under Not found was not on the pages read, which does not mean the site has none, so ask the user.';
+test('a brand kit made with facts says in its Next line, as the brand topic does, that a kind FACTS.md lists under Not found is one the kit found none of, which those pages and the site may still have, and one without FACTS.md says nothing of facts', async () => {
+  // In the eval's trial an assistant told the user the site had no rating or testimonial, which the kit had missed on the
+  // very page it read: a kind under Not found is the kit's reading, not a fact about the pages.
+  const caveat = 'a kind it lists under Not found is one the kit found none of on the pages read, which does not mean those pages or the site have none, so ask the user.';
+  for (const where of ['local', 'hosted']) {
+    const session = await connect({ definitions: loadKitDefinitions(), where, ...(where === 'hosted' ? { limits: LIMITS } : {}) });
+    try {
+      const brand = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['brand'] } }));
+      assert.ok(brand.includes(' A kind listed under "Not found" is one the kit found none of on the pages read, which does not mean those pages or the site have none, so ask the user. '), where);
+      assert.doesNotMatch(brand, /did not show it|was not on the pages read/, where);
+    } finally {
+      await session.close();
+    }
+  }
   for (const where of ['local', 'hosted']) {
     const id = where === 'local' ? 'job_1a2b3c4d' : '0f5c2e9a-1b2c-4d3e-8f90-123456789abc';
     for (const facts of [true, false]) {
