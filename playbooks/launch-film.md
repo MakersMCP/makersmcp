@@ -98,7 +98,7 @@ plan_launch_film {"url": "https://linear.app", "brand": "job:<job_id>/brand.json
 <!-- with easybrandkit -->
    The brand topic says which address of a site gives its brand.
 <!-- end -->
-3. Render it, which takes {fact:launch-film.render_minutes} for a 30 second film, then call `wait_for_job` with the `job_id` until it is done:
+3. Render it, which takes longer here than the {fact:launch-film.render_minutes} a 30 second film takes with two clips at a time, then call `wait_for_job` with the `job_id` until it is done:
 ```call
 render_launch_film {"film": "job:<job_id>/film.json", "wait_seconds": 0}
 ```

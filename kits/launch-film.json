@@ -193,7 +193,7 @@
       "asks": "a film.json rendered into film.mp4, after a plan or a change",
       "playbook": "launch-film",
       "description": "Renders a film.json into film.mp4 next to it, with Chrome and ffmpeg on this machine, and writes film.timeline.json, each clip's start and length, which the result shows. It replaces the film.mp4 and film.timeline.json of an earlier render there and does not draw frames/ again. check_video makes a new sheet.png to look at. The film is {fact:launch-film.fps} frames a second. Rendering a 30 second film takes {fact:launch-film.render_minutes}.",
-      "hostedDescription": "Renders the film.json of an earlier make_launch_film or plan_launch_film job into film.mp4, as it was planned, and writes film.timeline.json, each clip's start and length, which the result shows. The film is {fact:launch-film.fps} frames a second. Rendering a 30 second film takes {fact:launch-film.render_minutes}.",
+      "hostedDescription": "Renders the film.json of an earlier make_launch_film or plan_launch_film job into film.mp4, as it was planned, and writes film.timeline.json, each clip's start and length, which the result shows. The film is {fact:launch-film.fps} frames a second. It renders one clip at a time here, so a 30 second film takes longer than the {fact:launch-film.render_minutes} it takes with two clips at a time.",
       "args": ["render", "{film}"],
       "out": { "name": "{dir:film}" },
       "params": {

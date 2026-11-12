@@ -1606,6 +1606,29 @@ test('hosted, launch-film renders one clip at a time, as jobs is no parameter th
   }
 });
 
+test('a render\'s time is launch-film\'s own locally, and hosted, where clips render one at a time, longer than that time, which is two clips at a time', async () => {
+  // launch-film's own time is for two clips at a time: one at a time took 180 s against 100 s for the same film in a recheck.
+  const skill = readFileSync(path.join(resolveKit(loadKitDefinitions().find(kit => kit.kit === 'launch-film')).dir, 'skills', 'launch-film', 'SKILL.md'), 'utf8');
+  assert.match(skill, /Clips render two at a time; a 30 second film takes one to three minutes\./);
+  for (const where of ['local', 'hosted']) {
+    const session = await connect({ definitions: loadKitDefinitions(), where, limits: where === 'hosted' ? LIMITS : undefined });
+    try {
+      const render = session.tools.find(tool => tool.name === 'render_launch_film').description;
+      const topic = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['launch-film'] } }));
+      if (where === 'hosted') {
+        assert.ok(render.includes(' It renders one clip at a time here, so a 30 second film takes longer than the one to three minutes it takes with two clips at a time. '), render);
+        assert.match(topic, /\n3\. Render it, which takes longer here than the one to three minutes a 30 second film takes with two clips at a time, then call `wait_for_job` /);
+        assert.doesNotMatch(`${render}\n${topic}`, /takes one to three minutes/);
+      } else {
+        assert.ok(render.includes(' Rendering a 30 second film takes one to three minutes. '), render);
+        assert.match(topic, /\n4\. Render it, which takes one to three minutes for a 30 second film, then call `wait_for_job` /);
+      }
+    } finally {
+      await session.close();
+    }
+  }
+});
+
 test('a local parameter with a hosted default is no parameter of the hosted tool, and every hosted call has that value, whatever the call gives', async () => {
   const kits = fixtureKits();
   kits[0].tools[0].params.keep.hostedDefault = true;
