@@ -2288,6 +2288,57 @@ test('a kit tool whose own topic the server does not offer points to getting-sta
   }
 });
 
+test('with launch-film\'s film tools held back, no topic of a film or a launch kit is offered, named or given as an example, and launch_film_guide has its own line in getting-started and troubleshooting', async () => {
+  // As MakersMCP-Server holds them until launch-film's security fix is on makersmcp.com, listing launch_film_guide and check_video.
+  const held = ['plan_launch_film', 'make_launch_film', 'render_launch_film', 'make_launch_stills'];
+  const filmTopics = new Set(['launch-film', 'launch-kit']);
+  const guideLine = /^- `launch_film_guide`: it reads no site and runs no browser or ffmpeg, so a failed job of it is one of the cases above\.$/m;
+  const session = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits: LIMITS, held });
+  try {
+    const names = session.tools.map(tool => tool.name);
+    assert.ok(names.includes('launch_film_guide') && names.includes('check_video') && !names.includes('make_launch_film'), names.join());
+    const playbook = session.tools.find(tool => tool.name === 'makersmcp_playbook');
+    const offered = playbook.inputSchema.properties.topics.items.enum;
+    assert.ok(!offered.some(name => filmTopics.has(name)), offered.join());
+    const { resources } = await session.client.listResources();
+    assert.ok(!resources.some(resource => /\/launch-(?:film|kit)$/.test(resource.uri)), resources.map(resource => resource.uri).join());
+    // The index and the instructions give no film and no launch kit as an example of a job.
+    assert.ok(playbook.description.includes(' Before a job with more than one step, like music fitted to a video, or when unsure '), playbook.description.slice(0, 700));
+    assert.match(session.instructions, / Before a job with more than one step, call makersmcp_playbook with its topic, wait for it and follow it\. /);
+    assert.doesNotMatch(`${session.instructions}\n${playbook.description}`, /like a launch film|a launch kit/);
+    // No text the client gets names either topic: the instructions, each tool with its parameters, and every topic offered.
+    const texts = [session.instructions, ...session.tools.map(tool => JSON.stringify(tool))];
+    for (const name of offered) texts.push(text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [name] } })));
+    for (const content of texts) assert.deepEqual(topicsNamed(content, filmTopics), [], content.slice(0, 300));
+    // launch_film_guide's own topic is not offered: its description points to getting-started, which lists it, and its
+    // failed job to troubleshooting, which has a line for it.
+    assert.match(session.tools.find(tool => tool.name === 'launch_film_guide').description,
+      / The getting-started playbook \(makersmcp_playbook\) says which requests it fits here\. \(launch-film 9\.9\.9, on makersmcp\.com\.\)$/);
+    const started = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['getting-started'] } }));
+    assert.match(started, /^- `launch_film_guide`: the looks of a launch film, or the scene types film\.json takes\.$/m);
+    session.backend.view = (request, id) => ({ id, kit: 'launch-film', tool: 'launch_film_guide', title: 'Launch film looks and scene types', status: 'failed', exitCode: 1,
+      elapsedSeconds: 1, failure: 'Something went wrong on our side. Try again in a while.' });
+    const failed = await session.client.callTool({ name: 'launch_film_guide', arguments: { topic: 'looks' } });
+    assert.equal(failed.structuredContent.next, "The troubleshooting playbook (makersmcp_playbook) lists this tool's errors and their fixes.");
+    assert.match(text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['troubleshooting'] } })), guideLine);
+  } finally {
+    await session.close();
+  }
+  // With the film tools listed, both topics are offered and named as before, and launch_film_guide shares the film tools' line.
+  const listed = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits: LIMITS });
+  try {
+    const playbook = listed.tools.find(tool => tool.name === 'makersmcp_playbook');
+    assert.ok([...filmTopics].every(name => playbook.inputSchema.properties.topics.items.enum.includes(name)));
+    assert.match(listed.instructions, / Before a job with more than one step, like a launch film or a launch kit, call makersmcp_playbook/);
+    assert.match(listed.tools.find(tool => tool.name === 'launch_film_guide').description, / The launch-film playbook \(makersmcp_playbook\) has the whole job\. /);
+    const troubleshooting = text(await listed.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['troubleshooting'] } }));
+    assert.match(troubleshooting, /^- `make_launch_film`, `plan_launch_film`, `render_launch_film`, `make_launch_stills` and `launch_film_guide`: the launch-film topic/m);
+    assert.doesNotMatch(troubleshooting, guideLine);
+  } finally {
+    await listed.close();
+  }
+});
+
 test('a sentence that holds only while a tool is held back or off is not there while it is listed, and one that needs a tool is there only with it', async () => {
   const read = async (options, topics) => {
     const session = await connect({ definitions: loadKitDefinitions(), ...options });

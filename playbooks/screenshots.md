@@ -5,7 +5,7 @@ index: take_screenshots and check_pwa_screenshots: pages, store and gallery size
 description: Takes real screenshots of a website's pages with easyscreenshotkit, at desktop, phone, App Store, whole page and custom sizes, light or dark, and the screenshots a web app manifest needs, then checks a manifest's screenshots against Chrome's rules. Use it when the user asks for screenshots of a site, store or gallery screenshots, or screenshots for a web app's install dialog, or when work needs the product's real screens.
 kit: easyscreenshotkit
 requires: [easyscreenshotkit]
-optional: [launch-film]
+optional: [launch-film, make_launch_film, plan_launch_film]
 order: 50
 ---
 # Screenshots of a website
@@ -16,7 +16,7 @@ order: 50
 
 - The site, as `url`. Only what anyone can open is reached: a page behind a login, or a site that answers with a bot check, gives no screenshots. When the user names no address, ask for it.
 - The places, since each needs its own size: App Store screenshots are iphone, Google Play phone screenshots mobile, a Product Hunt gallery image 1270x760@2, and a web app's install dialog takes `pwa`. Ask when the request does not say.
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
 - The Google Play feature graphic, Chrome Web Store tiles, an og:image and an X picture are drawn pictures, not screenshots: `make_launch_stills` makes them (the launch-film topic). The launch-kit topic maps every place of a launch.
 <!-- end -->
 - A view an app shows behind a click or a #route, like /app/#/plants, is out of reach, since `url` and `page` are read as paths. Ask the user for those screens, or record them with `record_demo_video` and a steps file (the demo-video topic).

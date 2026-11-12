@@ -4,10 +4,10 @@ MakersMCP runs open source kits on this machine.
 <!-- hosted -->
 MakersMCP runs open source kits for you on its servers.
 <!-- end -->
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
 Before a job with more than one step, like a launch film or a launch kit, call makersmcp_playbook with its topic, wait for it and follow it.
 <!-- end -->
-<!-- without launch-film -->
+<!-- without make_launch_film, plan_launch_film -->
 Before a job with more than one step, call makersmcp_playbook with its topic, wait for it and follow it.
 <!-- end -->
 A tool still working after wait_seconds returns a job_id: call wait_for_job with it, never the same tool again, which would start a second job. A call that ended with no result may still have started one: call list_jobs before trying again. From a website or a file, the kits make {makes}.

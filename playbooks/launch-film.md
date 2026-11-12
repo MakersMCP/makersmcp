@@ -5,6 +5,7 @@ index: make_launch_film, plan_launch_film, render_launch_film, make_launch_still
 description: Plans, renders and hands over a short launch film made from a product's own site or store listing with launch-film, and makes the launch pictures for Product Hunt, link previews, X, Google Play and the Chrome Web Store from the same plan. Use it when the user wants a launch video, product video, promo, teaser or announcement clip, or launch pictures that match one.
 kit: launch-film
 requires: [launch-film]
+any: [make_launch_film, plan_launch_film]
 optional: [easybrandkit, check_video, fit_music]
 order: 65
 ---

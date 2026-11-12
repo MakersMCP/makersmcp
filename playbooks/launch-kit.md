@@ -5,6 +5,7 @@ index: the files a launch needs, made in order across the kits, with the place m
 description: Runs the whole set of launch files for a product's site with the MakersMCP kits on the server, in the order that works and with what can run side by side, from the brand kit and screenshots to launch films and launch pictures, with fitted music and checks where the server lists those tools. Says which place takes which file at which size and what to hand over. Use it when the user asks for a launch kit, for launch assets, or for what can be made for a launch on a named place.
 kit: makersmcp
 requires: [launch-film]
+any: [make_launch_film, plan_launch_film]
 optional: [easybrandkit, easyfontkit, easyscreenshotkit, musicfit, check_video, fit_music]
 order: 20
 ---

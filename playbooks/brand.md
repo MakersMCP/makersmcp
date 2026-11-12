@@ -5,7 +5,7 @@ index: make_brand_kit: logo files, colors, fonts, first screen, store assets and
 description: Makes a product's brand kit from its website with easybrandkit: the logo files cut from the page, the colors with where the site uses each, the fonts, the first screen, a brand card, the icons and screenshots of the apps it links to, and with facts the site's own claims, each with its page. Use it before designing, building or animating anything for a product whose site is known, and when the user asks for a site's logo, colors or brand guidelines.
 kit: easybrandkit
 requires: [easybrandkit]
-optional: [launch-film, easyfontkit]
+optional: [launch-film, easyfontkit, make_launch_film, plan_launch_film]
 order: 30
 ---
 # Brand kits from a website
@@ -78,7 +78,7 @@ make_brand_kit {"url": "https://linear.app", "facts": true}
 
 ## Passing the kit on
 
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
 A launch film takes the kit as `brand` of `plan_launch_film` or `make_launch_film`, which copy it into the film's brand/ folder instead of reading the site's brand again. A wrong name in the kit goes on screen, so check it first.
 <!-- local -->
 Fix the name in the film's plan before it renders (the launch-film topic).

@@ -5,7 +5,7 @@ index: which tool fits which request, how jobs, waits and files work, and what t
 description: Explains what MakersMCP's kits make from a website or a file and what they never make, which tool answers which request, how a job runs and how to wait for it, where the files go, the rules for using what the kits made, and what to tell the user at the end. Use it when a request names no tool, when it is unclear whether these kits can do it, or before a first job.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music, analyze_music]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music, analyze_music, make_launch_film, plan_launch_film]
 order: 10
 ---
 # Getting started with MakersMCP
@@ -27,7 +27,7 @@ No tool here fits a track to a video now: `analyze_music` only reads one, so the
 When the user asks what can be made, answer from this list, start no job, and ask which of it they want. No tool here makes an image, a video, a voice or music from a prompt, transcribes speech, uploads or posts: for such a request say so, and offer what the kits here do make.
 
 Before a first job, ask in one question for what the result depends on and the request leaves out, like the site's address. Before a job of more than one step, read its topic with `makersmcp_playbook`.
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
 A whole launch is the launch-kit topic.
 <!-- end -->
 

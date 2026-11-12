@@ -5,7 +5,7 @@ index: setup, the errors the tools return and their fixes, the kits' flag names
 description: Explains how a MakersMCP result shows a problem, from an argument the schema refused to a job that failed or a check that did not pass, lists the errors makersmcp itself returns with their fixes, says what check_setup reports and how to fix the setup, and maps the command line flags kit messages may name to the parameters they mean. Use it when a tool returns an error, a job fails, a tool is missing, or a message names a flag.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music, analyze_music]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music, analyze_music, make_launch_film, plan_launch_film, launch_film_guide]
 order: 90
 ---
 # When a tool fails
@@ -117,8 +117,13 @@ Kit messages can name the kit's command line flags, like --timeout or --page. A 
 <!-- with easyscreenshotkit -->
 - `take_screenshots` and `check_pwa_screenshots`: the screenshots topic. `record_demo_video`: the demo-video topic.
 <!-- end -->
-<!-- with launch-film -->
+<!-- with make_launch_film, plan_launch_film -->
 - `make_launch_film`, `plan_launch_film`, `render_launch_film`, `make_launch_stills` and `launch_film_guide`: the launch-film topic, and a film.json's problems the film-json topic.
+<!-- end -->
+<!-- with launch_film_guide -->
+<!-- without make_launch_film, plan_launch_film -->
+- `launch_film_guide`: it reads no site and runs no browser or ffmpeg, so a failed job of it is one of the cases above.
+<!-- end -->
 <!-- end -->
 <!-- with check_video -->
 - `check_video`: the checks topic.

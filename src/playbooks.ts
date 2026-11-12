@@ -62,7 +62,8 @@ const LIST_KEYS = new Set(['requires', 'any', 'optional']);
 const REQUIRED_KEYS = ['name', 'title', 'index', 'description', 'kit', 'order'];
 /**
  * Jobs of more than one step the index names as examples, each while its topic is offered, so a
- * held tool's job, like music fitted to a video while fit_music is held back, is never one.
+ * held tool's job, like music fitted to a video while fit_music is held back, or a launch film
+ * while launch-film's film tools are, is never one.
  */
 const EXAMPLE_JOBS: Array<[string, string]> = [['launch-film', 'a launch film'], ['music', 'music fitted to a video'], ['launch-kit', 'a launch kit']];
 
@@ -110,7 +111,10 @@ export interface Topic {
   kit: string;
   /** Kits that must all be on, and tools the server must list, for it to be offered. */
   requires: string[];
-  /** Kits of which one must be on, when any are named. */
+  /**
+   * Kits and tools of which one must be on or listed, when any are named, like the film tools that
+   * launch-film and launch-kit need, which a service may hold back while the kit is on.
+   */
   any: string[];
   /** Kits and tools the text has with or without blocks for. */
   optional: string[];
