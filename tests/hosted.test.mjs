@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -320,4 +321,68 @@ test('hosted, make_launch_stills refuses a link to a film.json, which the kit wo
     const pattern = new RegExp(schema.pattern);
     assert.deepEqual([...refused, ...taken].map(value => pattern.test(value)), [...refused.map(() => false), ...taken.map(() => true)]);
   });
+});
+
+// A backend whose start takes `startMs`, as a hosted service's can, and whose jobs run past every wait.
+class SlowStartBackend extends FakeHostedBackend {
+  waits = [];
+
+  constructor(startMs) {
+    super();
+    this.startMs = startMs;
+  }
+
+  async start(request) {
+    await sleep(this.startMs);
+    return super.start(request);
+  }
+
+  async wait(id, seconds) {
+    this.waits.push(seconds);
+    await sleep(seconds * 1000);
+    return this.jobs.get(id);
+  }
+}
+
+test('wait_seconds counts from the start of the call, so the time a start takes comes out of it', async () => {
+  const backend = new SlowStartBackend(2000);
+  await withHosted(async client => {
+    let calledAt = Date.now();
+    const result = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', wait_seconds: 3 } });
+    let took = Date.now() - calledAt;
+    assert.equal(result.structuredContent.status, 'running');
+    assert.ok(backend.waits[0] > 0.8 && backend.waits[0] <= 1, `waited ${backend.waits[0]} s after the start`);
+    assert.ok(took >= 2900 && took < 3600, `answered after ${took} ms`);
+
+    // A start that takes longer than wait_seconds leaves nothing to wait.
+    calledAt = Date.now();
+    const quick = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', wait_seconds: 1 } });
+    took = Date.now() - calledAt;
+    assert.equal(quick.structuredContent.status, 'running');
+    assert.equal(backend.waits[1], 0);
+    assert.ok(took < 2600, `answered after ${took} ms`);
+  }, { backend });
+});
+
+test('a call cancelled before its job starts starts none', async () => {
+  const backend = new FakeHostedBackend();
+  const server = createMcpServer({ definitions, backend });
+  const client = new Client({ name: 'test-client', version: '1.0.0' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  try {
+    // The call and its cancel arrive together, as from a client that gave up on it at once.
+    void clientTransport.send({ jsonrpc: '2.0', id: 'call-1', method: 'tools/call', params: { name: 'fake_make', arguments: { url: 'https://example.com' } } });
+    void clientTransport.send({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 'call-1', reason: 'gave up' } });
+    await sleep(200);
+    assert.deepEqual(backend.started, []);
+    // The same call not cancelled starts its job.
+    const started = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', wait_seconds: 0 } });
+    assert.equal(started.structuredContent.status, 'running');
+    assert.equal(backend.started.length, 1);
+  } finally {
+    await client.close();
+    await server.close();
+  }
 });

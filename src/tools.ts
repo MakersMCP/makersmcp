@@ -40,7 +40,7 @@ function waitSeconds(context: ToolContext): z.ZodType {
       ? `Each call waits at most ${limit} seconds here, whatever this asks.`
       : 'A call here may come back sooner, with the job_id to wait on.';
   return z.number().int().min(WAIT_SECONDS.min).max(WAIT_SECONDS.max).default(WAIT_SECONDS.default)
-    .describe(`How long to wait for the result before returning a job_id to wait on. ${words}`);
+    .describe(`How long to wait for the result, counted from the start of the call, before returning a job_id to wait on. ${words}`);
 }
 
 // A hosted kit cannot read the agent's disk: a file comes as a link, or as a file an
@@ -297,6 +297,11 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
       },
     },
     async (input: Record<string, unknown>, extra: Extra) => {
+      // wait_seconds counts from here, the start included: a hosted start can take seconds, and a
+      // client that ends a call after 60 seconds would otherwise lose one that waited 45 after it.
+      const calledAt = Date.now();
+      // A call the client cancelled before it got here starts nothing: no answer would reach it.
+      if (extra.signal.aborted) return errorResult(`## ${tool.title}: not started\n\nThe call was cancelled before its job started, so nothing was started.`);
       const { wait_seconds: wait, ...args } = input;
       // A local parameter with a hosted default is no parameter of the tool here, and every call has that value, like jobs 1 for a launch film.
       if (hosted) for (const [name, param] of Object.entries(tool.params)) if (param.where === 'local' && param.hostedDefault !== undefined) args[name] = param.hostedDefault;
@@ -311,7 +316,8 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
         throw error;
       }
       if (view.status === 'running') {
-        view = (await waitFor(context, view.id, Number(wait ?? WAIT_SECONDS.default), extra)) ?? view;
+        const left = Math.max(0, Number(wait ?? WAIT_SECONDS.default) - (Date.now() - calledAt) / 1000);
+        view = (await waitFor(context, view.id, left, extra)) ?? view;
       }
       return jobResult(view, resultContext(context, entry));
     },

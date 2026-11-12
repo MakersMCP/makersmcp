@@ -152,7 +152,7 @@ A long job, like rendering a film, keeps going after the tool returns. The tool 
 - The tools don't appear: check that `node --version` says 22 or newer, then restart the client. `npx -y makersmcp@0.1.1 --check` lists what makersmcp found.
 - A kit's tools are missing: `--check` says why. Every kit comes with makersmcp, so look at `--kits` and `--kit-path`, and from source run `npm install` again after a pull.
 - A kit can't find Chrome or ffmpeg: set `CHROME_PATH` and `FFMPEG_PATH` in the server's `env`. makersmcp gives them to every kit, to launch-film as `LAUNCH_FILM_CHROME` and `LAUNCH_FILM_FFMPEG` too, with `LAUNCH_FILM_FFPROBE` the ffprobe beside that ffmpeg. Without them, it gives each kit the Chrome and the ffmpeg `--check` shows. A setting names a program by its path, or by a command name on PATH like `ffmpeg`. `--check` also names a setting that leads to no program, and until it is fixed makersmcp starts no tool that reads a program from it.
-- A long job meets the client's time limit: no call waits longer than `wait_seconds`, 45 by default. A job still running then comes back with a `job_id` and `next_action: wait_for_job`, and the agent should call that, never the first tool again, which would start a second job. Where a client lets you set a tool timeout, keep it above 45 seconds.
+- A long job meets the client's time limit: no call waits longer than `wait_seconds`, 45 by default, counted from the start of the call. A job still running then comes back with a `job_id` and `next_action: wait_for_job`, and the agent should call that, never the first tool again, which would start a second job. Where a client lets you set a tool timeout, keep it above 45 seconds.
 
 ## Settings
 
