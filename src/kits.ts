@@ -66,6 +66,13 @@ export interface ParamDefinition {
    * in a playbook or a description shows it. makersmcp never passes it to the kit.
    */
   default?: unknown;
+  /**
+   * The value a hosted server gives the parameter when a call leaves it out, like 1 for
+   * launch-film's jobs, since two clips at once can run a hosted job out of its memory: its
+   * schema there shows it as the default, the call reaches the backend with it, and
+   * {default:<tool>.<param>} shows it in a hosted text. `default` stays the kit's own, here.
+   */
+  hostedDefault?: unknown;
   /** "local": the parameter is left out of the tools a hosted server lists, like keep, whose files a hosted job sweeps away. */
   where?: 'local';
 }
@@ -321,6 +328,24 @@ function staysInside(relative: string): boolean {
   return Boolean(relative) && !path.isAbsolute(relative) && !relative.split(/[\\/]/).includes('..');
 }
 
+/** Whether the parameter takes a value as it is: a number inside its bounds, a boolean, one of an enum's values, or a text. */
+function takesValue(param: ParamDefinition, value: unknown): boolean {
+  switch (param.type) {
+    case 'integer':
+    case 'number':
+      return typeof value === 'number' && Number.isFinite(value) && (param.type === 'number' || Number.isInteger(value))
+        && (param.min === undefined || value >= param.min) && (param.max === undefined || value <= param.max);
+    case 'boolean':
+      return typeof value === 'boolean';
+    case 'enum':
+      return typeof value === 'string' && Boolean(param.values?.includes(value));
+    case 'string':
+      return typeof value === 'string' && value.trim() !== '';
+    default:
+      return false;
+  }
+}
+
 function isPattern(value: unknown): boolean {
   if (typeof value !== 'string' || !value) return false;
   try {
@@ -466,6 +491,12 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
       if (param.where !== undefined) {
         if (param.where !== 'local') fail(`${tool.name}.${name}: where is "local", for a parameter a hosted server leaves out`);
         if (param.required || tool.args.includes(`{${name}}`)) fail(`${tool.name}.${name}: a local parameter cannot be required`);
+      }
+      if (param.hostedDefault !== undefined) {
+        if (param.required || param.where === 'local') fail(`${tool.name}.${name}: hostedDefault is for a parameter a call may leave out on a hosted server`);
+        if (!takesValue(param, param.hostedDefault)) {
+          fail(`${tool.name}.${name}: hostedDefault is a value the parameter takes as it is: a number inside its min and max, a boolean, one of its values or a text`);
+        }
       }
       if (param.type === 'enum' && !param.values?.length) fail(`${tool.name}.${name}: an enum needs values`);
       if (param.flag !== undefined && !/^--?[a-z]/.test(param.flag)) fail(`${tool.name}.${name}: bad flag "${param.flag}"`);

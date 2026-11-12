@@ -122,7 +122,12 @@ make_launch_film {"url": "https://linear.app", "aspect": "9:16", "wait_seconds":
 
 - `brand`, on `make_launch_film` and `plan_launch_film`, takes a brand kit, which the kit copies into brand/ in the film's folder; without it, the kit reads the brand from the site. `words` takes a `words.json` from an earlier plan instead of reading the page again. `music` false leaves out the bed and `sfx` false the sound effects; the plan writes both into `film.json`.
 - `render_launch_film` takes `film`, the `film.json`, and writes `film.mp4` and `film.timeline.json` next to it.
+<!-- local -->
 - `jobs` is the number of clips `make_launch_film` and `render_launch_film` render at once, {default:render_launch_film.jobs} unless given; 1 suits a slow machine.
+<!-- end -->
+<!-- hosted -->
+- `jobs` is the number of clips `make_launch_film` and `render_launch_film` render at once, {default:render_launch_film.jobs} here unless given. Leave it out: more at once can run out of the memory a job has here.
+<!-- end -->
 - `make_launch_stills` takes `source`, a `film.json` or the site's address, and `for`, the places.
 <!-- local -->
 - `keep` keeps each clip's MP4 in a launch-film-work- folder in the system's temp folder, which the summary names.

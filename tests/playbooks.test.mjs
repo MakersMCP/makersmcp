@@ -1543,7 +1543,47 @@ test('a kit file\'s new fields are checked when it is read', () => {
   assert.throws(broken((kit, tool) => { tool.params.keep.where = 'hosted'; }), /where is "local"/);
   assert.throws(broken((kit, tool) => { tool.params.keep.required = true; }), /a local parameter cannot be required/);
   assert.throws(broken((kit, tool, check) => { check.out.ownOnly = true; delete check.out.flag; }), /out\.ownOnly is true or false, for a tool whose folder the agent gives with out\.flag/);
+  // A hosted default is a value the parameter takes as it is, for one a call may leave out there.
+  for (const [param, value] of [['width', 9000], ['width', 600.5], ['width', '600'], ['hue', 'red'], ['clean', 'no'], ['sketch', 'sketch.png'], ['length', '']]) {
+    assert.throws(broken((kit, tool) => { tool.params[param].hostedDefault = value; }), new RegExp(`paint_picture\\.${param}: hostedDefault is a value the parameter takes as it is`), `${param} ${value}`);
+  }
+  assert.throws(broken((kit, tool) => { tool.params.keep.hostedDefault = true; }), /paint_picture\.keep: hostedDefault is for a parameter a call may leave out on a hosted server/);
+  assert.throws(broken((kit, tool) => { tool.params.url.hostedDefault = 'https://example.com'; }), /paint_picture\.url: hostedDefault is for a parameter a call may leave out on a hosted server/);
+  broken((kit, tool) => Object.assign(tool.params, {
+    width: { ...tool.params.width, hostedDefault: 600 }, hue: { ...tool.params.hue, hostedDefault: 'cool' },
+    clean: { ...tool.params.clean, hostedDefault: false }, length: { ...tool.params.length, hostedDefault: '2s' },
+  }))();
   broken(() => {})();
+});
+
+test('hosted, launch-film renders one clip at a time unless the call says otherwise, as jobs\' hosted default, which its schema and texts show, while the kit\'s own default holds locally', async () => {
+  for (const where of ['local', 'hosted']) {
+    const session = await connect({ definitions: loadKitDefinitions(), where, limits: where === 'hosted' ? LIMITS : undefined });
+    try {
+      const film = where === 'local' ? 'film.json' : 'job:job0/film.json';
+      for (const [args, jobs] of [[{}, where === 'hosted' ? 1 : undefined], [{ jobs: 3 }, 3]]) {
+        const result = await session.client.callTool({ name: 'render_launch_film', arguments: { film, ...args, wait_seconds: 0 } });
+        assert.notEqual(result.isError, true, text(result));
+        assert.equal(session.backend.started.at(-1).input.jobs, jobs, `${where} ${JSON.stringify(args)}`);
+      }
+      await session.client.callTool({ name: 'make_launch_film', arguments: { url: 'https://example.com', wait_seconds: 0 } });
+      assert.equal(session.backend.started.at(-1).input.jobs, where === 'hosted' ? 1 : undefined, `${where} make_launch_film`);
+      for (const name of ['make_launch_film', 'render_launch_film']) {
+        const jobs = session.tools.find(tool => tool.name === name).inputSchema.properties.jobs;
+        assert.equal(jobs.default, where === 'hosted' ? 1 : undefined, `${where} ${name}`);
+        assert.equal(jobs.description, where === 'hosted'
+          ? 'Clips rendered at once (default 1 here). Leave it out: more at once can run out of the memory a job has here.'
+          : 'Clips rendered at once (default 2). 1 suits a slow machine.');
+        assert.ok(!session.tools.find(tool => tool.name === name).inputSchema.required?.includes('jobs'));
+      }
+      const topic = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['launch-film'] } }));
+      assert.match(topic, where === 'hosted'
+        ? /\n- `jobs` is the number of clips `make_launch_film` and `render_launch_film` render at once, 1 here unless given\. Leave it out: more at once can run out of the memory a job has here\.\n/
+        : /\n- `jobs` is the number of clips `make_launch_film` and `render_launch_film` render at once, 2 unless given; 1 suits a slow machine\.\n/);
+    } finally {
+      await session.close();
+    }
+  }
 });
 
 test('a number given for a parameter the kit reads as text reaches it as text, and a local parameter is left out hosted', async () => {

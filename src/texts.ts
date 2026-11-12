@@ -258,11 +258,12 @@ function boundsOf(definitions: KitDefinition[], arg: string): string {
   throw new TextError(`{bounds:${arg}}: ${name} has no bounds`);
 }
 
-function defaultOf(definitions: KitDefinition[], arg: string): string {
-  const { tool, name, param } = paramOf(definitions, arg, 'default');
+function defaultOf(context: TextContext, arg: string): string {
+  const { tool, name, param } = paramOf(context.definitions, arg, 'default');
   if (name === 'wait_seconds') return String(WAIT_SECONDS.default);
   if (name === 'out_dir') return templateInWords(tool!.out!.name);
-  const value = param?.default;
+  // A hosted server gives the parameter its hosted default when a call leaves it out, so a hosted text names that one.
+  const value = context.where === 'hosted' && param?.hostedDefault !== undefined ? param.hostedDefault : param?.default;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (Array.isArray(value) && value.every(item => typeof item === 'string' || typeof item === 'number')) return inWords(value.map(String));
   throw new TextError(`{default:${arg}}: ${name} has no default in its kit file`);
@@ -311,7 +312,7 @@ export function fillText(text: string, context: TextContext, options: FillOption
       case 'bounds':
         return boundsOf(context.definitions, arg!) + after;
       case 'default':
-        return defaultOf(context.definitions, arg!) + after;
+        return defaultOf(context, arg!) + after;
       case 'version': {
         const version = context.versions.get(arg!);
         if (!version) throw new TextError(`{version:${arg}}: ${arg} is not running here`);

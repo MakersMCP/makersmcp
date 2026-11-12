@@ -77,7 +77,7 @@
         "words": { "type": "path", "flag": "--words", "description": "A words.json from an earlier plan or film, used instead of reading the page again, so a second aspect keeps the same words." },
         "music": { "type": "boolean", "flag": "--no-music", "when": false, "default": true, "description": "Set to false to leave out the look's music bed, as when the user's own track goes under the film later." },
         "sfx": { "type": "boolean", "flag": "--no-sfx", "when": false, "default": true, "description": "Set to false to leave out the sound effects." },
-        "jobs": { "type": "integer", "flag": "--jobs", "min": 1, "max": 4, "default": 2, "description": "Clips rendered at once (default {default:make_launch_film.jobs}). 1 suits a slow machine." },
+        "jobs": { "type": "integer", "flag": "--jobs", "min": 1, "max": 4, "default": 2, "hostedDefault": 1, "description": "Clips rendered at once (default {default:make_launch_film.jobs}). 1 suits a slow machine.", "hostedDescription": "Clips rendered at once (default {default:make_launch_film.jobs} here). Leave it out: more at once can run out of the memory a job has here." },
         "keep": { "type": "boolean", "flag": "--keep", "default": false, "where": "local", "description": "Keep the work files, each clip's MP4, in a launch-film-work- folder in the system's temp folder, outside the film's folder; the summary names it." }
       },
       "docs": [
@@ -198,7 +198,7 @@
       "out": { "name": "{dir:film}" },
       "params": {
         "film": { "type": "path", "required": true, "reads": ["brand", "clips.image", "clips.images", "clips.logo", "clips.icon"], "description": "The film.json to render. film.mp4 and film.timeline.json go next to it.", "hostedDescription": "The film.json an earlier job saved, as job:<job_id>/film.json, so the brand and screens it names come with it." },
-        "jobs": { "type": "integer", "flag": "--jobs", "min": 1, "max": 4, "default": 2, "description": "Clips rendered at once (default {default:render_launch_film.jobs}). 1 suits a slow machine." },
+        "jobs": { "type": "integer", "flag": "--jobs", "min": 1, "max": 4, "default": 2, "hostedDefault": 1, "description": "Clips rendered at once (default {default:render_launch_film.jobs}). 1 suits a slow machine.", "hostedDescription": "Clips rendered at once (default {default:render_launch_film.jobs} here). Leave it out: more at once can run out of the memory a job has here." },
         "keep": { "type": "boolean", "flag": "--keep", "default": false, "where": "local", "description": "Keep the work files, each clip's MP4, in a launch-film-work- folder in the system's temp folder, outside the film's folder; the summary names it." }
       },
       "docs": ["film.timeline.json"],

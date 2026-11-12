@@ -154,8 +154,11 @@ function paramSchema(tool: ToolDefinition, name: string, param: ParamDefinition,
     default:
       schema = number ? z.union([z.string().min(1), z.number()], { error: 'text, or a number' }) : z.string().min(1);
   }
-  schema = schema.describe(description);
-  return param.required ? schema : schema.optional();
+  if (param.required) return schema.describe(description);
+  // A hosted server gives the parameter its hosted default when a call leaves it out, like
+  // jobs 1 for a launch film, and its schema shows it, as wait_seconds' shows its own.
+  if (hosted && param.hostedDefault !== undefined) return schema.default(param.hostedDefault).describe(description);
+  return schema.describe(description).optional();
 }
 
 /** Waits for a job, sending its progress lines when the client asked for progress. */
