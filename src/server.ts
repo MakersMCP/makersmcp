@@ -92,7 +92,15 @@ export interface MakersMcpOptions {
    * them. Default: the package's playbooks/, read once per process.
    */
   playbooks?: string | Playbooks;
+  /**
+   * The most array items and object members one tool call may carry, counted before its
+   * arguments are checked. Default: 10,000; Infinity turns the check off.
+   */
+  maxToolInputElements?: number;
 }
+
+/** maxToolInputElements when the options give none. No kit tool takes a list near it. */
+export const MAX_TOOL_INPUT_ELEMENTS = 10_000;
 
 interface Prepared {
   backend: KitBackend;
@@ -219,9 +227,14 @@ export function createMcpServer(options: MakersMcpOptions = {}): McpServer {
   const context = toolContext(prepared, playbooks);
   const server = new McpServer(
     { name: 'makersmcp', title: 'MakersMCP', version, websiteUrl: 'https://makersmcp.com' },
-    // Rendered from playbooks/_instructions.md for this side and the kits that are on. The
-    // hosted text must not promise more than each parameter's own text says it takes.
-    { instructions: instructionsText(playbooks, context.text) },
+    {
+      // Rendered from playbooks/_instructions.md for this side and the kits that are on. The
+      // hosted text must not promise more than each parameter's own text says it takes.
+      instructions: instructionsText(playbooks, context.text),
+      // A list or repeat parameter has no limit of its own, so without this one call of a few
+      // megabytes could hand millions of items to the argument checks.
+      maxToolInputElements: options.maxToolInputElements ?? MAX_TOOL_INPUT_ELEMENTS,
+    },
   );
 
   registerPlaybookTool(server, playbooks, context.text);

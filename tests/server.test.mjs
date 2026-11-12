@@ -224,6 +224,34 @@ test('arguments the schema refuses never start a job', async () => {
   });
 });
 
+test('a call with more than 10,000 array items and object members gets one short error and starts nothing, and maxToolInputElements moves the limit', async () => {
+  // The url and sizes members and 9,999 sizes make 10,001; one size fewer makes 10,000, which the limit takes.
+  const sizes = Array.from({ length: 9_999 }, (_, i) => `s${i}`);
+  // 9,997 sizes and an empty one, which the argument checks refuse, so a call the limit lets through starts nothing either.
+  const checked = [...sizes.slice(2), ''];
+  const limit = (tool, most) => `MCP error -32602: Invalid arguments for tool ${tool}: arguments contain more than the maximum of ${most} elements`;
+  await withClient({}, async client => {
+    const result = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', sizes } });
+    assert.equal(result.isError, true);
+    assert.equal(text(result), limit('fake_make', 10000));
+    const under = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', sizes: checked } });
+    assert.equal(under.isError, true);
+    assert.match(text(under), / at sizes\[9997\]$/);
+    assert.equal(text(await client.callTool({ name: 'list_jobs', arguments: {} })), 'No jobs yet.');
+  });
+  await withClient({ maxToolInputElements: 3 }, async client => {
+    const result = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', sizes: ['a', 'b'] } });
+    assert.equal(text(result), limit('fake_make', 3));
+  });
+  // Infinity turns the check off: the call reaches the argument checks.
+  await withClient({ maxToolInputElements: Infinity }, async client => {
+    const result = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', sizes: [...sizes, ''] } });
+    assert.equal(result.isError, true);
+    assert.match(text(result), / at sizes\[9999\]$/);
+    assert.equal(text(await client.callTool({ name: 'list_jobs', arguments: {} })), 'No jobs yet.');
+  });
+});
+
 test('a slow job returns a job_id, and wait_for_job returns its result', async () => {
   await withClient({}, async client => {
     const started = await client.callTool({ name: 'fake_make', arguments: { url: 'https://slow.example.com', wait_seconds: 0 } });
