@@ -32,7 +32,7 @@ test('server.json, which the MCP Registry gets, names only settings makersmcp re
   assert.ok(server.description.length <= 100, `${server.description.length} characters`);
   const code = ['index.ts', 'setup.ts'].map(file => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')).join('\n');
   const settings = server.packages[0].environmentVariables;
-  assert.deepEqual(settings.map(setting => setting.name), ['MAKERSMCP_OUT', 'MAKERSMCP_KITS', 'MAKERSMCP_KIT_PATHS', 'CHROME_PATH', 'FFMPEG_PATH']);
+  assert.deepEqual(settings.map(setting => setting.name), ['MAKERSMCP_OUT', 'MAKERSMCP_KITS', 'MAKERSMCP_KIT_PATHS', 'CHROME_PATH', 'FFMPEG_PATH', 'FFPROBE_PATH']);
   for (const setting of settings) {
     assert.ok(code.includes(`'${setting.name}'`), `makersmcp reads ${setting.name}`);
     assert.equal(setting.isSecret, false, setting.name);

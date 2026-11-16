@@ -777,8 +777,8 @@ async function until(check, ms = 5000) {
   return check();
 }
 
-test('check_setup\'s description, --help and the README say ffprobe shows only while launch-film is on, as check_setup prints it', async () => {
-  const words = '(and ffprobe while launch-film is on)';
+test('check_setup\'s description, --help and the README say ffprobe shows only while a kit that reads videos with it is on, as check_setup prints it', async () => {
+  const words = '(and ffprobe while a kit that reads videos with it is on)';
   const flat = textOf => textOf.replace(/\s+/g, ' ');
   const help = spawnSync(process.execPath, [path.join(here, '..', 'dist', 'index.js'), '--help'], { encoding: 'utf8' });
   assert.equal(help.status, 0, help.stderr);
@@ -789,7 +789,7 @@ test('check_setup\'s description, --help and the README say ffprobe shows only w
   await withClient({}, async client => {
     const { tools } = await client.listTools();
     assert.ok(tools.find(tool => tool.name === 'check_setup').description.includes(`the Chrome and the ffmpeg found for them ${words}`));
-    // The fake kits here are not launch-film, so check_setup has no ffprobe line.
+    // The fake kits here read no videos with ffprobe, so check_setup has no ffprobe line.
     const setup = text(await client.callTool({ name: 'check_setup', arguments: {} }));
     assert.match(setup, /^ffmpeg: /m);
     assert.doesNotMatch(setup, /ffprobe/);

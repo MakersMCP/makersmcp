@@ -128,7 +128,7 @@ A failed job gives its reason, and the folder is as it was:
 - CAPTIONS.md says the brand font was asked for by name and this machine does not have it: give `fonts`, a font kit.
 - CAPTIONS.md says some letters show as boxes: no font drew them. Never hand over a video with boxes in its captions; ask the user for a font kit whose font has those letters.
 <!-- local -->
-- "easycaptionkit needs Chrome" or "easycaptionkit needs ffmpeg": the troubleshooting topic. With no Chrome that starts, `libass` draws the captions without it.
+- "easycaptionkit needs Chrome", "easycaptionkit needs ffmpeg" or "easycaptionkit needs ffprobe": the troubleshooting topic. With no Chrome that starts, `libass` draws the captions without it.
 <!-- end -->
 
 ## Hand over

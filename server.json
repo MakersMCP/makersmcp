@@ -64,6 +64,13 @@
           "isRequired": false,
           "isSecret": false,
           "format": "string"
+        },
+        {
+          "name": "FFPROBE_PATH",
+          "description": "The ffprobe the film, reframe and caption kits read videos with, by its path or a command name on PATH, when makersmcp finds none beside ffmpeg.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
         }
       ]
     }

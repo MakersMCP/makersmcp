@@ -19,7 +19,8 @@ Options:
                        musicfit=../musicfit (repeat it, or MAKERSMCP_KIT_PATHS
                        with commas)
   --check              print the kits, the Chrome and the ffmpeg found for them
-                       (and ffprobe while launch-film is on) and the folder, and exit
+                       (and ffprobe while a kit that reads videos with it is on)
+                       and the folder, and exit
   -h, --help           show this help
   -v, --version        show the version
 

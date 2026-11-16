@@ -489,7 +489,7 @@ export function registerCoreTools(server: McpServer, context: ToolContext): void
     {
       title: 'Check the setup',
       description: local
-        ? 'Shows which kits makersmcp has and their versions, the Chrome and the ffmpeg found for them (and ffprobe while launch-film is on), any setting that leads to no program, and where files are saved. Use it when a tool is missing or a kit fails to start. '
+        ? 'Shows which kits makersmcp has and their versions, the Chrome and the ffmpeg found for them (and ffprobe while a kit that reads videos with it is on), any setting that leads to no program, and where files are saved. Use it when a tool is missing or a kit fails to start. '
           + 'Settings like CHROME_PATH, FFMPEG_PATH and MAKERSMCP_OUT go in this server\'s entry in the MCP client\'s settings, and take effect when the client starts it again.'
         : 'Shows which kits are running and their versions, and how long files are kept. Use it when a tool is missing.',
       inputSchema: {},

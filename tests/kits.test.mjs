@@ -796,21 +796,25 @@ test('each kit gets the Chrome, the ffmpeg and the ffprobe check_setup reports u
     const none = { chrome: [], ffmpeg: [] };
     const env = (vars, places = none) => kitEnvironment({ PATH, ...vars }, places);
 
-    // FFMPEG_PATH, which check_setup tells the user to set, reaches launch-film with the ffprobe beside it.
-    assert.deepEqual(env({ FFMPEG_PATH: ffmpeg }), { PATH, FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFMPEG: ffmpeg, LAUNCH_FILM_FFPROBE: ffprobe });
+    // FFMPEG_PATH, which check_setup tells the user to set, reaches launch-film, and the ffprobe beside it every kit that reads one.
+    assert.deepEqual(env({ FFMPEG_PATH: ffmpeg }), { PATH, FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFMPEG: ffmpeg, FFPROBE_PATH: ffprobe, LAUNCH_FILM_FFPROBE: ffprobe });
     // launch-film's own setting reaches the other kits, and a setting that names no file gives way to it.
-    assert.deepEqual(env({ FFMPEG_PATH: gone, LAUNCH_FILM_FFMPEG: other }), { PATH, FFMPEG_PATH: other, LAUNCH_FILM_FFMPEG: other, LAUNCH_FILM_FFPROBE: otherProbe });
-    // Two settings that each name a file are the user's choice for each kit, and so is an ffprobe named apart.
+    assert.deepEqual(env({ FFMPEG_PATH: gone, LAUNCH_FILM_FFMPEG: other }), { PATH, FFMPEG_PATH: other, LAUNCH_FILM_FFMPEG: other, FFPROBE_PATH: otherProbe, LAUNCH_FILM_FFPROBE: otherProbe });
+    // Two settings that each name a file are the user's choice for each kit, each with the ffprobe beside it, and so is an ffprobe
+    // named apart, which reaches every kit that reads one.
     const both = { FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFMPEG: other };
-    assert.deepEqual(env(both), { PATH, ...both, LAUNCH_FILM_FFPROBE: otherProbe });
-    assert.deepEqual(env({ FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFPROBE: apart }), { PATH, FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFMPEG: ffmpeg, LAUNCH_FILM_FFPROBE: apart });
+    assert.deepEqual(env(both), { PATH, ...both, FFPROBE_PATH: ffprobe, LAUNCH_FILM_FFPROBE: otherProbe });
+    assert.deepEqual(env({ FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFPROBE: apart }), { PATH, FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFMPEG: ffmpeg, FFPROBE_PATH: apart, LAUNCH_FILM_FFPROBE: apart });
+    assert.deepEqual(env({ FFMPEG_PATH: ffmpeg, FFPROBE_PATH: apart }), { PATH, FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFMPEG: ffmpeg, FFPROBE_PATH: apart, LAUNCH_FILM_FFPROBE: apart });
+    // An FFPROBE_PATH that names no file gives way to the ffprobe beside the ffmpeg a setting names.
+    assert.deepEqual(env({ FFMPEG_PATH: ffmpeg, FFPROBE_PATH: gone }), { PATH, FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFMPEG: ffmpeg, FFPROBE_PATH: ffprobe, LAUNCH_FILM_FFPROBE: ffprobe });
     assert.deepEqual(env({ CHROME_PATH: chrome, LAUNCH_FILM_CHROME: path.join(dir, 'old-chrome') }), { PATH, CHROME_PATH: chrome, LAUNCH_FILM_CHROME: chrome });
     assert.deepEqual(env({ LAUNCH_FILM_CHROME: chrome }), { PATH, CHROME_PATH: chrome, LAUNCH_FILM_CHROME: chrome });
     // Without a setting, each name gets the program found on PATH, which not every kit looks for under its name...
     assert.deepEqual(env({ PATH: bin }), { PATH: bin, CHROME_PATH: pathChrome, LAUNCH_FILM_CHROME: pathChrome, FFMPEG_PATH: pathFfmpeg, LAUNCH_FILM_FFMPEG: pathFfmpeg });
     // ...or where package managers put ffmpeg, which musicfit and launch-film do not look in, with the ffprobe beside it.
     assert.deepEqual(env({}, { chrome: [], ffmpeg: [path.join(dir, 'nowhere', 'ffmpeg'), placed] }),
-      { PATH, FFMPEG_PATH: placed, LAUNCH_FILM_FFMPEG: placed, LAUNCH_FILM_FFPROBE: placedProbe });
+      { PATH, FFMPEG_PATH: placed, LAUNCH_FILM_FFMPEG: placed, FFPROBE_PATH: placedProbe, LAUNCH_FILM_FFPROBE: placedProbe });
     assert.deepEqual(env({}), { PATH });
     // A setting that names no file, a folder or nothing, stays while no setting names a program: the kits that read it stop.
     assert.deepEqual(env({ CHROME_PATH: gone }), { PATH, CHROME_PATH: gone });
@@ -821,31 +825,49 @@ test('each kit gets the Chrome, the ffmpeg and the ffprobe check_setup reports u
       .split('\n').filter(line => /^(?:Chrome|ffmpeg|ffprobe): |^launch-film's |^[A-Z][A-Z_]+: /.test(line));
     const noChrome = 'Chrome: not found in the usual places. Install Chrome, Chromium, Edge or Brave, or set CHROME_PATH.';
     const noProgram = (name, value) => `${name}: ${value} is no program file, so the kits that read ${name} cannot run it. Point it at the program, or take it out.`;
+    const noProbe = 'ffprobe: not found beside ffmpeg or on PATH. launch-film reads videos and pictures with it: install it with ffmpeg, or set FFPROBE_PATH.';
     // The ffmpeg line is "ffmpeg: <path>" alone, the last line that starts so: a service's check reads it.
     assert.deepEqual(report({ FFMPEG_PATH: ffmpeg }), [noChrome, `ffmpeg: ${ffmpeg}`, `ffprobe: ${ffprobe}`]);
-    assert.deepEqual(report(both), [noChrome, `ffmpeg: ${ffmpeg}`, `launch-film's ffmpeg: ${other} (LAUNCH_FILM_FFMPEG)`, `ffprobe: ${otherProbe}`]);
-    // An ffprobe named apart is the one launch-film reads with, beside an ffmpeg a setting names or not.
+    assert.deepEqual(report(both), [noChrome, `ffmpeg: ${ffmpeg}`, `launch-film's ffmpeg: ${other} (LAUNCH_FILM_FFMPEG)`, `ffprobe: ${ffprobe}`,
+      `launch-film's ffprobe: ${otherProbe} (LAUNCH_FILM_FFPROBE)`]);
+    // An ffprobe named apart is the one the kits read with, beside an ffmpeg a setting names or not.
     assert.deepEqual(report({ FFMPEG_PATH: ffmpeg, LAUNCH_FILM_FFPROBE: apart }), [noChrome, `ffmpeg: ${ffmpeg}`, `ffprobe: ${apart}`]);
+    assert.deepEqual(report({ FFMPEG_PATH: ffmpeg, FFPROBE_PATH: apart }), [noChrome, `ffmpeg: ${ffmpeg}`, `ffprobe: ${apart}`]);
     // launch-film's own Chrome, named apart from CHROME_PATH, is the one it runs.
     assert.deepEqual(report({ CHROME_PATH: chrome, LAUNCH_FILM_CHROME: otherChrome }).slice(0, 2), [`Chrome: ${chrome}`, `launch-film's Chrome: ${otherChrome} (LAUNCH_FILM_CHROME)`]);
     assert.deepEqual(report({ CHROME_PATH: chrome, LAUNCH_FILM_CHROME: chrome }).slice(0, 2), [`Chrome: ${chrome}`, 'ffmpeg: not found on PATH. Install ffmpeg or set FFMPEG_PATH.']);
     assert.deepEqual(report({ PATH: bin }), [`Chrome: ${pathChrome}`, `ffmpeg: ${pathFfmpeg}`,
-      'ffprobe: not found beside ffmpeg or on PATH. launch-film reads videos and pictures with it: install it with ffmpeg, or set LAUNCH_FILM_FFPROBE.']);
+      noProbe]);
     assert.deepEqual(report({}), [
       noChrome,
       'ffmpeg: not found on PATH. Install ffmpeg or set FFMPEG_PATH.',
-      'ffprobe: not found beside ffmpeg or on PATH. launch-film reads videos and pictures with it: install it with ffmpeg, or set LAUNCH_FILM_FFPROBE.',
+      noProbe,
     ]);
     // A setting that names a folder, like a macOS app bundle, or a file that is not there gets a line of its own.
     const unusable = { PATH: bin, CHROME_PATH: path.join(dir, 'c'), FFMPEG_PATH: gone, LAUNCH_FILM_FFPROBE: path.join(dir, 'old', 'ffprobe') };
     assert.deepEqual(report(unusable), [
       `Chrome: ${pathChrome}`, noProgram('CHROME_PATH', path.join(dir, 'c')),
       `ffmpeg: ${pathFfmpeg}`, noProgram('FFMPEG_PATH', gone),
-      'ffprobe: not found beside ffmpeg or on PATH. launch-film reads videos and pictures with it: install it with ffmpeg, or set LAUNCH_FILM_FFPROBE.',
+      noProbe,
       noProgram('LAUNCH_FILM_FFPROBE', path.join(dir, 'old', 'ffprobe')),
     ]);
-    // With launch-film off, nothing reads its settings or ffprobe.
+    // With musicfit alone, nothing reads launch-film's settings or ffprobe.
     assert.deepEqual(report(both, { enabled: new Set(['musicfit']) }), [noChrome, `ffmpeg: ${ffmpeg}`]);
+    assert.deepEqual(report({ PATH: bin, FFPROBE_PATH: gone }, { enabled: new Set(['musicfit']) }), [`Chrome: ${pathChrome}`, `ffmpeg: ${pathFfmpeg}`]);
+    // reframekit and easycaptionkit read videos with ffprobe, by FFPROBE_PATH, so the line is there while either is on, with a
+    // setting of it that names no file; reframekit reads launch-film's ffmpeg and ffprobe settings after FFMPEG_PATH and FFPROBE_PATH.
+    for (const kit of ['reframekit', 'easycaptionkit']) {
+      assert.deepEqual(report(both, { enabled: new Set([kit]) }), [noChrome, `ffmpeg: ${ffmpeg}`, `ffprobe: ${ffprobe}`], kit);
+      assert.deepEqual(report({ PATH: bin, FFPROBE_PATH: gone }, { enabled: new Set([kit]) }), [`Chrome: ${pathChrome}`, `ffmpeg: ${pathFfmpeg}`,
+        `ffprobe: not found beside ffmpeg or on PATH. ${kit} reads videos with it: install it with ffmpeg, or set FFPROBE_PATH.`, noProgram('FFPROBE_PATH', gone)], kit);
+    }
+    assert.deepEqual(report(unusable, { enabled: new Set(['reframekit']) }).slice(-2), [
+      'ffprobe: not found beside ffmpeg or on PATH. reframekit reads videos with it: install it with ffmpeg, or set FFPROBE_PATH.',
+      noProgram('LAUNCH_FILM_FFPROBE', path.join(dir, 'old', 'ffprobe')),
+    ]);
+    assert.deepEqual(report({ PATH: bin }, { enabled: new Set(['launch-film', 'reframekit', 'easycaptionkit']) }).slice(-1), [
+      'ffprobe: not found beside ffmpeg or on PATH. launch-film reads videos and pictures with it, and reframekit and easycaptionkit read videos with it: install it with ffmpeg, or set FFPROBE_PATH.',
+    ]);
     assert.deepEqual(report(unusable, { enabled: new Set(['musicfit']) }), [`Chrome: ${pathChrome}`, noProgram('CHROME_PATH', path.join(dir, 'c')), `ffmpeg: ${pathFfmpeg}`, noProgram('FFMPEG_PATH', gone)]);
     const ownGone = { LAUNCH_FILM_CHROME: gone, LAUNCH_FILM_FFMPEG: gone };
     assert.deepEqual(report(ownGone, { enabled: new Set(['musicfit']) }), [noChrome, 'ffmpeg: not found on PATH. Install ffmpeg or set FFMPEG_PATH.']);
@@ -857,7 +879,7 @@ test('each kit gets the Chrome, the ffmpeg and the ffprobe check_setup reports u
     // so easyscreenshotkit, which looks for a file, runs it too, and neither check_setup nor a tool's start finds a fault in it.
     const both2 = { PATH: [bin, path.join(dir, 'a')].join(path.delimiter), FFMPEG_PATH: 'ffmpeg', LAUNCH_FILM_FFPROBE: 'ffprobe', CHROME_PATH: 'google-chrome' };
     const bare = env(both2);
-    assert.deepEqual(bare, { ...both2, CHROME_PATH: pathChrome, LAUNCH_FILM_CHROME: pathChrome, FFMPEG_PATH: pathFfmpeg, LAUNCH_FILM_FFMPEG: pathFfmpeg, LAUNCH_FILM_FFPROBE: ffprobe });
+    assert.deepEqual(bare, { ...both2, CHROME_PATH: pathChrome, LAUNCH_FILM_CHROME: pathChrome, FFMPEG_PATH: pathFfmpeg, LAUNCH_FILM_FFMPEG: pathFfmpeg, FFPROBE_PATH: ffprobe, LAUNCH_FILM_FFPROBE: ffprobe });
     assert.deepEqual(report(both2), [`Chrome: ${pathChrome}`, `ffmpeg: ${pathFfmpeg}`, `ffprobe: ${ffprobe}`]);
     const every = kits.flatMap(kit => kit.tools.map(tool => settingsRead(kit.kit, tool.needs ?? kit.needs))).flat();
     assert.deepEqual(settingProblems(bare, every), []);
@@ -866,13 +888,27 @@ test('each kit gets the Chrome, the ffmpeg and the ffprobe check_setup reports u
     assert.deepEqual(env({ PATH: bin, FFMPEG_PATH: 'ffmpeg-6' }),
       { PATH: bin, CHROME_PATH: pathChrome, LAUNCH_FILM_CHROME: pathChrome, FFMPEG_PATH: six, LAUNCH_FILM_FFMPEG: six });
     assert.deepEqual(report({ PATH: bin, FFMPEG_PATH: 'ffmpeg-6' }), [`Chrome: ${pathChrome}`, `ffmpeg: ${six}`,
-      'ffprobe: not found beside ffmpeg or on PATH. launch-film reads videos and pictures with it: install it with ffmpeg, or set LAUNCH_FILM_FFPROBE.']);
+      noProbe]);
     // A bare name that is not on PATH names no program: check_setup's line, and the line a tool that runs it does not start with.
     const nowhere = env({ FFMPEG_PATH: 'ffmpeg7', LAUNCH_FILM_FFPROBE: 'ffprobe' });
     assert.deepEqual(nowhere, { PATH, FFMPEG_PATH: 'ffmpeg7', LAUNCH_FILM_FFPROBE: 'ffprobe' });
     assert.deepEqual(report({ FFMPEG_PATH: 'ffmpeg7', LAUNCH_FILM_FFPROBE: 'ffprobe' }).filter(line => / is no program file/.test(line)),
       [noProgram('FFMPEG_PATH', 'ffmpeg7'), noProgram('LAUNCH_FILM_FFPROBE', 'ffprobe')]);
     assert.deepEqual(settingProblems(nowhere, settingsRead('musicfit', ['ffmpeg'])), [noProgram('FFMPEG_PATH', 'ffmpeg7')]);
+    // reframekit reads launch-film's ffprobe setting when FFPROBE_PATH is not set, and easycaptionkit only FFPROBE_PATH.
+    assert.deepEqual(settingProblems(nowhere, settingsRead('reframekit', ['ffmpeg'])), [noProgram('FFMPEG_PATH', 'ffmpeg7'), noProgram('LAUNCH_FILM_FFPROBE', 'ffprobe')]);
+    assert.deepEqual(settingProblems(nowhere, settingsRead('easycaptionkit', ['chrome', 'ffmpeg'])), [noProgram('FFMPEG_PATH', 'ffmpeg7')]);
+    // The settings each kit reads its programs from, in its order, ffprobe among them where it reads videos with it.
+    assert.deepEqual(settingsRead('reframekit', ['ffmpeg']), [['FFMPEG_PATH', 'LAUNCH_FILM_FFMPEG'], ['FFPROBE_PATH', 'LAUNCH_FILM_FFPROBE']]);
+    assert.deepEqual(settingsRead('easycaptionkit', ['chrome', 'ffmpeg']), [['CHROME_PATH'], ['FFMPEG_PATH'], ['FFPROBE_PATH']]);
+    assert.deepEqual(settingsRead('easycaptionkit', []), []);
+    assert.deepEqual(settingsRead('musicfit', ['ffmpeg']), [['FFMPEG_PATH']]);
+    assert.deepEqual(settingsRead('launch-film', ['chrome', 'ffmpeg']), [['LAUNCH_FILM_CHROME', 'CHROME_PATH'], ['LAUNCH_FILM_FFMPEG'], ['LAUNCH_FILM_FFPROBE']]);
+    // An FFPROBE_PATH that names no file, with no setting for an ffmpeg to give way to, stops the kits that read it, and only them.
+    const badProbe = env({ PATH: bin, FFPROBE_PATH: gone });
+    assert.deepEqual(badProbe, { PATH: bin, CHROME_PATH: pathChrome, LAUNCH_FILM_CHROME: pathChrome, FFMPEG_PATH: pathFfmpeg, LAUNCH_FILM_FFMPEG: pathFfmpeg, FFPROBE_PATH: gone });
+    for (const kit of ['reframekit', 'easycaptionkit']) assert.deepEqual(settingProblems(badProbe, settingsRead(kit, ['ffmpeg'])), [noProgram('FFPROBE_PATH', gone)], kit);
+    for (const kit of ['musicfit', 'launch-film']) assert.deepEqual(settingProblems(badProbe, settingsRead(kit, ['ffmpeg'])), [], kit);
     // launch-film reads its own names, CHROME_PATH after LAUNCH_FILM_CHROME: a CHROME_PATH that names a folder stops the kits that
     // read it, while launch-film runs the Chrome found for its own name.
     const folderChrome = env({ PATH: bin, CHROME_PATH: path.join(dir, 'c') });
@@ -900,6 +936,7 @@ test('with ffmpeg reachable only through the backend\'s FFMPEG_PATH, check_setup
   const env = { ...process.env, PATH: `${broken}${path.delimiter}${process.env.PATH}`, FFMPEG_PATH: ffmpeg };
   delete env.LAUNCH_FILM_FFMPEG;
   delete env.LAUNCH_FILM_FFPROBE;
+  delete env.FFPROBE_PATH;
   try {
     await withLaunchFilm(async (client, outDir) => {
       tinyVideo(outDir);
@@ -926,7 +963,7 @@ test('a tool that reads a program from a setting that names no program file does
   const sessions = [];
   const connect = async vars => {
     const env = { ...process.env, ...vars };
-    for (const name of ['CHROME_PATH', 'LAUNCH_FILM_CHROME', 'FFMPEG_PATH', 'LAUNCH_FILM_FFMPEG', 'LAUNCH_FILM_FFPROBE']) if (!(name in vars)) delete env[name];
+    for (const name of ['CHROME_PATH', 'LAUNCH_FILM_CHROME', 'FFMPEG_PATH', 'LAUNCH_FILM_FFMPEG', 'FFPROBE_PATH', 'LAUNCH_FILM_FFPROBE']) if (!(name in vars)) delete env[name];
     const server = createMcpServer({ backend: new LocalBackend({ baseDir, kitPaths, env }) });
     const client = new Client({ name: 'test-client', version: '1.0.0' });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -1007,6 +1044,23 @@ test('a tool that reads a program from a setting that names no program file does
       assert.deepEqual(filesIn(path.join(baseDir, 'demo')), demo, `${tool} left the folder as it was`);
     }
     assert.ok(!existsSync(path.join(baseDir, 'check')), 'check_video wrote nothing');
+    // An FFPROBE_PATH that names nothing stops the tools of reframekit and easycaptionkit, which read videos with it, before
+    // anything is made, while check_video, which reads launch-film's own LAUNCH_FILM_FFPROBE, starts, and list_caption_styles,
+    // which runs no program, runs.
+    const noProbe = await connect({ FFPROBE_PATH: gone, PATH });
+    writeFileSync(path.join(baseDir, 'words.srt'), '1\n00:00:00,000 --> 00:00:01,000\nHello\n');
+    for (const [tool, args] of [
+      ['plan_reframe', { video: 'film.mp4' }], ['reframe_video', { video: 'film.mp4' }], ['check_place_limits', { target: 'film.mp4' }],
+      ['caption_video', { video: 'film.mp4', words: 'words.srt' }], ['make_subtitles', { words: 'words.srt', video: 'film.mp4' }],
+    ]) {
+      await notStarted(noProbe, tool, args, noProgram('FFPROBE_PATH', gone));
+    }
+    for (const folder of ['reframekit-film', 'reframekit-check-film', 'easycaptionkit-film', 'easycaptionkit-subtitles-words']) {
+      assert.ok(!existsSync(path.join(baseDir, folder)), `${folder} was not made`);
+    }
+    await starts(noProbe, 'check_video', { film: 'film.mp4', out_dir: 'probe-check' });
+    const styles = await noProbe.callTool({ name: 'list_caption_styles', arguments: { wait_seconds: 60 } });
+    assert.equal(styles.structuredContent?.status, 'done', text(styles));
     // A tool that runs fewer programs than its kit is not stopped by the others' settings: take_screenshots runs no ffmpeg,
     // and launch_film_guide no program at all.
     const shots = await noFfmpeg.callTool({ name: 'take_screenshots', arguments: { url: 'http://127.0.0.1:9/', out_dir: 'shots', wait_seconds: 0 } });

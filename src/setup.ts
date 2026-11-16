@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { expandHome } from './args.js';
 import { isInstalled, type InstalledKit, type MissingKit } from './kits.js';
+import { inWords } from './texts.js';
 
 const CHROME_NAMES = [
   'google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser',
@@ -43,13 +44,40 @@ export const PROGRAM_PLACES: ProgramPlaces = { chrome: CHROME_PLACES, ffmpeg: FF
 
 /**
  * The settings the kits read for the programs they run, in the order check_setup reads them:
- * CHROME_PATH and FFMPEG_PATH are makersmcp's own, and launch-film reads its own names.
+ * CHROME_PATH, FFMPEG_PATH and FFPROBE_PATH are the names most kits read, and launch-film reads
+ * its own names.
  */
 const CHROME_SETTINGS = ['CHROME_PATH', 'LAUNCH_FILM_CHROME'];
 const FFMPEG_SETTINGS = ['FFMPEG_PATH', 'LAUNCH_FILM_FFMPEG'];
-const FFPROBE_SETTINGS = ['LAUNCH_FILM_FFPROBE'];
-/** The settings only launch-film reads, which check_setup speaks of while launch-film is on. */
-const LAUNCH_FILM_SETTINGS = new Set(['LAUNCH_FILM_CHROME', 'LAUNCH_FILM_FFMPEG', 'LAUNCH_FILM_FFPROBE']);
+const FFPROBE_SETTINGS = ['FFPROBE_PATH', 'LAUNCH_FILM_FFPROBE'];
+/**
+ * Each ffprobe setting with the ffmpeg settings of the kits that read it, in their order: the
+ * ffprobe beside the ffmpeg a kit runs is the one it comes with.
+ */
+const FFPROBE_BESIDE: Array<[string, string[]]> = [
+  ['FFPROBE_PATH', ['FFMPEG_PATH', 'LAUNCH_FILM_FFMPEG']],
+  ['LAUNCH_FILM_FFPROBE', ['LAUNCH_FILM_FFMPEG', 'FFMPEG_PATH']],
+];
+/**
+ * launch-film's own settings, with the kits that read each, which check_setup speaks of while one
+ * of them is on: reframekit reads launch-film's ffmpeg and ffprobe after FFMPEG_PATH and FFPROBE_PATH.
+ */
+const LAUNCH_FILM_SETTINGS: Record<string, string[]> = {
+  LAUNCH_FILM_CHROME: ['launch-film'],
+  LAUNCH_FILM_FFMPEG: ['launch-film', 'reframekit'],
+  LAUNCH_FILM_FFPROBE: ['launch-film', 'reframekit'],
+};
+/** The ffmpeg settings of the kits that read other names than FFMPEG_PATH, in the order each reads them. */
+const FFMPEG_READ: Record<string, string[]> = {
+  'launch-film': ['LAUNCH_FILM_FFMPEG'],
+  reframekit: ['FFMPEG_PATH', 'LAUNCH_FILM_FFMPEG'],
+};
+/** The kits that read videos with ffprobe, each with the settings it reads it from, in its order. */
+const FFPROBE_READ: Record<string, string[]> = {
+  'launch-film': ['LAUNCH_FILM_FFPROBE'],
+  reframekit: ['FFPROBE_PATH', 'LAUNCH_FILM_FFPROBE'],
+  easycaptionkit: ['FFPROBE_PATH'],
+};
 
 type Env = NodeJS.ProcessEnv;
 
@@ -115,17 +143,12 @@ function besideOf(ffmpeg: string | undefined): string | undefined {
   return namesFile(beside) ? beside : undefined;
 }
 
-/** The ffprobe beside the ffmpeg a setting names for launch-film, LAUNCH_FILM_FFMPEG before FFMPEG_PATH. */
-function besideSetting(env: Env): string | undefined {
-  return besideOf(fromEnv(env, ['LAUNCH_FILM_FFMPEG']) ?? fromEnv(env, FFMPEG_SETTINGS));
-}
-
 /**
- * The ffprobe launch-film reads videos and pictures with: LAUNCH_FILM_FFPROBE, else the one
- * beside the ffmpeg a setting names for it, else the one on PATH.
+ * The ffprobe the kits read videos with, which check_setup reports: the one FFPROBE_PATH or
+ * LAUNCH_FILM_FFPROBE names, else the one beside the ffmpeg a setting names, else the one on PATH.
  */
 export function findFfprobe(env: Env = process.env): string | undefined {
-  return fromEnv(env, FFPROBE_SETTINGS) ?? besideSetting(env) ?? onPath('ffprobe', env);
+  return fromEnv(env, FFPROBE_SETTINGS) ?? besideOf(fromEnv(env, FFMPEG_SETTINGS)) ?? onPath('ffprobe', env);
 }
 
 /**
@@ -137,7 +160,8 @@ export function findFfprobe(env: Env = process.env): string | undefined {
  * for a file, like easyscreenshotkit, then finds too. Any other name gets the program a
  * setting names under another of its names, so
  * FFMPEG_PATH, which check_setup tells the user to set, reaches launch-film as
- * LAUNCH_FILM_FFMPEG with LAUNCH_FILM_FFPROBE the ffprobe beside it. Without such a setting,
+ * LAUNCH_FILM_FFMPEG, with FFPROBE_PATH and LAUNCH_FILM_FFPROBE the ffprobe beside it, and
+ * FFPROBE_PATH reaches launch-film as LAUNCH_FILM_FFPROBE. Without such a setting,
  * a name that is not set gets the program found on PATH or in its usual places, which not
  * every kit looks in, while a setting that names no program file, like a folder, is left as
  * the user set it: check_setup names it, and LocalBackend starts no tool that reads a
@@ -158,8 +182,12 @@ export function kitEnvironment(env: Env = process.env, places: ProgramPlaces = P
   };
   give(CHROME_SETTINGS, fromEnv(env, CHROME_SETTINGS), findChrome(env, places));
   give(FFMPEG_SETTINGS, fromEnv(env, FFMPEG_SETTINGS), findFfmpeg(env, places));
-  // ffprobe comes with ffmpeg, so a setting for an ffmpeg brings the ffprobe beside it.
-  give(FFPROBE_SETTINGS, besideSetting(env), findFfprobe(out));
+  // ffprobe comes with ffmpeg, so a setting for an ffmpeg brings the ffprobe beside it, to each ffprobe name the one
+  // beside the ffmpeg its kits run, and a setting for an ffprobe reaches every name.
+  const probe = fromEnv(env, FFPROBE_SETTINGS);
+  for (const [name, ffmpegs] of FFPROBE_BESIDE) {
+    give([name], probe ?? besideOf(fromEnv(env, ffmpegs)), besideOf(fromEnv(out, ffmpegs)) ?? onPath('ffprobe', out));
+  }
   return out;
 }
 
@@ -167,14 +195,17 @@ export function kitEnvironment(env: Env = process.env, places: ProgramPlaces = P
  * The settings a kit reads the programs it runs from, one list for each program, in the order
  * the kit reads them, so the first one set is the one it runs: CHROME_PATH and FFMPEG_PATH,
  * and launch-film's own names for launch-film, which reads CHROME_PATH after
- * LAUNCH_FILM_CHROME and ffprobe by LAUNCH_FILM_FFPROBE. `needs` are the programs the tool
- * runs, chrome and ffmpeg.
+ * LAUNCH_FILM_CHROME; reframekit reads LAUNCH_FILM_FFMPEG after FFMPEG_PATH; and ffprobe,
+ * which comes with ffmpeg, as each kit that reads videos with it does (FFPROBE_READ). `needs`
+ * are the programs the tool runs, chrome and ffmpeg.
  */
 export function settingsRead(kit: string, needs: readonly string[]): string[][] {
-  const launchFilm = kit === 'launch-film';
   const lists: string[][] = [];
-  if (needs.includes('chrome')) lists.push(launchFilm ? ['LAUNCH_FILM_CHROME', 'CHROME_PATH'] : ['CHROME_PATH']);
-  if (needs.includes('ffmpeg')) lists.push(...(launchFilm ? [['LAUNCH_FILM_FFMPEG'], ['LAUNCH_FILM_FFPROBE']] : [['FFMPEG_PATH']]));
+  if (needs.includes('chrome')) lists.push(kit === 'launch-film' ? ['LAUNCH_FILM_CHROME', 'CHROME_PATH'] : ['CHROME_PATH']);
+  if (needs.includes('ffmpeg')) {
+    lists.push(Object.hasOwn(FFMPEG_READ, kit) ? FFMPEG_READ[kit]! : ['FFMPEG_PATH']);
+    if (Object.hasOwn(FFPROBE_READ, kit)) lists.push(FFPROBE_READ[kit]!);
+  }
   return lists;
 }
 
@@ -240,11 +271,11 @@ export function folderProblem(dir: string): string | undefined {
 }
 
 /**
- * The setup in words: kits, their state, the browser, ffmpeg and, while launch-film is on,
- * ffprobe, and the folder. `env` is the environment the kits run with, this process's by
- * default, so each line names the program the kits run, and a setting that names no
- * program file, which the kits that read it cannot run, gets a line of its own. The ffmpeg
- * line stays "ffmpeg: <path>" alone, which a service's check reads.
+ * The setup in words: kits, their state, the browser, ffmpeg and, while a kit that reads
+ * videos with it is on (FFPROBE_READ), ffprobe, and the folder. `env` is the environment the
+ * kits run with, this process's by default, so each line names the program the kits run, and
+ * a setting that names no program file, which the kits that read it cannot run, gets a line
+ * of its own. The ffmpeg line stays "ffmpeg: <path>" alone, which a service's check reads.
  */
 export function setupReport(options: {
   version: string;
@@ -257,6 +288,7 @@ export function setupReport(options: {
   const places = options.places ?? PROGRAM_PLACES;
   const env = kitEnvironment(options.env ?? process.env, places);
   const launchFilm = options.enabled.has('launch-film');
+  const probing = Object.keys(FFPROBE_READ).filter(kit => options.enabled.has(kit));
   const chrome = findChrome(env, places);
   const ffmpeg = findFfmpeg(env, places);
   const problem = folderProblem(options.baseDir);
@@ -279,9 +311,11 @@ export function setupReport(options: {
     else state = `${kit.version}, on. Tools: ${tools}.${needs}`;
     lines.push(`- ${definition.kit} (${definition.field}): ${state}`);
   }
-  // A setting that names no program file, which the kits that read it cannot run; launch-film's own only while it is on.
+  // A setting that names no program file, which the kits that read it cannot run; launch-film's own only while a kit
+  // that reads it is on.
+  const read = (name: string) => !Object.hasOwn(LAUNCH_FILM_SETTINGS, name) || LAUNCH_FILM_SETTINGS[name]!.some(kit => options.enabled.has(kit));
   const unusable = (names: string[]) => names
-    .filter(name => (launchFilm || !LAUNCH_FILM_SETTINGS.has(name)) && env[name] && !programOf(env[name], env))
+    .filter(name => read(name) && env[name] && !programOf(env[name], env))
     .map(name => noProgram(name, env[name]!));
   // launch-film runs its own when the user set it apart.
   const own = (name: string, found: string | undefined) => {
@@ -299,10 +333,19 @@ export function setupReport(options: {
     ...(ownFfmpeg ? [`launch-film's ffmpeg: ${ownFfmpeg}`] : []),
     ...unusable(FFMPEG_SETTINGS),
   );
-  // Only launch-film reads ffprobe.
-  if (launchFilm) {
+  // ffprobe, while a kit that reads videos with it is on.
+  if (probing.length) {
+    const ffprobe = findFfprobe(env);
+    const ownFfprobe = own('LAUNCH_FILM_FFPROBE', ffprobe);
+    // launch-film reads its logos and screens with it too.
+    const others = probing.filter(kit => kit !== 'launch-film');
+    const readers = [
+      ...(launchFilm ? ['launch-film reads videos and pictures with it'] : []),
+      ...(others.length ? [`${inWords(others)} ${others.length > 1 ? 'read' : 'reads'} videos with it`] : []),
+    ].join(', and ');
     lines.push(
-      `ffprobe: ${findFfprobe(env) ?? 'not found beside ffmpeg or on PATH. launch-film reads videos and pictures with it: install it with ffmpeg, or set LAUNCH_FILM_FFPROBE.'}`,
+      `ffprobe: ${ffprobe ?? `not found beside ffmpeg or on PATH. ${readers}: install it with ffmpeg, or set FFPROBE_PATH.`}`,
+      ...(ownFfprobe ? [`launch-film's ffprobe: ${ownFfprobe}`] : []),
       ...unusable(FFPROBE_SETTINGS),
     );
   }

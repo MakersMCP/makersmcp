@@ -481,6 +481,7 @@ test('with ffmpeg reachable only through FFMPEG_PATH, a film renders and its che
   const env = { ...process.env, PATH: `${broken}${path.delimiter}${process.env.PATH}`, FFMPEG_PATH: ffmpeg };
   delete env.LAUNCH_FILM_FFMPEG;
   delete env.LAUNCH_FILM_FFPROBE;
+  delete env.FFPROBE_PATH;
   try {
     await withServer(async (client, outDir) => {
       const film = {
