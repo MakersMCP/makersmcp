@@ -128,7 +128,9 @@ let packageKits: KitDefinition[] | undefined;
  * The kits the texts read: those given, each with the tools of the same kit in kits/ that
  * it leaves out. MakersMCP-Server passes a kit without the tools its workers cannot run now
  * (check_video and fit_music on an older ffmpeg), and the texts still have to fill a
- * default of such a tool and know to leave out what names it.
+ * default of such a tool and know to leave out what names it. With no tool left out it is
+ * the very list given, so the renderings cached for that list (playbooks.ts cacheKey) are
+ * found again for every server built from it, as a hosted service builds one a request.
  */
 function withHeldTools(given: KitDefinition[]): KitDefinition[] {
   if (packageKits === undefined) {
@@ -138,10 +140,12 @@ function withHeldTools(given: KitDefinition[]): KitDefinition[] {
       packageKits = [];
     }
   }
-  return given.map(definition => {
+  let changed = false;
+  const result = given.map(definition => {
     const known = packageKits!.find(entry => entry.kit === definition.kit);
     const names = new Set(definition.tools.map(tool => tool.name));
     if (!known || known.tools.every(tool => names.has(tool.name))) return definition;
+    changed = true;
     // The package's order, with each tool given as it was given, and any it does not know after.
     const tools = [
       ...known.tools.map(tool => definition.tools.find(entry => entry.name === tool.name) ?? tool),
@@ -149,6 +153,7 @@ function withHeldTools(given: KitDefinition[]): KitDefinition[] {
     ];
     return { ...definition, tools };
   });
+  return changed ? result : given;
 }
 
 function prepare(options: MakersMcpOptions): Prepared {

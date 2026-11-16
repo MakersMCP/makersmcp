@@ -23,6 +23,9 @@ order: 74
   - a plain JSON list of entries with `text`, `start` and `end`, or the words.json of an earlier run.
   An ASS file is no words file. Without words, say so and ask for a file; never write times by guess.
 - The places, as `for`: tiktok, reels, shorts, youtube, x, linkedin or square. One file is safe on every place named. Left out, the places come from the video's shape.
+<!-- hosted -->
+- The video's size here: at most 2560x1440 pixels (or 1440x2560), in 4:2:0 at 8 or 10 bits, as phones and cameras record it. A larger one, or a ProRes or 4:4:4 master, fails before its kit starts: ask the user for an H.264 or HEVC copy of that size first.
+<!-- end -->
 - The look: `style` karaoke lights each word as it is spoken in a whole caption (default), line shows whole captions in one color, for YouTube, LinkedIn and longer watching, and word one word at a time, bigger, for short quick clips.
 <!-- with easyfontkit -->
 - The fonts: the font kit of `make_font_kit` for the same site, given to `caption_video` as `fonts`, draws the captions with the site's own font files.
@@ -111,7 +114,7 @@ Only ads have published margins, and apps move their buttons, so tell the user t
 - `wait_seconds`: a one minute video takes about half a minute; a long one several minutes.
 <!-- end -->
 <!-- hosted -->
-- `wait_seconds`: a job here has a share of one machine, and a minute of 1920x1080 video takes from about 3 minutes, as easy footage does, to about 7 with grain, more for a larger video. A job stops after {limit:job_minutes}, so a video that cannot be captioned in the time its job has left, or one too large for a job's memory, fails before its kit starts with what fits.
+- `wait_seconds`: a job here has a share of one machine, and a minute of 1920x1080 video takes from about 3 minutes, as easy footage does, to about 7 with grain, more for a larger video. A job stops after {limit:job_minutes}. A video that could not be captioned in the time its job has left even as easy footage fails before its kit starts, with the length that fits. Footage with grain or noise, as from a phone camera, takes two to three times as long, so it can pass that check and still be stopped when the time runs out, with no files kept: for a video of more than a few minutes, offer a shorter cut first, or a run on the user's own machine.
 <!-- end -->
 
 ## What it writes
@@ -129,6 +132,11 @@ A failed job gives its reason, and the folder is as it was:
 <!-- local -->
 - "holds words fixed by hand": the folder's words.json has fixes this run would lose. Give that words.json as `words`, or caption into another folder.
 - "Pick another out_dir" at the end of a refusal: the folder holds a file of one of the kit's names that it did not write, or changed since; give another folder.
+<!-- end -->
+<!-- hosted -->
+- "<param> is <size>: caption_video here takes a video of at most 2560x1440 pixels (or 1440x2560)" or "<tool> here takes a picture in 4:2:0 of 8 or 10 bits alone": ask the user for a smaller copy in H.264 or HEVC.
+- "<param> runs <time> at <size>, and caption_video here burns captions into about <time> of a video that size": even easy footage could not be captioned in the time the job had left, so give a cut of at most that length.
+- "It ran longer than <time> and was stopped.": the footage took longer than easy footage, as grain does; give a shorter cut.
 <!-- end -->
 - CAPTIONS.md says the brand font was asked for by name and this machine does not have it: give `fonts`, a font kit.
 - CAPTIONS.md says some letters show as boxes: no font drew them. Never hand over a video with boxes in its captions; ask the user for a font kit whose font has those letters.

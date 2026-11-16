@@ -84,7 +84,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 <!-- with reframekit -->
 <!-- local -->
-- `reframe_video` and `plan_reframe` save in reframekit-<video's name> next to the video, which holds the runs of that one video: a run there replaces the files it makes again and keeps the other places' files, and a folder that holds anything else stops them. `check_place_limits` saves in reframekit-check-<name> next to what it checks.
+- `reframe_video` and `plan_reframe` save in reframekit-<video's name> next to the video, which holds the runs of that one video: a run there replaces the files it makes again and keeps the other places' files, and a folder that is not empty and holds no earlier run of that video stops them. `check_place_limits` saves in reframekit-check-<name> next to what it checks.
 <!-- end -->
 <!-- end -->
 <!-- with easycaptionkit -->
@@ -101,7 +101,8 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 ## Files on makersmcp.com
 
 - Each job saves into a folder of its own, so no job replaces another's files.
-- The result lists each file with its link, and until when, in UTC, the links work: {limit:keep_days}, for anyone who holds them, so give them only to the user. After that the job shows done with no files and "Its files were deleted after <n> days."
+- The result lists each file with its link, and until when, in UTC, the links work, {limit:keep_time} after the job ended: anyone who holds them can download the files until then, so give them only to the user, with that time. After that the job shows done with no files and "Its files were deleted <time> after it ended.", or "Its files were deleted before their keep time ended." when they were deleted sooner.
+- An earlier job's files go into a later job only until that time, so start each step of a chain, like a plan and then its render, as soon as the one before it ends. `check_setup` says how long files are kept.
 - A file an earlier job saved goes in as job:<job_id>/<path>, the path as that job's file list writes it. The job's whole folder comes along, so the files that file names are there too. Only the user's own jobs that ended done count, and a makersmcp.com link to such a file counts as its job:<job_id>/<path>.
 <!-- with easybrandkit -->
   A brand kit goes in as job:<job_id>/brand.json, with its logo files.
@@ -120,7 +121,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 - Other files go as https links where a parameter takes a file: a public address, at most 200 MB, sent within 5 minutes. A parameter that takes an address or a file reads a link as the address.
 - Nothing here uploads a file the assistant wrote, so a file goes in only as a link the user gives or as a file an earlier job saved, used as it is. Say so instead of offering to change one.
-- "Job <job_id> has no file <path>." means the path is not as that job's file list writes it. "There is no job <job_id> with files to use. list_jobs shows your jobs; files are kept for a few days." means the job is not the user's, did not end done, or its files are gone.
+- "Job <job_id> has no file <path>." means the path is not as that job's file list writes it. "There is no job <job_id> with files to use." means the job is not the user's, did not end done, or its files are gone, as they are once the time its result gave has passed.
 - A link that fails says why: "The link's host <host> was not found.", "The link's host <host> is not on the public internet.", "The link could not be opened: <reason>", "The link answered <status> instead of the file.", "The file is over <size>.", "The link took too long to answer.", "The link took more than <time> to send the file.", "The link stopped sending the file.", "The download stopped: <reason>", "The link redirects too many times.", "The link redirects to an address that is not a link.", "A link with a user name or password in it is not allowed." or "Only http and https links work." Ask the user for a public link to the file itself.
 <!-- end -->
 

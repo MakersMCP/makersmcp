@@ -37,7 +37,7 @@ export const FAILED_NEXT = "The {topic} playbook (makersmcp_playbook) lists this
 export const FALLBACK_TOPIC = 'troubleshooting';
 /**
  * A hosted job's whole Next line once its files are gone: a service gives a job past the
- * days it keeps files as done with no file listed, so nothing of it can be shown or passed on.
+ * time it keeps files as done with no file listed, so nothing of it can be shown or passed on.
  * Only for a tool that writes files: a guide's or a manifest check's result is all in its text.
  */
 export const FILES_GONE_NEXT = "This job's files are gone: run the tool again to make them anew.";
@@ -300,7 +300,7 @@ function unlisted(context: ResultContext): string[] {
  * parameter, here only, like the film.json a stills job took. A refused job, whose kit
  * stopped before it touched its folder, has the refused lines, or else the playbook line:
  * never the failed ones, which may say what a run that got further deleted. A hosted job of a
- * tool that writes files, done with none listed, as one past the days its files are kept, has
+ * tool that writes files, done with none listed, as one past the time its files are kept, has
  * FILES_GONE_NEXT alone.
  */
 export function nextSentences(view: JobView, context: ResultContext): string[] {

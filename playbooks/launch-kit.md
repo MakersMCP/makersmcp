@@ -52,6 +52,10 @@ Store and gallery screenshots come from `take_screenshots`, one `sizes` entry pe
 
 ## The order
 
+<!-- hosted -->
+A step takes an earlier job's files as job:<job_id>/<path> only until the time that job's result gives, {limit:keep_time} after it ended, when its links stop too: start each step as soon as the one it needs ends, and when the user takes longer to decide, as on the brand or the plan, make that earlier step again first.
+<!-- end -->
+
 <!-- with easybrandkit, easyscreenshotkit, easyfontkit -->
 1. Start the jobs that need only the site side by side, each with `wait_seconds` 0 and a folder of its own, then call `wait_for_job` on each until it ends:
 <!-- end -->

@@ -37,7 +37,7 @@
         "failed": ["Read why it failed; the {topic} playbook has the fixes."]
       },
       "hostedNext": {
-        "done": ["Show {file:picture.png} to the user; its link works for {limit:keep_days}.", "Give {file:words.json} to the next job."]
+        "done": ["Show {file:picture.png} to the user; its link works for {limit:keep_time}.", "Give {file:words.json} to the next job."]
       }
     },
     {

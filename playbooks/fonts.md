@@ -88,5 +88,5 @@ Each error as the result shows it, then the fix.
 
 Tell the user which page was read, each role's font with its weights and its license, the closest free font beside each commercial or unknown one, and where the files are: the folder, or the links. Let them decide which fonts to use.
 <!-- hosted -->
-The links work for {limit:keep_days} for anyone who has them, so give them only to the user.
+The links work for anyone who has them until the time the result gives, so give them only to the user, with that time.
 <!-- end -->

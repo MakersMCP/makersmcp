@@ -11,5 +11,5 @@ From a website or a file, the kits make {makes}.
 Relative paths are read from {base_dir}.
 <!-- end -->
 <!-- hosted -->
-Links work for {limit:keep_days}.
+Links work for {limit:keep_time}.
 <!-- end -->

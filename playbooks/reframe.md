@@ -16,6 +16,9 @@ order: 72
 
 - The video: a finished video, any file ffmpeg reads. Nothing here edits it, adds a title or changes its sound but for its loudness.
 - The places, as `for`, from the table below. When the user names none, make all of them and say which those are.
+<!-- hosted -->
+- The video's size here: at most 3840x2160 pixels (or 2160x3840), in 4:2:0 at 8 or 10 bits, as phones and cameras record it, and a size given in `for` at most 2560x1440 pixels (or 1440x2560). A larger video, or a ProRes or 4:4:4 master, fails before its kit starts: ask the user for an H.264 or HEVC copy first.
+<!-- end -->
 - The crop follows motion, not faces: nothing in it knows a person or a product. For anything that matters, plan first and look at the windows.
 <!-- with make_launch_film, plan_launch_film -->
 - A launch film: a 9:16 plan of `plan_launch_film` is laid out for a phone, which a crop of the 16:9 film is not. For TikTok, Reels and Shorts, render the film in 9:16 too when the user wants the best one, and reframe the 16:9 film for the feeds, square, X and LinkedIn. Its film.timeline.json beside its film.mp4 gives its clips as the shots.
@@ -128,7 +131,7 @@ reframe_video {"video": "job:<fit_job_id>/video.mp4", "cuts": "job:<film_job_id>
 - `wait_seconds`: a plan takes seconds to a minute; rendering every place of a long video takes minutes.
 <!-- end -->
 <!-- hosted -->
-- `wait_seconds`: a job here has a share of one machine. A plan of a minute of 1920x1080 video takes about 20 seconds, and each file of a place takes from about 2 minutes for each minute of video, as easy footage does, to about 5 with grain; every place takes four files of a video up to 140 seconds long, five of one up to 3 minutes and six of a longer one. A job stops after {limit:job_minutes}, so a video that cannot be made in the time its job has left, or one or a size too large for a job's memory, is refused with what fits: ask for fewer places, or give `seconds`.
+- `wait_seconds`: a job here has a share of one machine. A plan of a minute of 1920x1080 video takes about 20 seconds, and each file from about 2 minutes for each minute of video, as easy footage takes it, to about 5 with grain. With every place in `for` there are four files for a video up to 140 seconds long, five up to 3 minutes and six past that, since places of one size and length share a file; fewer places take fewer. A job stops after {limit:job_minutes}. A video that could not be made in the time its job has left even as easy footage fails before its kit starts, with what fits: for `reframe_video` ask for fewer places or give `seconds`, and for `plan_reframe`, which reads the whole video, give a shorter one. Footage with grain or noise, as from a phone camera, takes two to three times as long, so it can pass that check and still be stopped when the time runs out, with no files kept: for more than a minute of video with every place, offer fewer places or `seconds` first, or a run on the user's own machine.
 <!-- end -->
 
 ## The check
@@ -187,6 +190,12 @@ It writes CHECK.md, which the result shows, and check.json. A failed check is a 
 <!-- end -->
 - A voice missing from the files: the video has more than one sound track and only the first is kept, as FORMATS.md says.
 - A run that fails, is refused or is canceled leaves its folder as it was.
+<!-- hosted -->
+- "for <size>: a file reframekit makes here may have at most 2560x1440 pixels (or 1440x2560)": ask for a smaller size. "for takes at most 12 places in one run. Ask for the others in another job.": split the places over two jobs.
+- "<param> is <size>: <tool> here takes a video of at most 3840x2160 pixels (or 2160x3840)" or "<tool> here takes a picture in 4:2:0 of 8 or 10 bits alone": ask the user for a smaller copy in H.264 or HEVC.
+- "<param> runs <time> at <size>, and reframe_video here makes the files asked for of about <time> of a video that size": even easy footage could not be made in the time the job had left; ask for fewer places or give `seconds`. For `plan_reframe`, give a shorter video.
+- "It ran longer than <time> and was stopped.": the footage took longer than easy footage, as grain does; ask for fewer places or `seconds`.
+<!-- end -->
 <!-- local -->
 - "reframekit needs ffmpeg and ffprobe": the troubleshooting topic. It needs an ffmpeg built with --enable-gpl, as Ubuntu's is.
 <!-- end -->

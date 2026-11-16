@@ -144,7 +144,7 @@ Notes in a finished result:
 - A folder that holds files but no earlier brand kit stops the kit, so it never mixes into the user's files.
 <!-- end -->
 <!-- hosted -->
-- Each job saves into a folder of its own, so no job replaces another. The result lists each file with its link, which works for {limit:keep_days} for anyone who has it, so give the links only to the user.
+- Each job saves into a folder of its own, so no job replaces another. The result lists each file with its link, which works for anyone who has it until the time the result gives, so give the links only to the user.
 - Another tool takes the kit as job:<job_id>/brand.json, which brings the logos and the rest of the kit along.
 - The site has to be public: the server cannot open an address on the user's own computer or network.
 <!-- end -->

@@ -41,7 +41,7 @@ A whole launch is the launch-kit topic.
    A call that gives a file from a running job's folder is refused until that job ends, wherever it saves.
 <!-- end -->
 <!-- hosted -->
-   Here at most {limit:jobs_at_once} run or wait at once, and a start past that is refused: start the next one when one ends.
+   Here at most {limit:jobs_at_once} run or wait at once, and more are refused: start the next when one ends.
 <!-- end -->
 
 Reading a page or a track takes seconds to a minute or two; screenshots and making a video can take minutes.
@@ -55,7 +55,7 @@ Here a call returns within {limit:max_wait}, and a job keeps running when the co
 Each tool saves into a folder named after the site or the file, in {base_dir} or next to the file it was given, unless the call names one, and relative paths are read from {base_dir}. A run that ends well replaces what an earlier run of its kit left in that folder, so give each version its own; one that fails or is canceled leaves it as it was.
 <!-- end -->
 <!-- hosted -->
-Each job saves into a folder of its own, and its result has a link to each file, which works for {limit:keep_days} for anyone who holds it. A file an earlier job saved goes into the next job as job:<job_id>/<path>, with the path its file list shows.
+Each job has a folder of its own, and its result links each file until the time it gives, {limit:keep_time} after the job ended. A file an earlier job saved goes into the next job as job:<job_id>/<path>, the path its file list shows, only until then: start a chain's next step once the one before ends.
 <!-- end -->
 jobs-and-files has the rest.
 
@@ -98,7 +98,7 @@ jobs-and-files has the rest.
 
 ## When something fails
 
-Read the reason in a failed result and change the call before trying again, since the same call fails the same way, unless the reason, or the tool's topic, says to wait or to try again. troubleshooting has the errors and their fixes, and `check_setup` shows the kits that are on.
+Read the reason in a failed result and change the call before trying again, unless the reason, or the tool's topic, says to wait or to try again. troubleshooting has the errors and their fixes, and `check_setup` shows the kits that are on.
 
 ## Hand over
 

@@ -33,16 +33,35 @@ export const HOSTED_ONLY = new Set(['limit']);
 /** Placeholders that stand alone on their line, since each becomes a list. */
 export const ON_THEIR_OWN_LINE = new Set(['requests', 'flags']);
 
-/** A hosted service's limits, and the words that promise nothing when the service does not give one. */
-const LIMITS: Record<string, { key: keyof HostedLimits; unit: [string, string]; unknown: string }> = {
-  // Words that read right after "at most", "within" and "after".
-  max_wait: { key: 'maxWaitSeconds', unit: ['second', 'seconds'], unknown: 'a set time' },
-  job_minutes: { key: 'jobMinutes', unit: ['minute', 'minutes'], unknown: 'a set time' },
-  jobs_at_once: { key: 'jobsAtOnce', unit: ['job', 'jobs'], unknown: 'a few jobs' },
-  jobs_a_day: { key: 'jobsPerDay', unit: ['job', 'jobs'], unknown: 'a set number of jobs' },
-  keep_days: { key: 'keepDays', unit: ['day', 'days'], unknown: 'a few days' },
+/**
+ * A hosted service's limits, and the words that promise nothing when the service does not give
+ * one. A limit with a unit shows its number with that unit; keep_time picks its own, as a keep
+ * time runs from minutes to months.
+ */
+const LIMITS: Record<string, { value: (limits: HostedLimits) => unknown; unit?: [string, string]; unknown: string }> = {
+  // Words that read right after "at most", "within", "after" and "for".
+  max_wait: { value: limits => limits.maxWaitSeconds, unit: ['second', 'seconds'], unknown: 'a set time' },
+  job_minutes: { value: limits => limits.jobMinutes, unit: ['minute', 'minutes'], unknown: 'a set time' },
+  jobs_at_once: { value: limits => limits.jobsAtOnce, unit: ['job', 'jobs'], unknown: 'a few jobs' },
+  jobs_a_day: { value: limits => limits.jobsPerDay, unit: ['job', 'jobs'], unknown: 'a set number of jobs' },
+  // A service that gave whole days before keepSeconds came gives keepDays.
+  keep_time: { value: limits => limits.keepSeconds ?? (typeof limits.keepDays === 'number' ? limits.keepDays * 86_400 : undefined), unknown: 'a set time' },
 };
 export const LIMIT_NAMES = Object.keys(LIMITS);
+
+/**
+ * A time in words, in the largest of days, hours and minutes that it is a whole number of, else
+ * in seconds, as MakersMCP-Api writes a keep time: 15 minutes, 90 days, 36 hours. Never longer
+ * than the time itself.
+ */
+export function timeInWords(seconds: number): string {
+  const whole = Math.max(1, Math.floor(seconds));
+  const unit = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+  if (whole % 86_400 === 0) return unit(whole / 86_400, 'day');
+  if (whole % 3600 === 0) return unit(whole / 3600, 'hour');
+  if (whole % 60 === 0) return unit(whole / 60, 'minute');
+  return unit(whole, 'second');
+}
 
 /** A placeholder found in a text. */
 export interface Placeholder {
@@ -272,8 +291,9 @@ function defaultOf(context: TextContext, arg: string): string {
 function limitOf(context: TextContext, name: string): string {
   if (context.where !== 'hosted') throw new TextError(`{limit:${name}} is for a hosted text only`);
   const limit = LIMITS[name]!;
-  const value = context.limits?.[limit.key];
+  const value = context.limits ? limit.value(context.limits) : undefined;
   if (typeof value !== 'number' || !Number.isFinite(value)) return limit.unknown;
+  if (!limit.unit) return value > 0 ? timeInWords(value) : limit.unknown;
   return `${value} ${value === 1 ? limit.unit[0] : limit.unit[1]}`;
 }
 
@@ -320,8 +340,10 @@ export function fillText(text: string, context: TextContext, options: FillOption
       }
       case 'limit': {
         const units = LIMITS[arg!]!.unit;
-        if (unit && !units.includes(unit.trim())) {
-          throw new TextError(`{limit:${arg}} renders with its unit, ${units[1]}, so the${unit} after it is one too many`);
+        if (unit && !units?.includes(unit.trim())) {
+          throw new TextError(units
+            ? `{limit:${arg}} renders with its unit, ${units[1]}, so the${unit} after it is one too many`
+            : `{limit:${arg}} renders with a unit of its own, like 15 minutes or 90 days, so the${unit} after it is one too many`);
         }
         // The unit is in the words already: "{limit:max_wait} seconds" is "50 seconds".
         return limitOf(context, arg!);

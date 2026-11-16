@@ -190,7 +190,7 @@ Pass `demo.mp4` on by its path.
 <!-- end -->
 <!-- end -->
 <!-- hosted -->
-Each job saves into a folder of its own, and its links work for {limit:keep_days} for anyone who has them, so give them only to the user.
+Each job saves into a folder of its own, and its links work for anyone who has them until the time the result gives, so give them only to the user.
 <!-- with check_video -->
 Pass the video on as job:<job_id>/demo.mp4.
 <!-- end -->

@@ -152,7 +152,7 @@ From `check_pwa_screenshots`, each followed by a line saying the check could not
 A path in `manifest` is absolute or relative to {base_dir}. Pass the PNGs on by their paths, like launch/screenshots/01-home-iphone.png.
 <!-- end -->
 <!-- hosted -->
-Each job saves into a folder of its own, and the result lists each file with its link, which works for {limit:keep_days} for anyone who has it, so give the links only to the user. Pass the manifest entries on as job:<job_id>/pwa/manifest-screenshots.json. The site has to be public: the server cannot open an address on the user's own computer or network.
+Each job saves into a folder of its own, and the result lists each file with its link, which works for anyone who has it until the time the result gives, so give the links only to the user. Pass the manifest entries on as job:<job_id>/pwa/manifest-screenshots.json. The site has to be public: the server cannot open an address on the user's own computer or network.
 <!-- end -->
 
 ## Hand over

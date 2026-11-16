@@ -483,9 +483,11 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
     if (tool.out?.ownOnly !== undefined && (typeof tool.out.ownOnly !== 'boolean' || !tool.out.flag)) {
       fail(`${tool.name}: out.ownOnly is true or false, for a tool whose folder the agent gives with out.flag`);
     }
-    if (tool.out?.runsOf !== undefined && (typeof tool.out.runsOf !== 'string' || !Object.hasOwn(tool.params, tool.out.runsOf)
-      || !FILE_TYPES.has(tool.params[tool.out.runsOf]!.type) || !tool.out.flag || tool.out.ownOnly)) {
-      fail(`${tool.name}: out.runsOf names the parameter whose file the folder's runs are of, like video, for a tool whose folder the agent gives with out.flag and that is not ownOnly`);
+    // A folder holds the runs of one file: a required parameter that is always a file, never a text or an address, and only
+    // for a tool that makes a run, since out_dir's description of a check says nothing of the runs a folder holds.
+    const runsOf = typeof tool.out?.runsOf === 'string' && Object.hasOwn(tool.params, tool.out.runsOf) ? tool.params[tool.out.runsOf]! : undefined;
+    if (tool.out?.runsOf !== undefined && (!runsOf || !runsOf.required || runsOf.type !== 'path' || !tool.out.flag || tool.out.ownOnly || tool.check)) {
+      fail(`${tool.name}: out.runsOf names the parameter whose file the folder's runs are of, like video, a required path, for a tool whose folder the agent gives with out.flag, that is not ownOnly and is no check`);
     }
     if (tool.writes !== undefined && !(Array.isArray(tool.writes) && tool.writes.every(file => typeof file === 'string' && staysInside(file)))) {
       fail(`${tool.name}.writes lists the files it writes in its folder, like card.png or logo-*.png`);

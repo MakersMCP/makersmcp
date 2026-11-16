@@ -217,7 +217,7 @@ A run writes only the places it is given, and `stills/STILLS.md` lists only thos
 - The film: the path of its `film.mp4`, its length from `film.timeline.json`, its look and aspect, and one line on each clip.
 <!-- end -->
 <!-- hosted -->
-- The film: the link to its `film.mp4`, which works for {limit:keep_days} for anyone who holds it, its length from `film.timeline.json`, its look and aspect, and one line on each clip.
+- The film: the link to its `film.mp4`, which works for anyone who holds it until the time the result gives, with that time, its length from `film.timeline.json`, its look and aspect, and one line on each clip.
 <!-- end -->
 <!-- with check_video -->
 - The check's verdict, with each failed check and what it measured.

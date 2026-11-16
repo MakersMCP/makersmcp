@@ -149,7 +149,7 @@ For a film already made, say which cuts `check_video` found off the beat.
 <!-- end -->
 - `wait_seconds`: both tools finish in seconds, and a long `video` takes a minute or more.
 <!-- hosted -->
-- A job here reads a track, a voice and a video's own sound of a set length at most, together, as both tools hold each whole in memory a few times over: past that the job fails before the kit starts, naming each length and the most taken.
+- Here a job's track, voice and video's own sound may run 15 minutes together at most, as both tools hold each whole in memory a few times over: past that the job fails before the kit starts with "<tool> here reads at most 15 minutes of sound in a job", naming each length. `fit_music` counts no sound of its `video` with `video_sound` drop, or when that video is the file given as `track` or `voice`.
 <!-- end -->
 
 `analyze_music` takes `track`, `bpm` and `meter` the same way. It has no `fps`: its frames count at {fact:musicfit.analyze_fps} a second, so use its times in seconds.
@@ -204,5 +204,5 @@ Warnings come with a done job, in `FIT.md` too:
 <!-- end -->
 - That nothing here checked whether the track may be used.
 <!-- hosted -->
-- That the links work for {limit:keep_days}, for anyone who has them.
+- That the links work for anyone who has them until the time the result gives, with that time.
 <!-- end -->
