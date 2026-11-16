@@ -38,6 +38,10 @@ jobs:
         run: npm ci
 
       # The tests also check that every manifest carries the same version.
+      # The kits' refusals and checks run ffmpeg, which the runner does not have.
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
       - name: Test
         run: npm test
 
