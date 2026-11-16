@@ -2,7 +2,7 @@
 name: jobs-and-files
 title: Jobs, waits and files
 index: long jobs, calls that end early, cancelling, folders, passing one job's files to the next
-description: Explains how a MakersMCP job runs and ends, how to wait for a long one, what to do after a call that ended with no result, what cancel_job and list_jobs do, where each job's files go and, locally, what a new run replaces, and how one job's files go into the next. Use it before running jobs side by side, after a call ended early, before reusing a folder, or when a file from one job has to go into another.
+description: Explains how a MakersMCP job runs and ends, how to wait for a long one, what to do after a call that ended with no result, what cancel_job and list_jobs do, where each job's files go and, locally, what a new run replaces, and how one job's files go into the next. Use it before running several jobs, after a call ended early, before reusing a folder, or when a file from one job has to go into another.
 kit: makersmcp
 requires: []
 optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, reframekit, easycaptionkit, check_video, fit_music, make_launch_film, plan_launch_film]
@@ -31,7 +31,7 @@ A client may end a call before the job ends, after a timeout or a lost connectio
 A start makersmcp.com could not confirm says so: "makersmcp.com could not be reached, so it is not known whether <title> started. Check list_jobs before you start it again."
 <!-- end -->
 
-## Listing, cancelling, running side by side
+## Listing, cancelling and running several jobs
 
 - `list_jobs` gives one line a job, newest first: its id, tool, status, seconds and folder.
 - `cancel_job` on a job that has ended returns it as it is.

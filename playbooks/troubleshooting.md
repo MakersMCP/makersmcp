@@ -39,12 +39,12 @@ Read the result before anything else: its first line says what happened, and the
 <!-- end -->
 <!-- end -->
 <!-- hosted -->
-- "<kit> is not running on makersmcp.com right now. Try again later." or "<tool> is not available on makersmcp.com right now. Try again later.": tell the user, and try again later. `check_setup` lists what runs now.
+- "<kit> is not running on makersmcp.com right now. Try again later.", "<tool> is not available on makersmcp.com right now. Try again later." or "<tool> is not available right now: <why>.", for a tool held back for now: tell the user, and try again later. `check_setup` lists what runs now.
 - "You have <n> jobs running or waiting. Wait for one of them to end.": wait for a running job with `wait_for_job` first. "You have started the <n> jobs allowed in any 24 hours.": the result says when a job can start again; tell the user.
 - "The kits are not available right now. Try again later.": tell the user.
 - A refusal that names an argument, like "<param> is required.", says what to change in it.
 - "makersmcp.com could not be reached, so it is not known whether <title> started. Check list_jobs before you start it again.", or one that starts "It is not known whether <title> started": the job may be running. Call `list_jobs`, wait for it there, and start it again only when it is not listed.
-- "makersmcp.com could not be reached to wait for job <job_id>. The job keeps running there: call wait_for_job again in a minute.": do that. A `list_jobs` or `cancel_job` that could not reach it says to try again in a minute.
+- "makersmcp.com could not be reached to wait for job <job_id>. The job keeps running there: call wait_for_job again in a minute.", or one that starts "makersmcp.com could not say how job <job_id> is doing.": the job keeps running, so call `wait_for_job` again in a minute, and never the tool that started it, which would start a second job. A `list_jobs` or `cancel_job` that could not reach it says to try again in a minute.
 <!-- end -->
 
 ## Failed jobs
@@ -65,7 +65,7 @@ Read the result before anything else: its first line says what happened, and the
 - A track, a voice and a video whose sounds run too long together for a job here fail before the kit starts, and the failure names each length and the most taken: offer a shorter track or voice.
 <!-- end -->
 <!-- with fit_music -->
-  fit_music counts no sound of its `video` with `video_sound` drop, or when that video is the file given as its `track` or `voice`. A fit too long for that much sound fails the same way, with "fit_music here makes a fit of at most" and the longest that fits: offer a shorter `length`.
+  fit_music counts no sound of its `video` with `video_sound` drop, or when that video is the file given as its `track` or `voice`. A fit too long for that much sound fails the same way, with "fit_music here makes a fit of at most" and the longest that fits: offer a shorter `length`, or with a `video` a shorter cut of the video with `length` set to it. A fit longer than 20 minutes with a `voice` or a `video`, or 12 with both, is refused as the call is made, before any job starts, when `length` is in seconds, or in frames with `fps`.
 <!-- end -->
 <!-- end -->
 <!-- local -->

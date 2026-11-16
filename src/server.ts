@@ -86,7 +86,9 @@ export interface MakersMcpOptions {
   /**
    * Kit definitions to use instead of the ones in kits/. A kit of kits/ given with fewer
    * tools, as a service passes one whose machines cannot run some of its tools, keeps the
-   * others for the texts: they are not listed, and the texts leave out what names them.
+   * others for the texts: they are not listed, and the texts leave out what names them. A
+   * list is read once in a process: the texts, descriptions and schemas made from it are kept
+   * for every server built from it again, so give a new list when a definition changes.
    */
   definitions?: KitDefinition[];
   /** Where the jobs run. Default: a LocalBackend on outDir and kitPaths. */

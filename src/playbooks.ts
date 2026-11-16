@@ -439,14 +439,23 @@ const rendered = new Map<string, string>();
 const MAX_RENDERED = 500;
 const fingerprints = new WeakMap<object, string>();
 
-function cacheKey(what: string, playbooks: Playbooks, context: TextContext): string {
+/**
+ * Everything the texts of the kits and the playbooks are made from, as a key: the side, the
+ * place, the folder, the kits on, the tools listed, their versions, the limits and the kit files,
+ * these last by a digest made once for each list of definitions.
+ */
+export function textKey(context: TextContext): string {
   let kits = fingerprints.get(context.definitions);
   if (!kits) {
     kits = createHash('sha1').update(JSON.stringify(context.definitions)).digest('hex');
     fingerprints.set(context.definitions, kits);
   }
-  return JSON.stringify([what, playbooks.dir, context.where, context.place, context.baseDir ?? null, [...context.enabled].sort(),
+  return JSON.stringify([context.where, context.place, context.baseDir ?? null, [...context.enabled].sort(),
     [...listedTools(context)].sort(), [...context.versions].sort(), context.limits ?? null, kits]);
+}
+
+function cacheKey(what: string, playbooks: Playbooks, context: TextContext): string {
+  return JSON.stringify([what, playbooks.dir, textKey(context)]);
 }
 
 function cached(key: string, make: () => string): string {

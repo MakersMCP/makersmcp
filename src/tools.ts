@@ -7,7 +7,7 @@ import { textPattern } from './args.js';
 import { NotStartedError, type AvailableKit, type JobView, type KitBackend } from './backend.js';
 import { strictInput } from './input.js';
 import type { ParamDefinition, ToolDefinition } from './kits.js';
-import { PLAYBOOK_TOOL } from './playbooks.js';
+import { PLAYBOOK_TOOL, textKey } from './playbooks.js';
 import { callKey, type CallOutcome, type RepeatTiming, type StartLedger, type StartOutcome, type StartRecord } from './repeats.js';
 import { checkNextLines, continuedResult, errorResult, jobListed, jobOutputSchema, jobResult, shownView, type ResultContext } from './results.js';
 import { BASE_DIR_IN_WORDS, fillText, inWords, templateInWords, TextError, WAIT_SECONDS, withoutUnlisted, type TextContext } from './texts.js';
@@ -267,20 +267,55 @@ function resultContext(context: ToolContext, entry: RegisteredKitTool | undefine
   return { text: context.text, topics: context.topics, listed: context.tools, ...(entry ? { kit: entry.kit.definition, tool: entry.tool } : {}) };
 }
 
-export function registerKitTool(server: McpServer, context: ToolContext, kit: AvailableKit, tool: ToolDefinition): void {
-  const { backend } = context;
-  const hosted = backend.where === 'hosted';
-  const inputSchema: Record<string, z.ZodType> = {};
+/** What a kit tool is listed with that its texts and parameters make: its description, its input schema, and whether it takes out_dir. */
+interface ListedParts {
+  description: string;
+  inputSchema: ReturnType<typeof strictInput>;
+  outDir: boolean;
+}
+
+/**
+ * The listed parts of each kit tool made so far in this process, by the tool and everything its
+ * texts and schema are made from (listedKey). A hosted service builds a whole server for every
+ * request, and making these took most of a build, some 14 ms of CPU for the 19 tools of 0.2's
+ * kits against under 1 ms for the rest, so a server built again for the same state takes them
+ * as they were made. Bounded as the playbooks' renderings are.
+ */
+const listedParts = new Map<string, ListedParts>();
+const MAX_LISTED_PARTS = 2000;
+// The part of the key that is the same for every tool of one server: its texts' state and the topics it offers.
+const contextKeys = new WeakMap<ToolContext, string>();
+
+/** The key of a tool's listed parts: the server's texts' state (textKey), the topics it offers, the backend's folder, the kit and its version, and the tool. */
+function listedKey(context: ToolContext, kit: AvailableKit, tool: ToolDefinition): string {
+  let shared = contextKeys.get(context);
+  if (shared === undefined) {
+    shared = JSON.stringify([textKey(context.text), [...context.topics].sort(), context.baseDir ?? null]);
+    contextKeys.set(context, shared);
+  }
+  return JSON.stringify([shared, kit.definition.kit, kit.version, tool.name]);
+}
+
+/** A kit tool's listed parts, made once for each state its texts and schema are made from. */
+function listedPartsOf(context: ToolContext, kit: AvailableKit, tool: ToolDefinition, entry: RegisteredKitTool): ListedParts {
+  const key = listedKey(context, kit, tool);
+  const known = listedParts.get(key);
+  // The Next lines are checked for every server all the same, as a list of definitions changed in place keeps its key.
+  if (known) {
+    checkNextLines(tool, resultContext(context, entry));
+    return known;
+  }
+  const hosted = context.backend.where === 'hosted';
+  const shape: Record<string, z.ZodType> = {};
   for (const [name, param] of Object.entries(tool.params)) {
     // A local parameter, like keep, means nothing where each job's work files are swept away.
     if (hosted && param.where === 'local') continue;
-    inputSchema[name] = paramSchema(tool, name, param, context);
+    shape[name] = paramSchema(tool, name, param, context);
   }
   if (tool.out?.flag && !hosted) {
-    inputSchema['out_dir'] = z.string().min(1).optional().describe(outDirHelp(tool, context.baseDir));
+    shape['out_dir'] = z.string().min(1).optional().describe(outDirHelp(tool, context.baseDir));
   }
-  inputSchema['wait_seconds'] = waitSeconds(context);
-  const numbers = Object.entries(tool.params).filter(([, param]) => takesNumber(param)).map(([name]) => name);
+  shape['wait_seconds'] = waitSeconds(context);
   // Hosted, a call with an argument only a local server takes is told why it is not taken here.
   const hints: Record<string, string> = {};
   if (hosted) {
@@ -292,17 +327,32 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
         : `Only makersmcp on the user's own machine takes \`${name}\`.`;
     }
   }
-  const entry = { kit, tool };
-  context.tools.set(tool.name, entry);
   // A Next sentence that cannot be filled stops the server, as a description does.
   checkNextLines(tool, resultContext(context, entry));
+  const parts: ListedParts = {
+    description: kitToolDescription(context, kit, tool),
+    inputSchema: strictInput(shape, { nothing: 'Nothing was started.', hints }),
+    outDir: Object.hasOwn(shape, 'out_dir'),
+  };
+  if (listedParts.size >= MAX_LISTED_PARTS) listedParts.clear();
+  listedParts.set(key, parts);
+  return parts;
+}
+
+export function registerKitTool(server: McpServer, context: ToolContext, kit: AvailableKit, tool: ToolDefinition): void {
+  const { backend } = context;
+  const hosted = backend.where === 'hosted';
+  const numbers = Object.entries(tool.params).filter(([, param]) => takesNumber(param)).map(([name]) => name);
+  const entry = { kit, tool };
+  context.tools.set(tool.name, entry);
+  const { description, inputSchema, outDir } = listedPartsOf(context, kit, tool, entry);
 
   server.registerTool(
     tool.name,
     {
       title: tool.title,
-      description: kitToolDescription(context, kit, tool),
-      inputSchema: strictInput(inputSchema, { nothing: 'Nothing was started.', hints }),
+      description,
+      inputSchema,
       outputSchema: jobOutputSchema,
       annotations: {
         title: tool.title,
@@ -381,7 +431,7 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
           outcome = 'answered';
           const result = jobResult(view!, resultContext(context, entry));
           if (!continued) return result;
-          const separate = hosted || !inputSchema['out_dir'] ? 'For a separate run, change an argument.' : 'For a separate run, give another out_dir.';
+          const separate = hosted || !outDir ? 'For a separate run, change an argument.' : 'For a separate run, give another out_dir.';
           return continuedResult(result, view!.id, calledAt - continued.startedAt, separate);
         }
       } catch (error) {

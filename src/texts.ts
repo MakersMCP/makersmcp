@@ -195,29 +195,63 @@ export function unlistedTools(context: TextContext): string[] {
 /** launch-film's four film tools, which a service holds back together. */
 const FILM_TOOLS = ['plan_launch_film', 'make_launch_film', 'render_launch_film', 'make_launch_stills'];
 
-/**
- * The sets of a kit's tools that the texts leave out by themselves while the rest of that kit
- * stays on, by kit: the topics name these tools, and the files only they write, only in blocks
- * for them, and the lint in tests/playbooks.test.mjs renders every text with each set held
- * back, alone and beside each set of the other kits. They are the holds MakersMCP-Server's
- * workers make: check_video and fit_music, which an older ffmpeg cannot run for their loudness
- * filter, and launch-film's four film tools, held together until its security fix runs there,
- * with check_video or without it. With any other set held back the topics would still name a tool
- * the server does not list, so a service holds back the whole kit then, which is off.
- */
-export const TEXTS_LEAVE_OUT: ReadonlyMap<string, ReadonlyArray<ReadonlyArray<string>>> = new Map(([
+/** The sets of TEXTS_LEAVE_OUT, each frozen, which textsLeaveOut reads. */
+const LEAVE_OUT_SETS: ReadonlyMap<string, ReadonlyArray<ReadonlyArray<string>>> = new Map(([
   ['launch-film', [['check_video'], FILM_TOOLS, [...FILM_TOOLS, 'check_video']]],
   ['musicfit', [['fit_music']]],
 ] as Array<[string, string[][]]>).map(([kit, sets]) => [kit, Object.freeze(sets.map(set => Object.freeze([...set])))]));
 
+const FIXED = 'TEXTS_LEAVE_OUT is read only: which held tools the texts leave out is for makersmcp\'s texts to say.';
+
+/** A Map whose set, delete and clear throw, frozen as it is made, so no caller can change it. */
+class FixedMap<K, V> extends Map<K, V> {
+  constructor(entries: Iterable<readonly [K, V]>) {
+    super();
+    for (const [key, value] of entries) super.set(key, value);
+    Object.freeze(this);
+  }
+
+  override set(): never {
+    throw new TypeError(FIXED);
+  }
+
+  override delete(): never {
+    throw new TypeError(FIXED);
+  }
+
+  override clear(): never {
+    throw new TypeError(FIXED);
+  }
+}
+
+/**
+ * The sets of a kit's tools that the texts leave out by themselves while the rest of that kit
+ * stays on, by kit: the topics name these tools, and the files only they write, only in blocks
+ * for them, and the lint in tests/playbooks.test.mjs renders every text with each set held
+ * back, alone and beside each set of the other kits. They are the holds of MakersMCP-Api's
+ * workers that keep the rest of their kit on: check_video and fit_music, for a release whose
+ * loudness filter the workers' ffmpeg cannot run, and launch-film's four film tools, held
+ * together while the launch-film installed there lacks its security fix, with check_video or
+ * without it. Those workers can hold back other sets too: make_launch_film and
+ * render_launch_film, or reframe_video, for the same loudness filter, and caption_video,
+ * reframe_video and plan_reframe while they cannot measure a video's shown size. With any set
+ * but these held back the topics would still name a tool the server does not list, so a service
+ * holds back the whole kit then, which is off, as MakersMCP-Server does. It is read only: set,
+ * delete and clear throw, so a service that reads it cannot change it for the lint or for
+ * another service in its process.
+ */
+export const TEXTS_LEAVE_OUT: ReadonlyMap<string, ReadonlyArray<ReadonlyArray<string>>> = new FixedMap(LEAVE_OUT_SETS);
+
 /**
  * Whether the texts leave out by themselves these tools of a kit that stays on, held back in
- * any order (TEXTS_LEAVE_OUT): true for none held, else only for one of its sets.
+ * any order and with a name given twice counted once (TEXTS_LEAVE_OUT): true for none held,
+ * else only for one of its sets. It reads the sets themselves, never the exported map, so its
+ * answers stay the same whatever a caller does to that map.
  */
 export function textsLeaveOut(kit: string, held: readonly string[]): boolean {
   const names = new Set(held);
   if (!names.size) return true;
-  return (TEXTS_LEAVE_OUT.get(kit) ?? []).some(set => set.length === names.size && set.every(tool => names.has(tool)));
+  return (LEAVE_OUT_SETS.get(kit) ?? []).some(set => set.length === names.size && set.every(tool => names.has(tool)));
 }
 
 /** Whether a text names one of these tools, as a word of its own. */
