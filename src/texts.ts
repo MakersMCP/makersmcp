@@ -203,7 +203,11 @@ const LEAVE_OUT_SETS: ReadonlyMap<string, ReadonlyArray<ReadonlyArray<string>>> 
 
 const FIXED = 'TEXTS_LEAVE_OUT is read only: which held tools the texts leave out is for makersmcp\'s texts to say.';
 
-/** A Map whose set, delete and clear throw, frozen as it is made, so no caller can change it. */
+/**
+ * A Map whose set, delete and clear throw, frozen as it is made. Map's own methods called on it
+ * past these still change what it holds, so an answer that must not change reads a copy of its
+ * own, as textsLeaveOut does.
+ */
 class FixedMap<K, V> extends Map<K, V> {
   constructor(entries: Iterable<readonly [K, V]>) {
     super();
@@ -234,11 +238,13 @@ class FixedMap<K, V> extends Map<K, V> {
  * together while the launch-film installed there lacks its security fix, with check_video or
  * without it. Those workers can hold back other sets too: make_launch_film and
  * render_launch_film, or reframe_video, for the same loudness filter, and caption_video,
- * reframe_video and plan_reframe while they cannot measure a video's shown size. With any set
- * but these held back the topics would still name a tool the server does not list, so a service
- * holds back the whole kit then, which is off, as MakersMCP-Server does. It is read only: set,
- * delete and clear throw, so a service that reads it cannot change it for the lint or for
- * another service in its process.
+ * reframe_video and plan_reframe while they cannot measure a job's video before it starts,
+ * and with them fit_music and analyze_music, the whole of musicfit, while they cannot measure its
+ * sound either. With any set but these held back the topics would still name a tool the server
+ * does not list, so a service holds back the whole kit then, which is off, as MakersMCP-Server
+ * does, and musicfit with both its tools held back is off already. Its set, delete and clear
+ * throw, and textsLeaveOut answers from a copy of its own, so no caller changes what
+ * textsLeaveOut says, though Map's own methods called on this map still change what it holds.
  */
 export const TEXTS_LEAVE_OUT: ReadonlyMap<string, ReadonlyArray<ReadonlyArray<string>>> = new FixedMap(LEAVE_OUT_SETS);
 

@@ -36,7 +36,12 @@ order: 70
 <!-- with easyscreenshotkit -->
 - A demo from `record_demo_video` runs at its `fps`, {default:record_demo_video.fps} unless set. Its `steps.json` gives the length as `video.duration`, or as `video.frames` with an f, and each click's moment as `pressedAt`.
 <!-- end -->
+<!-- local -->
 - Any other video: ask the user for its length and frame rate, or give it as `video`, whose frame rate counts the frames unless `fps` is given.
+<!-- end -->
+<!-- hosted -->
+- Any other video: ask the user for its length and frame rate, or give it as `video`, whose frame rate counts `hit` and `drop` in frames unless `fps` is given. A `length` in frames with a `video` needs `fps` here: without it the call is refused before any job starts.
+<!-- end -->
 
 ## Steps
 
@@ -52,6 +57,9 @@ analyze_music {"track": "https://example.com/track.mp3"}
 ```
 <!-- end -->
 2. Fit it with `fit_music`: `length` and `hit` as text, like "29.333" or "600f", `fps` the video's, and the video as `video` with its `video_sound`. Give `drop` only when the drop `FIT.md` names is not the one the user means.
+<!-- hosted -->
+   A `length` in frames with a `video` needs `fps` here, or the call is refused before any job starts.
+<!-- end -->
 <!-- with make_launch_film, plan_launch_film -->
    For a launch film, `length` is its `seconds`, `hit` its logo `start` and `fps` {fact:launch-film.fps}.
 <!-- local -->
@@ -150,7 +158,7 @@ For a film already made, say which cuts `check_video` found off the beat.
 - `wait_seconds`: both tools finish in seconds, and a long `video` takes a minute or more.
 <!-- hosted -->
 - Here a job's track, voice and video's own sound may run 15 minutes together at most, as both tools hold each whole in memory a few times over: past that the job fails before the kit starts with "<tool> here reads at most 15 minutes of sound in a job", naming each length. `fit_music` counts no sound of its `video` with `video_sound` drop, or when that video is the file given as `track` or `voice`.
-- The fit counts too: `fit_music` holds its `length` once in memory, three times with a `voice` or with a `video`, and five times with both. Those copies together may run an hour at most, and the sounds with a quarter of them 20 minutes. So from a track of 14 minutes it makes a fit of at most 24 minutes, from one of 15 minutes 20, and from one of 3 minutes the whole hour, or 20 minutes with a voice of a minute. Past that the job fails before the kit starts with "fit_music here makes a fit of at most", naming the longest that fits: give a shorter `length` or a shorter track, and with a `video`, whose length the fit takes, a shorter cut of the video with `length` set to it. A fit longer than 20 minutes with a `voice` or a `video`, or 12 with both, passes the hour whatever the track, and its call is refused before any job starts when `length` is in seconds, or in frames with `fps`.
+- The fit counts too: `fit_music` holds its `length` once in memory, three times with a `voice` or with a `video`, and five times with both. Those copies together may run an hour at most, and the sounds with a quarter of them 20 minutes. So from a track of 14 minutes it makes a fit of at most 24 minutes, from one of 15 minutes 20, and from one of 3 minutes the whole hour, or 20 minutes with a voice of a minute. Past that the job fails before the kit starts with "fit_music here makes a fit of at most", naming the longest that fits: give a shorter `length` or a shorter track, and with a `video`, whose length the fit takes, a shorter cut of the video with `length` set to it. A fit longer than 20 minutes with a `voice` or a `video`, or 12 with both, passes the hour whatever the track, and its call is refused before any job starts when `length` is in seconds, or in frames with `fps`. A `length` in frames with a `video` and no `fps` is refused as the call is made too, with "length in frames with a video needs fps here": give `fps`, the video's frame rate, or `length` in seconds.
 <!-- end -->
 
 `analyze_music` takes `track`, `bpm` and `meter` the same way. It has no `fps`: its frames count at {fact:musicfit.analyze_fps} a second, so use its times in seconds.

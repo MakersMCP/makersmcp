@@ -46,7 +46,11 @@ export interface RepeatTiming {
 
 export const REPEAT_TIMING: Readonly<RepeatTiming> = Object.freeze({ retryAfterMs: 10_000, unansweredWindowMs: 10 * 60_000 });
 
-const MAX_RECORDS = 1000;
+/**
+ * The most calls the ledger keeps, the oldest going first, so a long session cannot grow it
+ * without end. A service that keeps answers for the jobs a call may continue needs no more.
+ */
+export const MAX_REPEAT_RECORDS = 1000;
 
 /** JSON with the keys of every object sorted, so their order does not tell two calls apart. */
 function canonicalJson(value: unknown): string {
@@ -146,7 +150,7 @@ export class StartLedger {
   }
 
   private trim(): void {
-    while (this.records.size > MAX_RECORDS) {
+    while (this.records.size > MAX_REPEAT_RECORDS) {
       const oldest = this.records.keys().next().value;
       if (oldest === undefined) break;
       this.records.delete(oldest);

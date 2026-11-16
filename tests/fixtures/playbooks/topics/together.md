@@ -11,6 +11,8 @@ order: 40
 ---
 # A picture with its sound
 
+Each tool on makes one file of the pair.
+
 <!-- with paintkit -->
 First `paint_picture`.
 <!-- end -->

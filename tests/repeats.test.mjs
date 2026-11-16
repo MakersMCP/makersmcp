@@ -271,3 +271,26 @@ test('locally, the same call after one its client cancelled waits for that job, 
     rmSync(outDir, { recursive: true, force: true });
   }
 });
+
+// A service that keeps answers for the jobs a call may continue, as MakersMCP-Server keeps the
+// answers of its Kits/Start, follows the ledger's times and its bound from the package's main
+// entry instead of copying them.
+test('the package exports the ledger\'s times and the most calls it keeps, and the ledger keeps no more, the oldest going first', async () => {
+  const makersmcp = await import('../dist/server.js');
+  assert.deepEqual({ ...makersmcp.REPEAT_TIMING }, { retryAfterMs: 10_000, unansweredWindowMs: 10 * 60_000 });
+  assert.ok(Object.isFrozen(makersmcp.REPEAT_TIMING));
+  assert.equal(makersmcp.MAX_REPEAT_RECORDS, 1000);
+  const { StartLedger } = await import('../dist/repeats.js');
+  const ledger = new StartLedger();
+  const view = id => ({ id, kit: 'fakekit', tool: 'fake_make', title: 'Fake make', status: 'running', exitCode: null, elapsedSeconds: 0 });
+  const records = [];
+  for (let n = 0; n < makersmcp.MAX_REPEAT_RECORDS + 5; n++) {
+    const record = ledger.start(`key-${n}`, async () => view(`job_${n}`), n);
+    ledger.attach(record);
+    records.push(record);
+  }
+  await Promise.all(records.map(record => record.started));
+  const keys = [...ledger.records.keys()];
+  assert.equal(keys.length, makersmcp.MAX_REPEAT_RECORDS);
+  assert.deepEqual([keys[0], keys.at(-1)], ['key-5', `key-${makersmcp.MAX_REPEAT_RECORDS + 4}`]);
+});

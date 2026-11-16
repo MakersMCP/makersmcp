@@ -518,9 +518,13 @@ export function jobResult(view: JobView, context?: ResultContext): CallToolResul
       .map(file => `- ${file.path} (${size(file.bytes)})${file.url ? `: ${file.url}` : ''}`);
     if (view.files.length > MAX_LISTED) listed.push(`- and ${view.files.length - MAX_LISTED} more`);
     // Links on a hosted server, even when there are none left; a folder here, when the job has one.
-    const links = context?.text.where === 'hosted' || view.files.some(file => file.url);
+    const hosted = context?.text.where === 'hosted';
+    const links = hosted || view.files.some(file => file.url);
+    // Hosted, a later job takes the files as job:<job_id>/<path> only until their links stop too,
+    // as the service deletes them then: said where every client sees it, beside that time.
+    const use = hosted ? ` or to give a later job as job:${view.id}/<path>,` : '';
     const where = links
-      ? `Files${view.expiresAt && view.files.length ? `, to download until ${until(view.expiresAt)}` : ''}:`
+      ? `Files${view.expiresAt && view.files.length ? `, to download${use} until ${until(view.expiresAt)}` : ''}:`
       : view.folder ? `Folder: ${view.folder}` : '';
     // A job's folder has no link, and one an assistant makes up from a file's leads nowhere.
     const note = view.files.some(file => file.url) ? [LINKS_NOTE] : [];

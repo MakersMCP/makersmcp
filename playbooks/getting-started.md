@@ -20,7 +20,7 @@ Each topic, with its tools and what the user wants when each fits:
 <!-- with analyze_music -->
 <!-- without fit_music -->
 
-No tool here fits a track to a video now: `analyze_music` only reads one, so the line of its FIT.md about fitting the track does not apply here.
+No tool here fits a track now: `analyze_music` only reads one, so its FIT.md line about fitting does not apply.
 <!-- end -->
 <!-- end -->
 

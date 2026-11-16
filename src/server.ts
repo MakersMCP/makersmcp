@@ -57,7 +57,7 @@ export type { BuiltCommand, CommandContext } from './args.js';
 export { LocalBackend, failureText, listFiles, readDocs, viewJob } from './local-backend.js';
 export type { LocalBackendOptions } from './local-backend.js';
 export { NotStartedError, isAvailable } from './backend.js';
-export { REPEAT_TIMING } from './repeats.js';
+export { MAX_REPEAT_RECORDS, REPEAT_TIMING } from './repeats.js';
 export type { RepeatTiming } from './repeats.js';
 export type {
   AvailableKit,

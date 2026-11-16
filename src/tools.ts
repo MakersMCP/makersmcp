@@ -50,12 +50,13 @@ function waitSeconds(context: ToolContext): z.ZodType {
 }
 
 // A hosted kit cannot read the agent's disk: a file comes as a link, or as a file an
-// earlier job of the same user saved.
+// earlier job of the same user saved, which a later job takes only until the time that job's
+// result gave, when its files and links go.
 const HOSTED_FILE_SOURCE = '(https?:\\/\\/\\S+|job:[^\\s/]+\\/\\S+)';
 const HOSTED_FILE = new RegExp(`^${HOSTED_FILE_SOURCE}$`, 'i');
-const HOSTED_FILE_HELP = ' Give an https link to the file, or job:<job_id>/<path> for a file an earlier job saved.';
-const HOSTED_TEXT_OR_FILE_HELP = ' For a file, give an https link to it, or job:<job_id>/<path> for a file an earlier job saved.';
-const HOSTED_ADDRESS_OR_FILE_HELP = ' A link is read as the address, so give a file as job:<job_id>/<path>, for one an earlier job saved.';
+const HOSTED_FILE_HELP = ' Give an https link to the file, or job:<job_id>/<path> for a file an earlier job saved, until the time its result gave.';
+const HOSTED_TEXT_OR_FILE_HELP = ' For a file, give an https link to it, or job:<job_id>/<path> for a file an earlier job saved, until the time its result gave.';
+const HOSTED_ADDRESS_OR_FILE_HELP = ' A link is read as the address, so give a file as job:<job_id>/<path>, for one an earlier job saved, until the time its result gave.';
 
 /**
  * Hosted, a url_or_path whose kit tells a file by the value itself: a link it does not

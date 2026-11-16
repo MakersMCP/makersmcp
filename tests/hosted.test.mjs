@@ -130,7 +130,8 @@ test('a hosted job returns links to its files and when they stop working', async
     assert.equal(result.structuredContent.status, 'done');
     assert.equal(result.structuredContent.expires_at, '2026-11-08T12:30:00.000Z');
     assert.equal(result.structuredContent.files[1].url, 'https://files.example.com/job1/logo.svg?s=1');
-    assert.match(text(result), /Files, to download until 2026-11-08 12:30 UTC:\n\n- REPORT\.md \(120 B\): https:\/\/files\.example\.com\/job1\/REPORT\.md\?s=1/);
+    // A later job takes them as job:<job_id>/<path> until that time too, and not after, when the service deletes them.
+    assert.match(text(result), /Files, to download or to give a later job as job:job1\/<path>, until 2026-11-08 12:30 UTC:\n\n- REPORT\.md \(120 B\): https:\/\/files\.example\.com\/job1\/REPORT\.md\?s=1/);
     // Under the links, that each opens one file: a folder has none, and a link made up from a file's leads nowhere.
     assert.match(text(result), /logo\.svg\?s=1\n\nEach link opens only the file it names, and none opens a folder: hand each file over with its own link\.\n\n### REPORT\.md/);
     assert.ok(text(result).endsWith(shownDoc('REPORT.md', '# Report\n\nAll good.')), text(result));

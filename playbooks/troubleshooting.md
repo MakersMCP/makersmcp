@@ -65,7 +65,7 @@ Read the result before anything else: its first line says what happened, and the
 - A track, a voice and a video whose sounds run too long together for a job here fail before the kit starts, and the failure names each length and the most taken: offer a shorter track or voice.
 <!-- end -->
 <!-- with fit_music -->
-  fit_music counts no sound of its `video` with `video_sound` drop, or when that video is the file given as its `track` or `voice`. A fit too long for that much sound fails the same way, with "fit_music here makes a fit of at most" and the longest that fits: offer a shorter `length`, or with a `video` a shorter cut of the video with `length` set to it. A fit longer than 20 minutes with a `voice` or a `video`, or 12 with both, is refused as the call is made, before any job starts, when `length` is in seconds, or in frames with `fps`.
+  fit_music counts no sound of its `video` with `video_sound` drop, or when that video is the file given as its `track` or `voice`. A fit too long for that much sound fails the same way, with "fit_music here makes a fit of at most" and the longest that fits: offer a shorter `length`, or with a `video` a shorter cut of the video with `length` set to it. A fit longer than 20 minutes with a `voice` or a `video`, or 12 with both, is refused as the call is made, before any job starts, when `length` is in seconds, or in frames with `fps`. A `length` in frames with a `video` and no `fps` is refused as the call is made too: give `fps`, the video's frame rate, or `length` in seconds.
 <!-- end -->
 <!-- end -->
 <!-- local -->
