@@ -192,6 +192,34 @@ export function unlistedTools(context: TextContext): string[] {
   return context.definitions.flatMap(kit => kit.tools.map(tool => tool.name)).filter(name => !listed.has(name));
 }
 
+/** launch-film's four film tools, which a service holds back together. */
+const FILM_TOOLS = ['plan_launch_film', 'make_launch_film', 'render_launch_film', 'make_launch_stills'];
+
+/**
+ * The sets of a kit's tools that the texts leave out by themselves while the rest of that kit
+ * stays on, by kit: the topics name these tools, and the files only they write, only in blocks
+ * for them, and the lint in tests/playbooks.test.mjs renders every text with each set held
+ * back, alone and beside each set of the other kits. They are the holds MakersMCP-Server's
+ * workers make: check_video and fit_music, which an older ffmpeg cannot run for their loudness
+ * filter, and launch-film's four film tools, held together until its security fix runs there,
+ * with check_video or without it. With any other set held back the topics would still name a tool
+ * the server does not list, so a service holds back the whole kit then, which is off.
+ */
+export const TEXTS_LEAVE_OUT: ReadonlyMap<string, ReadonlyArray<ReadonlyArray<string>>> = new Map(([
+  ['launch-film', [['check_video'], FILM_TOOLS, [...FILM_TOOLS, 'check_video']]],
+  ['musicfit', [['fit_music']]],
+] as Array<[string, string[][]]>).map(([kit, sets]) => [kit, Object.freeze(sets.map(set => Object.freeze([...set])))]));
+
+/**
+ * Whether the texts leave out by themselves these tools of a kit that stays on, held back in
+ * any order (TEXTS_LEAVE_OUT): true for none held, else only for one of its sets.
+ */
+export function textsLeaveOut(kit: string, held: readonly string[]): boolean {
+  const names = new Set(held);
+  if (!names.size) return true;
+  return (TEXTS_LEAVE_OUT.get(kit) ?? []).some(set => set.length === names.size && set.every(tool => names.has(tool)));
+}
+
 /** Whether a text names one of these tools, as a word of its own. */
 export function namesTool(text: string, tools: string[]): boolean {
   return tools.some(name => new RegExp(`(?<![\\w-])${name}(?![\\w-])`).test(text));

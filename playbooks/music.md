@@ -150,6 +150,7 @@ For a film already made, say which cuts `check_video` found off the beat.
 - `wait_seconds`: both tools finish in seconds, and a long `video` takes a minute or more.
 <!-- hosted -->
 - Here a job's track, voice and video's own sound may run 15 minutes together at most, as both tools hold each whole in memory a few times over: past that the job fails before the kit starts with "<tool> here reads at most 15 minutes of sound in a job", naming each length. `fit_music` counts no sound of its `video` with `video_sound` drop, or when that video is the file given as `track` or `voice`.
+- The fit counts too: `fit_music` holds its `length` once in memory, three times with a `voice` or with a `video`, and five times with both. Those copies together may run an hour at most, and the sounds with a quarter of them 20 minutes. So from a track of 14 minutes it makes a fit of at most 24 minutes, from one of 15 minutes 20, and from one of 3 minutes the whole hour, or 20 minutes with a voice of a minute. Past that the job fails before the kit starts with "fit_music here makes a fit of at most", naming the longest that fits: give a shorter `length` or a shorter track.
 <!-- end -->
 
 `analyze_music` takes `track`, `bpm` and `meter` the same way. It has no `fps`: its frames count at {fact:musicfit.analyze_fps} a second, so use its times in seconds.
@@ -196,7 +197,13 @@ Warnings come with a done job, in `FIT.md` too:
 - The link to video.mp4, the video with the track under it, or the links to the video and to the track to lay in.
 <!-- end -->
 <!-- with reframekit -->
-- Each place's version made with `reframe_video` from video.mp4, which carries the track, never from the video it went under. No timeline or steps file is beside video.mp4 under its name, so give `reframe_video` the launch film's film.timeline.json as `cuts`, or the demo's steps.json as `steps` (the reframe topic).
+- Each place's version made with `reframe_video` from video.mp4, which carries the track, never from the video it went under. No timeline or steps file is beside video.mp4 under its name, so give `reframe_video` the shots of the video it went under, as the reframe topic shows.
+<!-- with make_launch_film, plan_launch_film -->
+  For a launch film, that is its film.timeline.json as `cuts`.
+<!-- end -->
+<!-- with easyscreenshotkit -->
+  For a demo, that is its steps.json as `steps`.
+<!-- end -->
 <!-- end -->
 - From `FIT.md`: the length and level, the tempo, where the drop landed, and the moments to listen at.
 <!-- with check_video -->

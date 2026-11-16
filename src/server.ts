@@ -48,6 +48,7 @@ export {
   PLAYBOOKS_DIR,
 } from './playbooks.js';
 export type { Playbooks, Topic } from './playbooks.js';
+export { TEXTS_LEAVE_OUT, textsLeaveOut } from './texts.js';
 export type { TextContext } from './texts.js';
 export { JobManager, Job, FolderBusyError } from './jobs.js';
 export type { JobSpec } from './jobs.js';

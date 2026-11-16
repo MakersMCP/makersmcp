@@ -109,12 +109,14 @@ export interface HostedLimits {
   jobMinutes?: number;
   /** How many jobs a user may have running or waiting at once. */
   jobsAtOnce?: number;
-  /** How many jobs a user may start in a day. */
+  /** How many jobs a user may start in any 24 hours. */
   jobsPerDay?: number;
   /**
    * How long a finished job's files and their links are kept, in seconds, for this backend's
    * user: a service whose plans keep files for different times gives the user's own, or none.
-   * The texts say it in its own unit, like 15 minutes or 90 days.
+   * A service that cannot tell the user's own keep time gives none, as an account's own limits
+   * can differ from its plan's: the texts then promise no time and point at the one each
+   * result gives. The texts say it in its own unit, like 15 minutes or 90 days.
    */
   keepSeconds?: number;
   /** The same in whole days, as services gave it before keepSeconds; keepSeconds counts when both are given. */

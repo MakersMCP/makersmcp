@@ -40,7 +40,7 @@ Read the result before anything else: its first line says what happened, and the
 <!-- end -->
 <!-- hosted -->
 - "<kit> is not running on makersmcp.com right now. Try again later." or "<tool> is not available on makersmcp.com right now. Try again later.": tell the user, and try again later. `check_setup` lists what runs now.
-- "You have <n> jobs running or waiting. Wait for one of them to end.": wait for a running job with `wait_for_job` first. "You have used today's <n> jobs.": the result says when a job can start again; tell the user.
+- "You have <n> jobs running or waiting. Wait for one of them to end.": wait for a running job with `wait_for_job` first. "You have started the <n> jobs allowed in any 24 hours.": the result says when a job can start again; tell the user.
 - "The kits are not available right now. Try again later.": tell the user.
 - A refusal that names an argument, like "<param> is required.", says what to change in it.
 - "makersmcp.com could not be reached, so it is not known whether <title> started. Check list_jobs before you start it again.", or one that starts "It is not known whether <title> started": the job may be running. Call `list_jobs`, wait for it there, and start it again only when it is not listed.
@@ -56,7 +56,7 @@ Read the result before anything else: its first line says what happened, and the
 <!-- hosted -->
 - "It ran longer than <time> and was stopped.": a job here stops after {limit:job_minutes}, so ask for less, like fewer pages or a shorter film. "Something went wrong on our side. Try again in a while.": tell the user. A failed job keeps no files.
 <!-- with easycaptionkit, reframekit -->
-- A video too large for a job here, in a form other than 4:2:0 at 8 or 10 bits as a ProRes or 4:4:4 master is, with more streams than a job reads, or too long to end in the job's time even as easy footage, fails before its kit starts, and the failure names what fits. Tell the user, and offer a smaller copy in H.264 or HEVC with one picture and one sound, a shorter cut or a run on their own machine. A video that passed that check can still be stopped at the job's time limit, as footage with grain takes two to three times as long as easy footage.
+- A video too large for a job here, in a form other than 4:2:0 at 8 or 10 bits as a ProRes or 4:4:4 master is, with more streams than a job reads, or too long to end in the job's time even as easy footage, fails before its kit starts, and the failure names what fits. Tell the user, and offer a smaller copy in H.264 or HEVC with one picture and one sound, a shorter cut or a run on their own machine. A video that passed that check can still be stopped at the job's time limit, as footage with grain takes two to three times as long as easy footage. A video whose pixels are wider than they are tall counts at the size it is shown, like HDV's 1440x1080 as 1920x1080. A failure that says the time this job has left "is too little for <tool> to start on it" means its inputs took the rest of the job's time to come in: start it again, with a link that downloads faster if one was slow.
 <!-- end -->
 <!-- with reframekit -->
 - A size in reframe_video's `for` too large for a job here is refused before the job starts, with the largest size taken: ask for a smaller one.
@@ -65,7 +65,7 @@ Read the result before anything else: its first line says what happened, and the
 - A track, a voice and a video whose sounds run too long together for a job here fail before the kit starts, and the failure names each length and the most taken: offer a shorter track or voice.
 <!-- end -->
 <!-- with fit_music -->
-  fit_music counts no sound of its `video` with `video_sound` drop, or when that video is the file given as its `track` or `voice`.
+  fit_music counts no sound of its `video` with `video_sound` drop, or when that video is the file given as its `track` or `voice`. A fit too long for that much sound fails the same way, with "fit_music here makes a fit of at most" and the longest that fits: offer a shorter `length`.
 <!-- end -->
 <!-- end -->
 <!-- local -->

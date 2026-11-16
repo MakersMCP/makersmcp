@@ -24,7 +24,7 @@ order: 74
   An ASS file is no words file. Without words, say so and ask for a file; never write times by guess.
 - The places, as `for`: tiktok, reels, shorts, youtube, x, linkedin or square. One file is safe on every place named. Left out, the places come from the video's shape.
 <!-- hosted -->
-- The video's size here: at most 2560x1440 pixels (or 1440x2560), in 4:2:0 at 8 or 10 bits, as phones and cameras record it. A larger one, or a ProRes or 4:4:4 master, fails before its kit starts: ask the user for an H.264 or HEVC copy of that size first.
+- The video's size here: at most 3,686,400 pixels, as many as 2560x1440 has, like 1920x1920 too, in 4:2:0 at 8 or 10 bits, as phones and cameras record it. A video whose pixels are wider than they are tall counts at the size it is shown, like HDV's 1440x1080 as 1920x1080. A larger one, or a ProRes or 4:4:4 master, fails before its kit starts: ask the user for an H.264 or HEVC copy of that size first.
 <!-- end -->
 - The look: `style` karaoke lights each word as it is spoken in a whole caption (default), line shows whole captions in one color, for YouTube, LinkedIn and longer watching, and word one word at a time, bigger, for short quick clips.
 <!-- with easyfontkit -->
@@ -114,7 +114,7 @@ Only ads have published margins, and apps move their buttons, so tell the user t
 - `wait_seconds`: a one minute video takes about half a minute; a long one several minutes.
 <!-- end -->
 <!-- hosted -->
-- `wait_seconds`: a job here has a share of one machine, and a minute of 1920x1080 video takes from about 3 minutes, as easy footage does, to about 7 with grain, more for a larger video. A job stops after {limit:job_minutes}. A video that could not be captioned in the time its job has left even as easy footage fails before its kit starts, with the length that fits. Footage with grain or noise, as from a phone camera, takes two to three times as long, so it can pass that check and still be stopped when the time runs out, with no files kept: for a video of more than a few minutes, offer a shorter cut first, or a run on the user's own machine.
+- `wait_seconds`: a job here has a share of one machine, and a minute of 1920x1080 video takes from about 3 minutes, as easy footage does, to about 7 with grain, more for a larger video. A job stops after {limit:job_minutes}. A video that could not be captioned in the time its job has left even as easy footage fails before its kit starts, with the length that fits. Footage with grain or noise, as from a phone camera, takes two to three times as long, so it can pass that check and still be stopped when the time runs out, with no files kept: for more than about two minutes of 1920x1080 video, or one minute at 2560x1440, which is what fits the shortest jobs here, offer a shorter cut first, or a run on the user's own machine.
 <!-- end -->
 
 ## What it writes

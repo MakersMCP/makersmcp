@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
-  createMcpServer, loadKitDefinitions, loadPlaybooks, offeredTopics, PLAYBOOKS_DIR, renderTopic, resolveKit, validateKitDefinition,
+  createMcpServer, loadKitDefinitions, loadPlaybooks, offeredTopics, PLAYBOOKS_DIR, renderTopic, resolveKit, TEXTS_LEAVE_OUT, textsLeaveOut, validateKitDefinition,
 } from '../dist/server.js';
 import { KEEP_FINISHED } from '../dist/jobs.js';
 import { MAX_FILES } from '../dist/local-backend.js';
@@ -1235,6 +1235,13 @@ function packageCode(definitions) {
   ];
 }
 
+/** Every set of tools a service may hold back of kits that stay on: one set of TEXTS_LEAVE_OUT of each kit, or none, but not none of all. */
+function heldSets() {
+  let combos = [[]];
+  for (const sets of TEXTS_LEAVE_OUT.values()) combos = combos.flatMap(combo => [combo, ...sets.map(set => [...combo, ...set])]);
+  return combos.filter(combo => combo.length);
+}
+
 // The package's own kits/ and playbooks/: the files the other steps write, held to the same rules.
 test('the kits in kits/ and the topics in playbooks/ pass every check of the lint', async t => {
   const definitions = loadKitDefinitions();
@@ -1260,12 +1267,11 @@ test('the kits in kits/ and the topics in playbooks/ pass every check of the lin
   assert.ok(sdk('mcp.js').includes('`Input validation error: Invalid arguments for tool ${toolName}: ${errorMessage}`'), 'the SDK words a refused call another way now');
   assert.ok(sdk('zod-compat.js').includes('`${i.message} at ${getDotPath(i.path)}`'), 'the SDK words a refusal\'s place another way now');
   corpus.push('Input validation error: Invalid arguments for tool <tool>: <reason> at <path>');
-  // MakersMCP-Server's workers hold these back where their ffmpeg cannot run them, both now, and each alone once one kit's release
-  // runs on that ffmpeg before the other's. It holds launch-film's four film tools until launch-film's security fix is on
-  // makersmcp.com (KITS_HELD_TOOLS in Inferne-Deploy's setup/makersmcp-env.js), alone and beside the first two.
-  const filmTools = ['plan_launch_film', 'make_launch_film', 'render_launch_film', 'make_launch_stills'];
-  const problems = await lint({ definitions, dir: PLAYBOOKS_DIR, corpus, extraNames: launchFilmNames(),
-    held: [['check_video', 'fit_music'], ['fit_music'], ['check_video'], filmTools, [...filmTools, 'check_video', 'fit_music']] });
+  // Each set of tools the texts leave out by themselves (TEXTS_LEAVE_OUT), alone and beside each set of the other kit. The
+  // workers of MakersMCP-Server hold check_video and fit_music back where their ffmpeg cannot run them, both now, and each alone
+  // once one kit's release runs on that ffmpeg before the other's, and launch-film's four film tools until launch-film's security
+  // fix is on makersmcp.com (KITS_HELD_TOOLS in Inferne-Deploy's setup/makersmcp-env.js), with check_video or without it.
+  const problems = await lint({ definitions, dir: PLAYBOOKS_DIR, corpus, extraNames: launchFilmNames(), held: heldSets() });
   // The size of each topic, so one past 8,000 characters is seen.
   try {
     const playbooks = loadPlaybooks();
@@ -2108,12 +2114,12 @@ test('hosted, a doc cut short points to its link above, and a job with no folder
   }
 });
 
-test('hosted, getting-started and launch-kit hand each file over with its own link, as no link opens a folder', async () => {
+test('hosted, getting-started and launch-kit hand each file over with its own link, as no link opens a folder, and name a file whose link has stopped instead of giving it', async () => {
   const session = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits: LIMITS });
   try {
     for (const topic of ['getting-started', 'launch-kit']) {
       const read = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [topic] } }));
-      assert.match(read, /\n## Hand over\n[^#]*\nGive each file its own link from its result, with the time it stops working: no link opens a folder\.$/, topic);
+      assert.match(read, /\n## Hand over\n[^#]*\nGive each file its own link from its result, with the time it stops working: no link opens a folder\. A link past its time works no more: name that file as gone and offer to make it again\.$/, topic);
     }
   } finally {
     await session.close();
@@ -2971,11 +2977,17 @@ test('hosted with only the longest wait given, as MakersMCP-Server gives its lim
   // MakersMCP-Server is not told a user's plan, so it gives maxWaitSeconds alone: the texts must read right with that.
   const bare = { where: 'hosted', limits: { maxWaitSeconds: 50 } };
   const captions = await readTopics(bare, ['captions']);
-  assert.match(captions, /A job stops after a set time\. A video that could not be captioned in the time its job has left even as easy footage fails before its kit starts, with the length that fits\. Footage with grain or noise, as from a phone camera, takes two to three times as long, so it can pass that check and still be stopped when the time runs out, with no files kept: for a video of more than a few minutes, offer a shorter cut first, or a run on the user's own machine\./);
+  assert.match(captions, /A job stops after a set time\. A video that could not be captioned in the time its job has left even as easy footage fails before its kit starts, with the length that fits\. Footage with grain or noise, as from a phone camera, takes two to three times as long, so it can pass that check and still be stopped when the time runs out, with no files kept: for more than about two minutes of 1920x1080 video, or one minute at 2560x1440, which is what fits the shortest jobs here, offer a shorter cut first, or a run on the user's own machine\./);
   const reframe = await readTopics(bare, ['reframe']);
   // Places of one size and length share a file, as MakersMCP-Api's reframeEncodes counts them: so few places take few files.
   assert.match(reframe, /With every place in `for` there are four files for a video up to 140 seconds long, five up to 3 minutes and six past that, since places of one size and length share a file; fewer places take fewer\./);
   assert.match(reframe, /A job stops after a set time\. A video that could not be made in the time its job has left even as easy footage fails before its kit starts, with what fits: for `reframe_video` ask for fewer places or give `seconds`, and for `plan_reframe`, which reads the whole video, give a shorter one\. Footage with grain or noise, as from a phone camera, takes two to three times as long, so it can pass that check and still be stopped when the time runs out/);
+  // The advice to offer a shorter cut holds for the shortest jobs, 15 minutes on Free: MakersMCP-Api's grain figures (video-bounds.js
+  // TIMES) caption about two minutes of grainy 1920x1080 at 30 frames a second in it, one at 2560x1440, and make every place of
+  // about 40 seconds of it.
+  assert.doesNotMatch(captions, /for a video of more than a few minutes/);
+  assert.match(reframe, /with no files kept: for more than about half a minute of 1920x1080 video with every place, or two minutes with one place, which is what fits the shortest jobs here, offer fewer places or `seconds` first, or a run on the user's own machine\./);
+  assert.doesNotMatch(reframe, /for more than a minute of video with every place/);
   const trouble = await readTopics(bare, ['troubleshooting']);
   assert.match(trouble, /A video that passed that check can still be stopped at the job's time limit, as footage with grain takes two to three times as long as easy footage\./);
   for (const [name, text] of [['captions', captions], ['reframe', reframe], ['troubleshooting', trouble]]) {
@@ -3001,38 +3013,61 @@ test('hosted texts promise no days for a job\'s files: links and job: references
       const jobs = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['jobs-and-files', 'getting-started'] } }));
       const keep = limits.keepSeconds === 900 ? '15 minutes' : limits.keepSeconds ? '4 days' : 'a set time';
       assert.ok(jobs.includes(`until when, in UTC, the links work, ${keep} after the job ended`), keep);
-      assert.match(jobs, /An earlier job's files go into a later job only until that time, so start each step of a chain/);
+      assert.match(jobs, /An earlier job's files go into a later job when a worker takes the later job, and only until that time, so start each step of a chain, like a plan and then its render, right after the one before it ends, before any other job\./);
       assert.ok(jobs.includes(`its result links each file until the time it gives, ${keep} after the job ended`), keep);
       assert.match(jobs, /"Its files were deleted <time> after it ended\.", or "Its files were deleted before their keep time ended\."/);
       // A launch kit chains its jobs, so each step has to start before the files of the one it needs are gone.
       const kit = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['launch-kit'] } }));
-      assert.ok(kit.includes(`A step takes an earlier job's files as job:<job_id>/<path> only until the time that job's result gives, ${keep} after it ended, when its links stop too: start each step as soon as the one it needs ends`), keep);
+      assert.ok(kit.includes(`a job takes an earlier job's files as job:<job_id>/<path> when a worker takes it, only until the time that job's result gives, ${keep} after it ended, when its links stop too.`), keep);
     } finally {
       await session.close();
     }
   }
 });
 
-test('the bounds the hosted texts give are those MakersMCP-Api refuses by, as tests/fixtures/hosted-errors.json quotes it', async () => {
+test('the bounds the hosted texts give are those MakersMCP-Api refuses by, as tests/fixtures/hosted-errors.json quotes it, said as a count of pixels as the API counts them', async () => {
   const errors = readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors.map(entry => entry.text);
   const bound = pattern => {
-    const found = errors.map(entry => pattern.exec(entry)).filter(Boolean);
-    assert.equal(found.length, 1, String(pattern));
-    return found[0][1];
+    const found = [...new Set(errors.map(entry => pattern.exec(entry)?.[1]).filter(Boolean))];
+    assert.equal(found.length, 1, `${pattern}: ${found}`);
+    return found[0];
   };
-  const forSize = bound(/^for <size>: a file reframekit makes here may have at most (\d+x\d+ pixels \(or \d+x\d+\))/);
-  const caption = bound(/caption_video here takes a video of at most (\d+x\d+ pixels \(or \d+x\d+\))/);
-  const reframe = bound(/^<param> is <size>: <tool> here takes a video of at most (\d+x\d+ pixels \(or \d+x\d+\))/);
+  // MakersMCP-Api compares a picture's width times its height with a size's (video-bounds.js pixelsOf and readMedia), whatever its
+  // shape, while its sentences name the size: so 1920x1920 passes, as many pixels as 2560x1440, which a reader of "at most
+  // 2560x1440 pixels (or 1440x2560)" would refuse. The texts give the count, with the size it comes from.
+  const pixels = size => size.split('x').map(Number).reduce((a, b) => a * b);
+  const asPixels = size => `at most ${pixels(size).toLocaleString('en-US')} pixels, as many as ${size} has`;
+  const forBound = bound(/^for <size>: a file reframekit makes here may have at most (\d+x\d+) pixels \(or \d+x\d+\)/);
+  const captionBound = bound(/caption_video here takes a video of at most (\d+x\d+) pixels \(or \d+x\d+\)/);
+  const reframeBound = bound(/<tool> here takes a video of at most (\d+x\d+) pixels \(or \d+x\d+\)/);
+  const [forSize, caption, reframe] = [forBound, captionBound, reframeBound].map(asPixels);
   const sound = bound(/^<param>: its sound runs <time>, and <tool> here reads at most (\d+ minutes) of sound in a job/);
+  // The square example the texts give has no more pixels than the bound, and a side past the size's: the case the old words got wrong.
+  for (const size of [forBound, captionBound]) assert.ok(pixels('1920x1920') <= pixels(size) && 1920 > Math.min(...size.split('x').map(Number)), size);
+  // A picture whose pixels are not square counts at the size it is shown, as the API's sentence for one says (sizeText): HDV's
+  // 1440x1080 with pixels 4:3 as wide as tall is shown at 1920x1080.
+  assert.ok(errors.some(entry => entry.includes('<size> as shown (stored as <size>, each pixel <n> times as wide as it is tall)')));
+  assert.equal(1440 * 4 / 3, 1920);
+  const shown = "A video whose pixels are wider than they are tall counts at the size it is shown, like HDV's 1440x1080 as 1920x1080.";
   const session = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits: { maxWaitSeconds: 50 } });
   try {
     const byName = Object.fromEntries(session.tools.map(tool => [tool.name, tool]));
-    for (const name of ['reframe_video', 'plan_reframe']) assert.ok(byName[name].inputSchema.properties.for.description.includes(`here at most ${forSize}`), name);
+    for (const name of ['reframe_video', 'plan_reframe']) {
+      const forText = byName[name].inputSchema.properties.for.description;
+      assert.ok(forText.includes(`here of ${forSize}`), name);
+      assert.doesNotMatch(forText, /at most \d+x\d+ pixels/, name);
+    }
     const read = async name => text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [name] } }));
-    assert.ok((await read('captions')).includes(`The video's size here: at most ${caption}, in 4:2:0 at 8 or 10 bits`));
+    const captions = await read('captions');
+    assert.ok(captions.includes(`The video's size here: ${caption}, like 1920x1920 too, in 4:2:0 at 8 or 10 bits`));
     const reframeTopic = await read('reframe');
-    assert.ok(reframeTopic.includes(`The video's size here: at most ${reframe}, in 4:2:0 at 8 or 10 bits`));
-    assert.ok(reframeTopic.includes(`a size given in \`for\` at most ${forSize}`));
+    assert.ok(reframeTopic.includes(`The video's size here: ${reframe}, in 4:2:0 at 8 or 10 bits`));
+    assert.ok(reframeTopic.includes(`a size given in \`for\` ${forSize}, like 1920x1920 too`));
+    for (const [name, topic] of [['captions', captions], ['reframe', reframeTopic], ['troubleshooting', await read('troubleshooting')]]) {
+      assert.ok(topic.includes(shown), name);
+      // The API's own sentences are quoted with their words; a bound the topic states itself is a count of pixels.
+      assert.doesNotMatch(topic, /size here: at most \d+x\d+ pixels/, name);
+    }
     assert.ok((await read('music')).includes(`may run ${sound} together at most`));
   } finally {
     await session.close();
@@ -3041,8 +3076,8 @@ test('the bounds the hosted texts give are those MakersMCP-Api refuses by, as te
   const local = await connect({ definitions: loadKitDefinitions() });
   try {
     const byName = Object.fromEntries(local.tools.map(tool => [tool.name, tool]));
-    assert.doesNotMatch(byName.reframe_video.inputSchema.properties.for.description, /here at most/);
-    assert.doesNotMatch(text(await local.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['captions', 'reframe', 'music'] } })), /2560x1440|3840x2160 pixels|15 minutes of sound/);
+    assert.doesNotMatch(byName.reframe_video.inputSchema.properties.for.description, /here of at most|here at most/);
+    assert.doesNotMatch(text(await local.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['captions', 'reframe', 'music', 'troubleshooting'] } })), /2560x1440|3840x2160 pixels|3,686,400|8,294,400|15 minutes of sound|HDV/);
   } finally {
     await local.close();
   }
@@ -3084,4 +3119,119 @@ test('reframekit\'s folder rule, and the hosted sound and form of a job\'s files
   assert.doesNotMatch(await readTopics({ ...hosted, held: ['fit_music'] }, ['troubleshooting']), /fit_music counts no sound/);
   // A picture of another form, and a file of more streams than a job reads, are refused before the kit starts too.
   assert.match(await readTopics(hosted, ['troubleshooting']), /A video too large for a job here, in a form other than 4:2:0 at 8 or 10 bits as a ProRes or 4:4:4 master is, with more streams than a job reads, or too long to end in the job's time even as easy footage, fails before its kit starts/);
+});
+
+test('hosted with a keep time of 15 minutes, the launch kit gives each job\'s links as it ends, checks each job\'s files right after it and starts a step that needs an earlier job\'s file right after that job, as a person\'s jobs run one at a time there', async () => {
+  // A person's jobs run one at a time in the order they were started (MakersMCP-Api claimNext), and a job takes an earlier job's
+  // file when a worker takes it, refused once that job's keep time has passed (worker-job.js keepsFiles): 15 minutes on Free.
+  const hosted = { where: 'hosted', limits: { ...LIMITS, keepSeconds: 900 } };
+  const kit = await readTopics(hosted, ['launch-kit']);
+  assert.ok(kit.includes("Here a person's jobs run one at a time, in the order they were started, and a job takes an earlier job's files as job:<job_id>/<path> when a worker takes it, only until the time that job's result gives, 15 minutes after it ended, when its links stop too. So give the user each job's links as soon as it ends, with the time they stop, check a job's files right after that job, and start a step that needs an earlier job's file right after that job, before any other. When the user takes longer to decide than that time, as on the brand or the plan, make that earlier step again first."));
+  // The checks of the screenshots and the demo come right after their jobs in the first step, not after two plans, two renders,
+  // the pictures, the music and the places' versions.
+  const first = kit.indexOf('\n1. ');
+  const second = kit.indexOf('\n2. ');
+  const rest = kit.indexOf('Check the rest before the hand over.');
+  assert.ok(first > 0 && second > first && rest > second);
+  for (const words of ['check its pwa/manifest-screenshots.json with `check_pwa_screenshots` right after it ends', 'Check its demo.mp4 with `check_video` right after it ends']) {
+    const at = kit.indexOf(words);
+    assert.ok(at > first && at < second, words);
+  }
+  assert.ok(kit.indexOf('check_pwa_screenshots {') > first && kit.indexOf('check_pwa_screenshots {') < second);
+  assert.doesNotMatch(kit.slice(rest), /check_pwa_screenshots|on the demo/);
+  // Nothing runs side by side there: one job at a time, the brand kit last, right before the plan that takes it.
+  assert.doesNotMatch(kit, /side by side/);
+  assert.match(kit, /\n1\. Make what needs only the site one job at a time, each started once the one before has ended:\n/);
+  assert.ok(kit.includes('Make the brand kit last, so that the plan can start right after it.'));
+  assert.ok(kit.indexOf('make_brand_kit {') > kit.indexOf('record_demo_video {'));
+  // The pictures take the plan's film.json alone, so they come before the renders, which outlast a plan's keep time between them.
+  assert.ok(kit.indexOf('make_launch_stills {') < kit.indexOf('render_launch_film {'));
+  assert.ok(kit.includes("When the user takes longer to decide than the time the plan's result gives, plan again."));
+  assert.ok(kit.includes('Give the user the links to the pictures, the checks\' sheet.png among them, as each job ends'));
+  assert.match(kit, /A link past its time works no more: name that file as gone and offer to make it again\.$/);
+  // getting-started, jobs-and-files and launch-film say the same of the queue and the keep time.
+  const started = await readTopics(hosted, ['getting-started']);
+  assert.ok(started.includes("Here a person's jobs run one at a time, in the order they were started, and a start past 3 jobs running or waiting is refused."));
+  assert.ok(started.includes("A file an earlier job saved goes into a later job as job:<job_id>/<path>, the path its file list shows, when a worker takes that job and only until then: start a chain's next step right after the one before ends, before any other job."));
+  assert.doesNotMatch(started, /side by side/);
+  assert.match(started, /A link past its time works no more: name that file as gone and offer to make it again\.$/);
+  assert.ok((await readTopics(hosted, ['jobs-and-files'])).includes("A user's jobs run one at a time, in the order they were started, so jobs started together run one after another."));
+  const film = await readTopics(hosted, ['launch-film']);
+  assert.ok(film.includes("A render takes the plan's film.json only until the time the plan's result gives: when the user takes longer to decide, plan again."));
+  assert.match(film, /\n5\. Make the pictures from the same plan when the user wants them, before the time the plan's result gives:\n/);
+  // Locally the files stay and jobs in their own folders run side by side; the checks still come right after their jobs.
+  const local = await readTopics({}, ['launch-kit', 'getting-started']);
+  assert.match(local, /\n1\. Start the jobs that need only the site side by side, each with `wait_seconds` 0 and a folder of its own/);
+  assert.match(local, /Jobs that save into separate folders, none inside another, run side by side/);
+  assert.match(local, /check its pwa\/manifest-screenshots\.json with `check_pwa_screenshots` right after it ends/);
+  assert.doesNotMatch(local, /a worker takes|links stop|one job at a time|brand kit last/);
+});
+
+test('the sets of a kit\'s tools the texts leave out by themselves are exported for a service, and a tool outside them held back alone is still named, so its whole kit is held back', async () => {
+  const film = ['plan_launch_film', 'make_launch_film', 'render_launch_film', 'make_launch_stills'];
+  const sorted = Object.fromEntries([...TEXTS_LEAVE_OUT].map(([kit, sets]) => [kit, sets.map(set => [...set].sort())]));
+  assert.deepEqual(sorted, { 'launch-film': [['check_video'], [...film].sort(), [...film, 'check_video'].sort()], musicfit: [['fit_music']] });
+  // A service reads them and cannot change them for the lint or another service in its process.
+  for (const sets of TEXTS_LEAVE_OUT.values()) assert.ok(Object.isFrozen(sets) && sets.every(set => Object.isFrozen(set)));
+  // The lint renders every one of them, alone and beside each set of the other kit.
+  assert.equal(heldSets().length, (3 + 1) * (1 + 1) - 1);
+  const definitions = loadKitDefinitions();
+  for (const [kit, sets] of TEXTS_LEAVE_OUT) {
+    const tools = definitions.find(entry => entry.kit === kit).tools.map(tool => tool.name);
+    for (const set of sets) {
+      assert.ok(set.every(name => tools.includes(name)) && set.length < tools.length, `${kit}: ${set}`);
+      assert.equal(textsLeaveOut(kit, [...set].reverse()), true, `${kit}: ${set}`);
+    }
+  }
+  assert.equal(textsLeaveOut('easycaptionkit', []), true);
+  assert.equal(textsLeaveOut('launch-film', ['check_video', 'check_video']), true);
+  const others = [
+    ['launch-film', ['plan_launch_film']], ['launch-film', ['check_video', 'launch_film_guide']], ['musicfit', ['analyze_music']],
+    ['musicfit', ['fit_music', 'analyze_music']], ['easycaptionkit', ['caption_video']], ['reframekit', ['check_place_limits']],
+    ['easyscreenshotkit', ['check_pwa_screenshots']], ['easybrandkit', ['check_video']],
+  ];
+  for (const [kit, held] of others) assert.equal(textsLeaveOut(kit, held), false, `${kit}: ${held}`);
+  // A tool of no set, held back alone, is still named where its kit's files go into the next job: the texts leave it out only
+  // with its whole kit, and MakersMCP-Server then gives that kit no tools.
+  for (const held of ['caption_video', 'check_place_limits']) {
+    assert.match(await readTopics({ where: 'hosted', limits: LIMITS, held: [held] }, ['jobs-and-files']), new RegExp(`\`${held}\``), held);
+  }
+});
+
+test('hosted, the refusals past a person\'s job limits and of a job whose files are gone are quoted as MakersMCP-Api and MakersMCP-Server write them, a day counted as any 24 hours', async () => {
+  const errors = readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors.map(entry => entry.text);
+  for (const entry of [
+    'You have <n> jobs running or waiting. Wait for one of them to end. Your account page, <url>, shows them. Try again in 30 seconds.',
+    'You have started the <n> jobs allowed in any 24 hours. Your account page, <url>, shows your usage. Try again in <time>, after <date> UTC.',
+    "You are keeping <n> MB of finished jobs' files, the most kept at once. Wait for older jobs' files to expire (<time> after their jobs end). Your account page, <url>, shows your usage. Try again in <time>, after <date> UTC.",
+    'It is not known whether <title> started. Check list_jobs before you start it again.',
+    "There is no job <job_id> with files to use. list_jobs shows your jobs; a job's files can be used until the time its result gave.",
+  ]) assert.ok(errors.includes(entry), entry);
+  assert.ok(!errors.some(entry => /today's <n> jobs|Wait for one of them to end\. Try again|makersmcp\.com said: <text>|a few days/.test(entry)));
+  const read = await readTopics({ where: 'hosted', limits: LIMITS }, ['jobs-and-files', 'troubleshooting']);
+  assert.equal(read.split('"You have started the <n> jobs allowed in any 24 hours."').length - 1, 2);
+  assert.match(read, /at most 29 jobs can start in any 24 hours\./);
+  assert.doesNotMatch(read, /today's|in a day\b/);
+});
+
+test('hosted, music says the fit itself counts toward a job\'s memory as MakersMCP-Api bounds it, and troubleshooting what to do when a job\'s inputs left its kit no time', async () => {
+  const errors = readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors.map(entry => entry.text);
+  for (const words of [
+    'length asks for a fit of <time> from <sound>, and fit_music here makes a fit of at most <time> from that much sound in a job',
+    'length asks for a fit of <time> with <what> from <sound>, and fit_music here makes a fit of at most <time> with <what> from that much sound in a job',
+    "this job has left is too little for <tool> to start on it, as its inputs took the rest of the job's time to come in. Start it again, with a link that downloads faster if one was slow.",
+  ]) assert.ok(errors.some(entry => entry.includes(words)), words);
+  const hosted = { where: 'hosted', limits: LIMITS };
+  const music = await readTopics(hosted, ['music']);
+  assert.ok(music.includes('The fit counts too: `fit_music` holds its `length` once in memory, three times with a `voice` or with a `video`, and five times with both. Those copies together may run an hour at most, and the sounds with a quarter of them 20 minutes.'));
+  // The examples follow from that rule (video-bounds.js soundProblem): the longest fit is an hour over the copies, or four times
+  // what the sounds leave of 20 minutes over the copies, whichever is less.
+  const longest = (soundMinutes, copies) => Math.min(60, (20 - soundMinutes) * 4) / copies;
+  assert.deepEqual([longest(14, 1), longest(15, 1), longest(3, 1), longest(3 + 1, 3)], [24, 20, 60, 20]);
+  assert.ok(music.includes('So from a track of 14 minutes it makes a fit of at most 24 minutes, from one of 15 minutes 20, and from one of 3 minutes the whole hour, or 20 minutes with a voice of a minute.'));
+  const trouble = await readTopics(hosted, ['troubleshooting']);
+  assert.ok(trouble.includes('A failure that says the time this job has left "is too little for <tool> to start on it" means its inputs took the rest of the job\'s time to come in: start it again, with a link that downloads faster if one was slow.'));
+  assert.ok(trouble.includes('A fit too long for that much sound fails the same way, with "fit_music here makes a fit of at most" and the longest that fits: offer a shorter `length`.'));
+  assert.doesNotMatch(await readTopics({ ...hosted, held: ['fit_music'] }, ['troubleshooting']), /makes a fit of at most/);
+  assert.doesNotMatch(await readTopics({}, ['music', 'troubleshooting']), /makes a fit of at most|too little for/);
 });

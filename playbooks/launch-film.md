@@ -100,7 +100,7 @@ plan_launch_film {"url": "https://linear.app"}
 plan_launch_film {"url": "https://linear.app", "brand": "job:<job_id>/brand.json"}
 ```
 <!-- end -->
-2. Read the plan in the result, which holds `film.json`, `words.json` and `brand/BRAND.md`. Check the brand's name first: the kit takes it from the site's name, its title or its host, and the film shows it. Then check every word on screen against `words.json`. A plan cannot be changed here and renders as it was planned, so when the name or a word is wrong, or the brand came from a cookie wall, a login page or a page with no logo, tell the user what came back before rendering, and ask for the product's own site when the address is not it, or whether to go on with it.
+2. Read the plan in the result, which holds `film.json`, `words.json` and `brand/BRAND.md`. Check the brand's name first: the kit takes it from the site's name, its title or its host, and the film shows it. Then check every word on screen against `words.json`. A plan cannot be changed here and renders as it was planned, so when the name or a word is wrong, or the brand came from a cookie wall, a login page or a page with no logo, tell the user what came back before rendering, and ask for the product's own site when the address is not it, or whether to go on with it. A render takes the plan's film.json only until the time the plan's result gives: when the user takes longer to decide, plan again.
 <!-- with easybrandkit -->
    The brand topic says which address of a site gives its brand.
 <!-- end -->
@@ -117,7 +117,7 @@ check_video {"film": "job:<job_id>/film.mp4", "expect": "{fact:launch-film.size_
 <!-- without check_video -->
 4. Nothing here checks the film or draws stills of a render, so give the user the `film.mp4` link the render's result lists, to watch before it goes out.
 <!-- end -->
-5. Make the pictures from the same plan when the user wants them:
+5. Make the pictures from the same plan when the user wants them, before the time the plan's result gives:
 ```call
 make_launch_stills {"source": "job:<job_id>/film.json", "for": ["ph", "og"]}
 ```

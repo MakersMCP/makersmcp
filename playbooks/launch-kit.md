@@ -2,7 +2,7 @@
 name: launch-kit
 title: Everything a launch needs
 index: the files a launch needs, made in order across the kits, with the place map and what to hand over
-description: Runs the whole set of launch files for a product's site with the MakersMCP kits on the server, in the order that works and with what can run side by side, from the brand kit and screenshots to launch films and launch pictures, with fitted music and checks where the server lists those tools. Says which place takes which file at which size and what to hand over. Use it when the user asks for a launch kit, for launch assets, or for what can be made for a launch on a named place.
+description: Runs the whole set of launch files for a product's site with the MakersMCP kits on the server, in the order that works, from the brand kit and screenshots to launch films and launch pictures, with fitted music and checks where the server lists those tools. Says which place takes which file at which size and what to hand over. Use it when the user asks for a launch kit, for launch assets, or for what can be made for a launch on a named place.
 kit: makersmcp
 requires: [launch-film]
 any: [make_launch_film, plan_launch_film]
@@ -11,7 +11,7 @@ order: 20
 ---
 # Everything a launch needs
 
-A launch kit is the set of files a launch takes, all made from the product's own site with the kits on this server. Each piece has a topic of its own. This one gives the order, what runs side by side, which file goes into which call, and what to hand over.
+A launch kit is the set of files a launch takes, all made from the product's own site with the kits on this server. Each piece has a topic of its own. This one gives the order, which file goes into which call, and what to hand over.
 
 ## Decide first
 
@@ -53,36 +53,37 @@ Store and gallery screenshots come from `take_screenshots`, one `sizes` entry pe
 ## The order
 
 <!-- hosted -->
-A step takes an earlier job's files as job:<job_id>/<path> only until the time that job's result gives, {limit:keep_time} after it ended, when its links stop too: start each step as soon as the one it needs ends, and when the user takes longer to decide, as on the brand or the plan, make that earlier step again first.
+Here a person's jobs run one at a time, in the order they were started, and a job takes an earlier job's files as job:<job_id>/<path> when a worker takes it, only until the time that job's result gives, {limit:keep_time} after it ended, when its links stop too. So give the user each job's links as soon as it ends, with the time they stop, check a job's files right after that job, and start a step that needs an earlier job's file right after that job, before any other. When the user takes longer to decide than that time, as on the brand or the plan, make that earlier step again first.
 <!-- end -->
 
 <!-- with easybrandkit, easyscreenshotkit, easyfontkit -->
+<!-- local -->
 1. Start the jobs that need only the site side by side, each with `wait_seconds` 0 and a folder of its own, then call `wait_for_job` on each until it ends:
+<!-- end -->
+<!-- hosted -->
+1. Make what needs only the site one job at a time, each started once the one before has ended:
+<!-- end -->
 <!-- end -->
 <!-- with easybrandkit -->
    - `make_brand_kit`, with `facts` when the copy needs the site's claims.
 <!-- end -->
 <!-- with easyscreenshotkit -->
-   - `take_screenshots` with the `sizes` the places need, and `pwa` true for an install dialog.
+   - `take_screenshots` with the `sizes` the places need, and `pwa` true for an install dialog. With `pwa` true, check its pwa/manifest-screenshots.json with `check_pwa_screenshots` right after it ends.
    - `record_demo_video` when the user wants a demo.
+<!-- with check_video -->
+     Check its demo.mp4 with `check_video` right after it ends, with `expect` {fact:easyscreenshotkit.demo.size}@{default:record_demo_video.fps}.
+<!-- end -->
 <!-- end -->
 <!-- with easyfontkit -->
    - `make_font_kit` when the user needs the fonts.
 <!-- end -->
-<!-- with easybrandkit, easyscreenshotkit, easyfontkit -->
-<!-- hosted -->
-   Here at most {limit:jobs_at_once} run or wait at once, and a start past that is refused: start them in this order, and the next one when one ends.
-<!-- end -->
-<!-- end -->
 <!-- with easybrandkit -->
+<!-- hosted -->
+   Make the brand kit last, so that the plan can start right after it.
+<!-- end -->
 <!-- local -->
 ```call
 make_brand_kit {"url": "https://linear.app", "out_dir": "launch/brand", "wait_seconds": 0}
-```
-<!-- end -->
-<!-- hosted -->
-```call
-make_brand_kit {"url": "https://linear.app", "wait_seconds": 0}
 ```
 <!-- end -->
 <!-- end -->
@@ -95,8 +96,17 @@ record_demo_video {"url": "https://linear.app", "out_dir": "launch/demo", "wait_
 <!-- end -->
 <!-- hosted -->
 ```call
-take_screenshots {"url": "https://linear.app", "sizes": ["iphone", "mobile", "1270x760@2"], "wait_seconds": 0}
-record_demo_video {"url": "https://linear.app", "wait_seconds": 0}
+take_screenshots {"url": "https://linear.app", "sizes": ["iphone", "mobile", "1270x760@2"], "pwa": true}
+check_pwa_screenshots {"manifest": "job:<job_id>/pwa/manifest-screenshots.json"}
+record_demo_video {"url": "https://linear.app"}
+```
+   pwa/manifest-screenshots.json is the screenshots' job's.
+<!-- end -->
+<!-- end -->
+<!-- with easybrandkit -->
+<!-- hosted -->
+```call
+make_brand_kit {"url": "https://linear.app"}
 ```
 <!-- end -->
 <!-- end -->
@@ -149,9 +159,21 @@ plan_launch_film {"url": "https://linear.app", "brand": "job:<job_id>/brand.json
    Read the plan's film.json and words.json, and fix any wrong word or name in film.json as the film-json topic says. Without a way to write files, tell the user what is wrong instead.
 <!-- end -->
 <!-- hosted -->
-   Read the plan in the result. A plan renders as it was planned here, so when a word or the name is wrong, tell the user before rendering.
+   Read the plan in the result. A plan renders as it was planned here, so when a word or the name is wrong, tell the user before rendering. When the user takes longer to decide than the time the plan's result gives, plan again.
 <!-- end -->
-4. Render each plan with `render_launch_film`.
+4. Make the pictures with `make_launch_stills`, with `source` the plan's film.json, the 16:9 one when there are two, and `for` the places, so they match the film's look and words: they need the plan, not its render. They go to stills/ next to that film.json, with `stills/STILLS.md` saying which file is for which place.
+<!-- local -->
+```call
+make_launch_stills {"source": "launch/film-16x9/film.json", "for": ["ph", "og", "x"]}
+```
+<!-- end -->
+<!-- hosted -->
+```call
+make_launch_stills {"source": "job:<job_id>/film.json", "for": ["ph", "og", "x"]}
+```
+   film.json is the plan's job's.
+<!-- end -->
+5. Render each plan with `render_launch_film`.
 <!-- with check_video -->
    Once each render is done, check its film with `check_video` and `expect` {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16. Its `CHECK.md` gives the film's length under its heading and each cut's time in its Cuts table, the logo close last.
 <!-- end -->
@@ -172,17 +194,6 @@ check_video {"film": "job:<job_id>/film.mp4", "expect": "{fact:launch-film.size_
 ```
    film.mp4 is the render's.
 <!-- end -->
-<!-- end -->
-5. Make the pictures with `make_launch_stills`, with `source` the film's film.json and `for` the places, so they match the film's look and words. They go to stills/ next to that film.json, with `stills/STILLS.md` saying which file is for which place.
-<!-- local -->
-```call
-make_launch_stills {"source": "launch/film-16x9/film.json", "for": ["ph", "og", "x"]}
-```
-<!-- end -->
-<!-- hosted -->
-```call
-make_launch_stills {"source": "job:<job_id>/film.json", "for": ["ph", "og", "x"]}
-```
 <!-- end -->
 <!-- with fit_music -->
 6. For the user's track, follow the music topic: `analyze_music`, then `fit_music` with `length` the film's length and `hit` the time of its logo close, both from its film.timeline.json, and `fps` {fact:launch-film.fps}. Given the film as `video`, it also writes video.mp4, the film with the track under it.
@@ -220,18 +231,12 @@ reframe_video {"video": "job:<job_id>/film.mp4", "for": ["feed", "square", "x", 
 <!-- end -->
 <!-- end -->
 8. Check the rest before the hand over.
-<!-- with easyscreenshotkit -->
-   - `check_pwa_screenshots` with `manifest` the pwa/manifest-screenshots.json of `take_screenshots`.
-<!-- with check_video -->
-   - `check_video` on the demo, with `expect` {fact:easyscreenshotkit.demo.size}@{default:record_demo_video.fps}.
-<!-- end -->
-<!-- end -->
 <!-- with check_video -->
 <!-- local -->
    - Look at every check's sheet.png and at every picture, for words cut off, text on text and a wrong logo. When you cannot open a picture, give the user its path with what to look for.
 <!-- end -->
 <!-- hosted -->
-   - Give the user the links to the pictures, the checks' sheet.png among them, with what to look for: words cut off, text on text and a wrong logo. Nothing here shows you a picture.
+   - Give the user the links to the pictures, the checks' sheet.png among them, as each job ends, with what to look for: words cut off, text on text and a wrong logo. Nothing here shows you a picture.
 <!-- end -->
 <!-- end -->
 <!-- without check_video -->
@@ -276,5 +281,5 @@ The film's cuts fall on the bars of its look's own music: launch at {fact:launch
 
 List every file by place: the file, its size, and what it is for. Say what you chose where the user left it open, like the places and the film's shape. Then say what was checked, with each verdict, and what is left to the user: laying a track under a film when that was not done, uploading to each place, and any place no tool here makes for.
 <!-- hosted -->
-Give each file its own link from its result, with the time it stops working: no link opens a folder.
+Give each file its own link from its result, with the time it stops working: no link opens a folder. A link past its time works no more: name that file as gone and offer to make it again.
 <!-- end -->

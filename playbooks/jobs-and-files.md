@@ -44,9 +44,10 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 <!-- end -->
 <!-- hosted -->
-- `list_jobs` lists the user's 50 newest jobs. Jobs belong to the user and keep running when the connection closes. One waiting for a free worker shows running, with "Waiting for a free worker" as its last line.
+- `list_jobs` lists the user's 50 newest jobs. Jobs belong to the user and keep running when the connection closes. One waiting for a free worker, or for the user's own earlier job, shows running, with "Waiting for a free worker" as its last line.
+- A user's jobs run one at a time, in the order they were started, so jobs started together run one after another.
 - `cancel_job` stops a running job, and its files are deleted.
-- At most {limit:jobs_at_once} can run or wait at once, and at most {limit:jobs_a_day} can start in a day. Past that a start is refused with "You have <n> jobs running or waiting. Wait for one of them to end." or "You have used today's <n> jobs.", and the time to try again.
+- At most {limit:jobs_at_once} can run or wait at once, and at most {limit:jobs_a_day} can start in any 24 hours. Past that a start is refused with "You have <n> jobs running or waiting. Wait for one of them to end." or "You have started the <n> jobs allowed in any 24 hours.", and the time to try again.
 - A job is stopped after {limit:job_minutes}, counted from when a worker takes it, the downloads of its links included: "It ran longer than <time> and was stopped." A job that failed, was canceled or was stopped keeps no files.
 <!-- end -->
 
@@ -102,7 +103,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 
 - Each job saves into a folder of its own, so no job replaces another's files.
 - The result lists each file with its link, and until when, in UTC, the links work, {limit:keep_time} after the job ended: anyone who holds them can download the files until then, so give them only to the user, with that time. After that the job shows done with no files and "Its files were deleted <time> after it ended.", or "Its files were deleted before their keep time ended." when they were deleted sooner.
-- An earlier job's files go into a later job only until that time, so start each step of a chain, like a plan and then its render, as soon as the one before it ends. `check_setup` says how long files are kept.
+- An earlier job's files go into a later job when a worker takes the later job, and only until that time, so start each step of a chain, like a plan and then its render, right after the one before it ends, before any other job. `check_setup` says how long files are kept.
 - A file an earlier job saved goes in as job:<job_id>/<path>, the path as that job's file list writes it. The job's whole folder comes along, so the files that file names are there too. Only the user's own jobs that ended done count, and a makersmcp.com link to such a file counts as its job:<job_id>/<path>.
 <!-- with easybrandkit -->
   A brand kit goes in as job:<job_id>/brand.json, with its logo files.
