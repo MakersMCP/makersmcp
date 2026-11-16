@@ -148,6 +148,9 @@ For a film already made, say which cuts `check_video` found off the beat.
 - `out_dir`: by default musicfit-<track's name> in {base_dir} for `fit_music`, and musicfit-<track's name>.analysis for `analyze_music`, so an analysis never replaces a fit.
 <!-- end -->
 - `wait_seconds`: both tools finish in seconds, and a long `video` takes a minute or more.
+<!-- hosted -->
+- A job here reads a track, a voice and a video's own sound of a set length at most, together, as both tools hold each whole in memory a few times over: past that the job fails before the kit starts, naming each length and the most taken.
+<!-- end -->
 
 `analyze_music` takes `track`, `bpm` and `meter` the same way. It has no `fps`: its frames count at {fact:musicfit.analyze_fps} a second, so use its times in seconds.
 

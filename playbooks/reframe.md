@@ -124,7 +124,12 @@ reframe_video {"video": "job:<fit_job_id>/video.mp4", "cuts": "job:<film_job_id>
 - `crop`: a crop.json to render as it is. It takes no `cuts` or `steps`, and no `mode` but fit.
 - `out_dir`: by default reframekit-<video's name> next to the video. A folder holds the run of one video: a run of the same video there replaces the files it makes again and keeps the other places', and a folder of another video's run, or one that holds anything but an earlier run, is refused.
 <!-- end -->
+<!-- local -->
 - `wait_seconds`: a plan takes seconds to a minute; rendering every place of a long video takes minutes.
+<!-- end -->
+<!-- hosted -->
+- `wait_seconds`: a job here has a share of one machine. A plan of a minute of 1920x1080 video takes about 20 seconds, and each file of a place takes from about 2 minutes for each minute of video, as easy footage does, to about 5 with grain; every place takes four files of a video up to 140 seconds long, five of one up to 3 minutes and six of a longer one. A job stops after {limit:job_minutes}, so a video that cannot be made in the time its job has left, or one or a size too large for a job's memory, is refused with what fits: ask for fewer places, or give `seconds`.
+<!-- end -->
 
 ## The check
 

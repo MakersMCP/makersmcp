@@ -107,7 +107,12 @@ Only ads have published margins, and apps move their buttons, so tell the user t
 - `libass`, for `caption_video`: ffmpeg's libass draws the captions where Chrome cannot start, as in a container without its sandbox; it needs an ffmpeg built with libass and draws no color emoji.
 - `out_dir`: easycaptionkit-<video's name> next to the video for `caption_video`. A run replaces the files an earlier run wrote there and leaves anything else.
 <!-- end -->
+<!-- local -->
 - `wait_seconds`: a one minute video takes about half a minute; a long one several minutes.
+<!-- end -->
+<!-- hosted -->
+- `wait_seconds`: a job here has a share of one machine, and a minute of 1920x1080 video takes from about 3 minutes, as easy footage does, to about 7 with grain, more for a larger video. A job stops after {limit:job_minutes}, so a video that cannot be captioned in the time its job has left, or one too large for a job's memory, fails before its kit starts with what fits.
+<!-- end -->
 
 ## What it writes
 

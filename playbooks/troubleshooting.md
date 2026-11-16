@@ -55,6 +55,15 @@ Read the result before anything else: its first line says what happened, and the
 <!-- end -->
 <!-- hosted -->
 - "It ran longer than <time> and was stopped.": a job here stops after {limit:job_minutes}, so ask for less, like fewer pages or a shorter film. "Something went wrong on our side. Try again in a while.": tell the user. A failed job keeps no files.
+<!-- with easycaptionkit, reframekit -->
+- A video too large or too long for a job here fails before its kit starts, and the failure names its size or length and what fits. Tell the user, and offer a smaller copy, a shorter cut or a run on their own machine.
+<!-- end -->
+<!-- with reframekit -->
+- A size in reframe_video's `for` too large for a job here is refused before the job starts, with the largest size taken: ask for a smaller one.
+<!-- end -->
+<!-- with musicfit -->
+- A track, a voice and a video whose sounds run too long together for a job here fail before the kit starts, and the failure names each length and the most taken: offer a shorter track or voice.
+<!-- end -->
 <!-- end -->
 <!-- local -->
 - A site that shows a bot check, a cookie wall or a login page instead of itself: a kit stops with "<address> answered with a bot check (<title>) instead of its page, so <what was not made>", or saves what the page showed. Tell the user what came back and ask for the logo, the colors or the screens. Never fill in a brand from a guess.
