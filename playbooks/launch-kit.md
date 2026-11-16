@@ -181,7 +181,7 @@ make_launch_stills {"source": "job:<job_id>/film.json", "for": ["ph", "og", "x"]
 ```
 <!-- end -->
 <!-- with fit_music -->
-6. For the user's track, follow the music topic: `analyze_music`, then `fit_music` with `length` the film's length and `hit` the time of its logo close, both from its film.timeline.json, and `fps` {fact:launch-film.fps}. `fit_music` writes the sound only.
+6. For the user's track, follow the music topic: `analyze_music`, then `fit_music` with `length` the film's length and `hit` the time of its logo close, both from its film.timeline.json, and `fps` {fact:launch-film.fps}. Given the film as `video`, it also writes video.mp4, the film with the track under it.
 <!-- local -->
    Give `fit_music` an `out_dir` inside the film's folder, like its music/, so that folder holds the film's track.
 ```call
@@ -210,6 +210,9 @@ reframe_video {"video": "launch/film-16x9/film.mp4", "for": ["feed", "square", "
 ```call
 reframe_video {"video": "job:<job_id>/film.mp4", "for": ["feed", "square", "x", "linkedin"]}
 ```
+<!-- end -->
+<!-- with fit_music -->
+   When `fit_music` made video.mp4, reframe that file in place of film.mp4, whose sound is only the effects of a film planned with `music` false, so each place's file carries the user's track. video.mp4 has no timeline under its name, so give `cuts` the film's film.timeline.json, as the reframe topic shows.
 <!-- end -->
 <!-- end -->
 8. Check the rest before the hand over.

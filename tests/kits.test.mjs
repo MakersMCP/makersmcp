@@ -51,7 +51,7 @@ test('every number has its bounds, and every address an example with https://', 
 });
 
 test('every tool that writes says it is destructive, as each deletes or replaces what an earlier run left in its folder', () => {
-  // In MCP a tool that is not destructive only adds. An ownOnly tool deletes the earlier run as it starts, a tool with
+  // In MCP a tool that is not destructive only adds. An ownOnly tool replaces the earlier run once it has ended well, a tool with
   // replaces deletes those folders, and every other tool that writes saves its files over an earlier run's.
   for (const kit of kits) {
     for (const tool of kit.tools) {
@@ -654,6 +654,104 @@ test('check_video on a real video is a check, passed or failed, with its CHECK.m
     assert.match(text(result), /### CHECK\.md/);
     assert.ok(readFileSync(path.join(outDir, 'check', 'CHECK.md'), 'utf8').length > 0);
   });
+});
+
+// reframekit needs an ffmpeg built with --enable-gpl, with libx264 and cropdetect, as Ubuntu's is.
+const ffmpegLists = hasFfmpeg ? ['-filters', '-encoders'].map(flag => spawnSync('ffmpeg', ['-hide_banner', flag], { encoding: 'utf8' }).stdout ?? '').join('\n') : '';
+const gplFfmpeg = /\bcropdetect\b/.test(ffmpegLists) && /\blibx264\b/.test(ffmpegLists);
+
+test('the reframe and caption tools run through makersmcp: a plan and a render in the folder next to the video, with the places, seconds and trim false as the kit takes them, a check that passes, one that fails, one that could not run, subtitles from an SRT and the caption styles', { skip: !gplFfmpeg && 'needs an ffmpeg built with --enable-gpl, with libx264 and cropdetect' }, async () => {
+  const outDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-video-'));
+  const server = createMcpServer({ kits: ['reframekit', 'easycaptionkit'], outDir, kitPaths });
+  const client = new Client({ name: 'test-client', version: '1.0.0' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  const call = async (name, args) => {
+    const result = await client.callTool({ name, arguments: { ...args, wait_seconds: 300 } });
+    return { result, view: result.structuredContent ?? {}, words: text(result) };
+  };
+  try {
+    // A 16:9 video of two shots of three seconds each, with sound.
+    const made = spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=30:duration=3', '-f', 'lavfi', '-i', 'smptebars=size=640x360:rate=30:duration=3',
+      '-f', 'lavfi', '-i', 'sine=frequency=440:duration=6', '-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[v]', '-map', '[v]', '-map', '2:a',
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', path.join(outDir, 'clip.mp4')]);
+    assert.equal(made.status, 0, String(made.stderr));
+    const run = path.join(outDir, 'reframekit-clip');
+
+    // The plan goes to reframekit-<video's name> next to the video, for both places in one run.
+    const plan = await call('plan_reframe', { video: 'clip.mp4', for: ['square', 'feed'] });
+    assert.equal(plan.view.status, 'done', plan.words);
+    assert.equal(plan.view.folder, run);
+    assert.deepEqual(plan.view.files.map(file => file.path).sort(), ['FORMATS.md', 'crop.json', 'sheet.png']);
+    assert.match(plan.view.next, /then call reframe_video with crop \S*crop\.json, the same video and the same other arguments, without mode, cuts or steps, which crop\.json holds\./);
+    // The render cuts each file at a shot change within seconds, and trim false reaches the kit as --no-trim: the command FORMATS.md
+    // gives to render again holds the options of this run that crop.json does not.
+    const render = await call('reframe_video', { video: 'clip.mp4', for: ['square', 'feed'], seconds: '4', trim: false });
+    assert.equal(render.view.status, 'done', render.words);
+    assert.equal(render.view.folder, run);
+    for (const file of ['square.mp4', 'feed.mp4', 'square-cover.jpg', 'feed-cover.jpg', 'formats.json', 'FORMATS.md']) assert.ok(render.view.files.some(entry => entry.path === file), file);
+    assert.match(readFileSync(path.join(run, 'FORMATS.md'), 'utf8'), /--for square,feed --out .+ --seconds 4 --no-trim`/);
+    for (const [file, size] of [['square.mp4', '1080x1080'], ['feed.mp4', '1080x1350']]) {
+      const probe = spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height:format=duration', '-of', 'json', path.join(run, file)], { encoding: 'utf8' });
+      const info = JSON.parse(probe.stdout);
+      assert.equal(`${info.streams[0].width}x${info.streams[0].height}`, size, file);
+      assert.ok(Number(info.format.duration) <= 4.05, `${file} is ${info.format.duration} s long, over seconds 4`);
+    }
+    // A run that fails leaves the folder as it was.
+    const before = filesIn(run);
+    const late = await call('reframe_video', { video: 'clip.mp4', for: ['square'], cuts: '99' });
+    assert.equal(late.view.status, 'failed', late.words);
+    assert.match(late.words, /gives no cut inside the video/);
+    assert.deepEqual(filesIn(run), before);
+
+    // The folder the render made passes the check, whose report goes next to it.
+    const passed = await call('check_place_limits', { target: 'reframekit-clip' });
+    assert.equal(passed.view.status, 'done', passed.words);
+    assert.equal(passed.view.passed, true, passed.words);
+    assert.equal(passed.view.folder, path.join(outDir, 'reframekit-check-reframekit-clip'));
+    assert.match(passed.words, /### CHECK\.md/);
+    assert.match(passed.view.next, /^Tell the user each file passed its place's limits/);
+    // A 16:9 file checked for Reels fails the check, a normal result with its report and the check_failed Next line.
+    const failed = await call('check_place_limits', { target: 'clip.mp4', for: ['reels'] });
+    assert.notEqual(failed.result.isError, true, failed.words);
+    assert.equal(failed.view.status, 'done');
+    assert.equal(failed.view.passed, false, failed.words);
+    assert.match(failed.view.next, /^Read which file failed which limit in CHECK\.md below, and tell the user\./);
+    assert.ok(existsSync(path.join(outDir, 'reframekit-check-clip', 'CHECK.md')));
+    // A file that is no video: the kit exits with 1 and writes no report, so the check could not run and the job failed.
+    writeFileSync(path.join(outDir, 'notes.txt'), 'not a video');
+    const unread = await call('check_place_limits', { target: 'notes.txt', for: ['reels'] });
+    assert.equal(unread.result.isError, true);
+    assert.equal(unread.view.status, 'failed');
+    assert.equal(unread.view.passed, undefined);
+    assert.match(unread.words, /The check could not run: the kit wrote no CHECK\.md\./);
+
+    // Subtitle files from an SRT, next to it, and a run that fails leaves them as they were.
+    writeFileSync(path.join(outDir, 'words.srt'), '1\n00:00:00,500 --> 00:00:02,000\nKeep every plant alive\n\n2\n00:00:02,500 --> 00:00:04,500\nAcme tells you which one needs water\n');
+    const subtitles = await call('make_subtitles', { words: 'words.srt', video: 'clip.mp4', for: ['youtube'] });
+    assert.equal(subtitles.view.status, 'done', subtitles.words);
+    const captions = path.join(outDir, 'easycaptionkit-subtitles-words');
+    assert.equal(subtitles.view.folder, captions);
+    assert.deepEqual(subtitles.view.files.map(file => file.path).sort(), ['CAPTIONS.md', 'captions.ass', 'captions.json', 'captions.srt', 'captions.vtt', 'words.json']);
+    assert.match(readFileSync(path.join(captions, 'captions.srt'), 'utf8'), /Keep every plant alive/);
+    const subtitled = filesIn(captions);
+    writeFileSync(path.join(outDir, 'late.srt'), '1\n00:01:00,000 --> 00:01:02,000\nToo late\n');
+    const lateWords = await call('make_subtitles', { words: 'late.srt', video: 'clip.mp4', out_dir: 'easycaptionkit-subtitles-words' });
+    assert.equal(lateWords.view.status, 'failed', lateWords.words);
+    assert.match(lateWords.words, /Every word starts after the video ends/);
+    assert.deepEqual(filesIn(captions), subtitled);
+
+    // The styles and the margins come in what the kit printed, under the Next line.
+    const styles = await call('list_caption_styles', {});
+    assert.equal(styles.view.status, 'done', styles.words);
+    assert.match(styles.view.next, /the margins below are the apps' ad guides or estimates/);
+    assert.ok(styles.words.indexOf('Next: ') < styles.words.indexOf('karaoke'), styles.words);
+  } finally {
+    await client.close();
+    await server.close();
+    rmSync(outDir, { recursive: true, force: true });
+  }
 });
 
 /** A program on PATH, or nothing. */

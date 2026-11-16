@@ -97,6 +97,12 @@ export interface OutDefinition {
    */
   ownOnly?: boolean;
   /**
+   * The parameter whose file the folder's runs are of, like video for reframekit: the kit starts
+   * only in a folder that is empty or holds an earlier run of any of its tools for that same file,
+   * and stops in any other. out_dir's description says so.
+   */
+  runsOf?: string;
+  /**
    * The files a run writes in the folder, by name, like the demo's demo.mp4 and steps.json.
    * makersmcp does not start the kit when a file the call gives is one of them, since the kit
    * would write over it.
@@ -476,6 +482,10 @@ export function validateKitDefinition(definition: KitDefinition, where = definit
     }
     if (tool.out?.ownOnly !== undefined && (typeof tool.out.ownOnly !== 'boolean' || !tool.out.flag)) {
       fail(`${tool.name}: out.ownOnly is true or false, for a tool whose folder the agent gives with out.flag`);
+    }
+    if (tool.out?.runsOf !== undefined && (typeof tool.out.runsOf !== 'string' || !Object.hasOwn(tool.params, tool.out.runsOf)
+      || !FILE_TYPES.has(tool.params[tool.out.runsOf]!.type) || !tool.out.flag || tool.out.ownOnly)) {
+      fail(`${tool.name}: out.runsOf names the parameter whose file the folder's runs are of, like video, for a tool whose folder the agent gives with out.flag and that is not ownOnly`);
     }
     if (tool.writes !== undefined && !(Array.isArray(tool.writes) && tool.writes.every(file => typeof file === 'string' && staysInside(file)))) {
       fail(`${tool.name}.writes lists the files it writes in its folder, like card.png or logo-*.png`);

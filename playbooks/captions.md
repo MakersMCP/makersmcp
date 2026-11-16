@@ -121,8 +121,8 @@ For a launch film, it copies the film's timeline beside the result as captioned.
 
 A failed job gives its reason, and the folder is as it was:
 - "Every word starts after the video ends": the words are another video's, or their times are in milliseconds. Ask for the right file.
-- "holds words fixed by hand": the folder's words.json has fixes this run would lose. Give that words.json as `words`, or caption into another folder.
 <!-- local -->
+- "holds words fixed by hand": the folder's words.json has fixes this run would lose. Give that words.json as `words`, or caption into another folder.
 - "Pick another out_dir" at the end of a refusal: the folder holds a file of one of the kit's names that it did not write, or changed since; give another folder.
 <!-- end -->
 - CAPTIONS.md says the brand font was asked for by name and this machine does not have it: give `fonts`, a font kit.

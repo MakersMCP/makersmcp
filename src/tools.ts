@@ -213,6 +213,8 @@ function outDirHelp(tool: ToolDefinition, baseDir: string | undefined): string {
   } else if (!tool.check) {
     // A check writes only its report; the other kits replace their earlier files once they have new ones.
     help += ' A run replaces the files an earlier run of this kit left there, so give each version its own out_dir.';
+    // A kit whose folder holds the runs of one input, of any of its tools, like reframekit's of one video, takes no other folder.
+    if (out.runsOf) help += ` The folder must be empty or hold an earlier run of this kit for the same ${out.runsOf}: any other folder stops it.`;
   }
   if (out.otherwise) help += ` Given a file instead of an address, the kit saves in ${inPlainWords(out.otherwise)} and takes no out_dir.`;
   for (const [name, kind] of Object.entries(out.replaces ?? {})) {

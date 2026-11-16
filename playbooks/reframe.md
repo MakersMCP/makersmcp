@@ -5,7 +5,7 @@ index: reframe_video, plan_reframe and check_place_limits: each place's shape, l
 description: Turns one finished video into the version each place takes with reframekit, 9:16 for TikTok, Reels and Shorts, 4:5 for the feeds, 1:1, and 16:9 for YouTube, X and LinkedIn, with a crop that follows what moves and each file cut and fitted to its place's published limits, and checks any MP4 against those limits. Use it when a video has to go to a place in another shape, or within a place's length or file size.
 kit: reframekit
 requires: [reframekit]
-optional: [easybrandkit, easyscreenshotkit, easycaptionkit, check_video, make_launch_film, plan_launch_film]
+optional: [easybrandkit, easyscreenshotkit, easycaptionkit, check_video, fit_music, make_launch_film, plan_launch_film]
 order: 72
 ---
 # A video in each place's shape
@@ -19,9 +19,15 @@ order: 72
 - The crop follows motion, not faces: nothing in it knows a person or a product. For anything that matters, plan first and look at the windows.
 <!-- with make_launch_film, plan_launch_film -->
 - A launch film: a 9:16 plan of `plan_launch_film` is laid out for a phone, which a crop of the 16:9 film is not. For TikTok, Reels and Shorts, render the film in 9:16 too when the user wants the best one, and reframe the 16:9 film for the feeds, square, X and LinkedIn. Its film.timeline.json beside its film.mp4 gives its clips as the shots.
+<!-- with fit_music -->
+  When `fit_music` laid the user's track under the film as video.mp4, give `reframe_video` video.mp4 in place of film.mp4, whose sound is then only its effects, and `cuts` the film's film.timeline.json, since no timeline is beside video.mp4 under its name.
+<!-- end -->
 <!-- end -->
 <!-- with easyscreenshotkit -->
 - A demo from `record_demo_video`: its steps.json beside its demo.mp4 gives its pages, the page's box and each click, and the window goes to each click and stays off the backdrop.
+<!-- with fit_music -->
+  When `fit_music` laid a track under the demo as video.mp4, give `reframe_video` video.mp4 and `steps` the demo's steps.json, which is not beside it under its name.
+<!-- end -->
 <!-- end -->
 <!-- with easycaptionkit -->
 - Captions go on after reframing, one file per place, so each keeps clear of its own app's buttons (the captions topic).
@@ -59,15 +65,15 @@ plan_reframe {"video": "job:<job_id>/film.mp4", "for": ["feed", "square", "x", "
 <!-- end -->
 <!-- local -->
 2. Look at sheet.png, and sheet-2.png and on for more than {fact:reframekit.shots_a_sheet} shots: each shape's window on three frames of every shot, solid for a crop, dashed for a padded shot. Check that each holds the person, the product and the words; words cut at a window's edge are the usual miss. When you cannot open a picture, give the user its path with what to look for.
-3. Fix a window that misses in crop.json, as the next section says, then render with `crop`:
+3. Fix a window that misses in crop.json, as the next section says, then render with `crop`, the same `video` and the plan's other arguments, without `mode`, `cuts` or `steps`, which crop.json holds:
 ```call
 reframe_video {"video": "launch/film-16x9/film.mp4", "for": ["feed", "square", "x", "linkedin"], "crop": "launch/film-16x9/reframekit-film/crop.json"}
 ```
-   With nothing to fix, render without `crop`, which plans the same windows again.
+   With nothing to fix, render without `crop` and with the plan's own arguments, which plans the same windows again.
 <!-- end -->
 <!-- hosted -->
 2. Give the user the link to sheet.png, and to sheet-2.png and on for more than {fact:reframekit.shots_a_sheet} shots, with what to look for: each shape's window on three frames of every shot, solid for a crop, dashed for a padded shot, holding the person, the product and the words. Nothing here shows you a picture.
-3. A crop.json cannot be changed here, so a window cannot be moved. When the windows are right, render; when one misses, tell the user, and offer `mode` pad, which shows every shot whole:
+3. A crop.json cannot be changed here, so a window cannot be moved. When the windows are right, render with the plan's own arguments, which plans the same windows again; when one misses, tell the user, and offer `mode` pad, which shows every shot whole:
 ```call
 reframe_video {"video": "job:<job_id>/film.mp4", "for": ["feed", "square", "x", "linkedin"]}
 ```
@@ -92,6 +98,20 @@ Given places of a shape crop.json has no windows of, a `crop` render plans that 
 
 `reframe_video` and `plan_reframe` take the same:
 - `video`, the file. A launch film's timeline or a demo's steps file beside it, under its name, gives its shots; `steps` gives a demo's steps file that is not beside it, and `cuts` every shot change by hand, as seconds like "3.2,7.5" or a JSON file, in place of all found. Give them all: a cut left out is no cut.
+<!-- with fit_music -->
+  The video.mp4 of `fit_music` has neither beside it, so for a launch film with the user's track under it give `cuts` the film's timeline:
+<!-- local -->
+```call
+reframe_video {"video": "launch/film-16x9/music/video.mp4", "cuts": "launch/film-16x9/film.timeline.json", "for": ["feed", "square", "x", "linkedin"]}
+```
+<!-- end -->
+<!-- hosted -->
+```call
+reframe_video {"video": "job:<fit_job_id>/video.mp4", "cuts": "job:<film_job_id>/film.timeline.json", "for": ["feed", "square", "x", "linkedin"]}
+```
+   video.mp4 is the fit's, film.timeline.json the film's.
+<!-- end -->
+<!-- end -->
 - `for`, at most {fact:reframekit.places_max} places in one run.
 - `mode`: follow (default), center, pad, or fit, which keeps the picture's own shape and only fits each place's limits, so places of any shape whose frame fits the picture share one file.
 - `pad`: what a padded shot sits on, blur (default), black, white, a color like #0f172a, or brand with `brand`, a brand kit whose page background is used.
@@ -102,13 +122,20 @@ Given places of a shape crop.json has no windows of, a `crop` render plans that 
 - `lufs`: the loudness, {default:reframe_video.lufs} LUFS unless given. `fps`: the files' frame rate, the video's unless given. `cover`: the moment of every cover, picked unless given.
 <!-- local -->
 - `crop`: a crop.json to render as it is. It takes no `cuts` or `steps`, and no `mode` but fit.
-- `out_dir`: by default reframekit-<video's name> next to the video. A folder holds the run of one video: a run of the same video there replaces the files it makes again and keeps the other places', and a folder of another video's run is refused.
+- `out_dir`: by default reframekit-<video's name> next to the video. A folder holds the run of one video: a run of the same video there replaces the files it makes again and keeps the other places', and a folder of another video's run, or one that holds anything but an earlier run, is refused.
 <!-- end -->
 - `wait_seconds`: a plan takes seconds to a minute; rendering every place of a long video takes minutes.
 
 ## The check
 
-`check_place_limits` measures finished files and changes nothing: shape, size, frame rate, length, file size, codecs, and whether the MP4 is whole, with its index first and no edit lists. Give `target` a folder `reframe_video` made, its formats.json, or one MP4 with `for`, the places to check it against. With `captions`, the ASS, SRT or WebVTT file burned into the video, it checks their timing, and an ASS file's text against each 9:16 place's safe area. The estimate errs wide, so look at a frame before moving a caption that fails by a little.
+`check_place_limits` measures finished files and changes nothing: shape, size, frame rate, length, file size, codecs, and whether the MP4 is whole, with its index first and no edit lists.
+<!-- local -->
+Give `target` a folder `reframe_video` made, its formats.json, or one MP4 with `for`, the places to check it against.
+<!-- end -->
+<!-- hosted -->
+Give `target` the formats.json of a `reframe_video` job, whose files come with it, or one MP4 with `for`, the places to check it against.
+<!-- end -->
+With `captions`, the ASS, SRT or WebVTT file burned into the video, it checks their timing, and an ASS file's text against each 9:16 place's safe area. The estimate errs wide, so look at a frame before moving a caption that fails by a little.
 <!-- local -->
 ```call
 check_place_limits {"target": "launch/film-16x9/reframekit-film/formats.json"}
@@ -116,6 +143,7 @@ check_place_limits {"target": "launch/film-16x9/reframekit-film/formats.json"}
 <!-- end -->
 <!-- hosted -->
 ```call
+check_place_limits {"target": "job:<job_id>/formats.json"}
 check_place_limits {"target": "job:<job_id>/tiktok.mp4", "for": ["tiktok"]}
 ```
 <!-- end -->

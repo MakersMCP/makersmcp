@@ -84,7 +84,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 <!-- with reframekit -->
 <!-- local -->
-- `reframe_video` and `plan_reframe` save in reframekit-<video's name> next to the video, which holds the runs of that one video: a run there replaces the files it makes again and keeps the other places' files. `check_place_limits` saves in reframekit-check-<name> next to what it checks.
+- `reframe_video` and `plan_reframe` save in reframekit-<video's name> next to the video, which holds the runs of that one video: a run there replaces the files it makes again and keeps the other places' files, and a folder that holds anything else stops them. `check_place_limits` saves in reframekit-check-<name> next to what it checks.
 <!-- end -->
 <!-- end -->
 <!-- with easycaptionkit -->
@@ -93,7 +93,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 <!-- end -->
 <!-- local -->
-- Every kit puts a run's files in place only once the run has ended well, so one that fails or is canceled leaves its folder as it was. A kit stops before any work at a file of the user's under a name it writes, and the brand, font and screenshot kits at any folder that holds neither nothing nor an earlier run of theirs. A run that ends well replaces an earlier result there, so before a run into a folder that holds a result the user wants, give another `out_dir`.
+- Every kit puts a run's files in place only once the run has ended well, so one that fails or is canceled leaves its folder as it was. A kit stops before any work at a file of the user's under a name it writes, and the brand, font, screenshot and reframe kits at any folder that holds neither nothing nor an earlier run of theirs. A run that ends well replaces an earlier result there, so before a run into a folder that holds a result the user wants, give another `out_dir`.
 - A result lists the files the job saved or changed in its folder, without hidden files: 40 in the text and up to 200 in `files`. The kit's notes come after them. The list and the notes stay as they were when the job ended: what a later job saves in that folder, or in one inside it, never shows under this one, though it may have replaced some of these files since.
 <!-- end -->
 
@@ -114,6 +114,9 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 <!-- with easyfontkit -->
   A font kit goes in as job:<job_id>/fonts.css, with its font files.
+<!-- end -->
+<!-- with reframekit -->
+  A reframe run goes in as job:<job_id>/formats.json, with the files it lists.
 <!-- end -->
 - Other files go as https links where a parameter takes a file: a public address, at most 200 MB, sent within 5 minutes. A parameter that takes an address or a file reads a link as the address.
 - Nothing here uploads a file the assistant wrote, so a file goes in only as a link the user gives or as a file an earlier job saved, used as it is. Say so instead of offering to change one.
@@ -154,7 +157,13 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 - A video goes to `video` of `fit_music`, which lays the track under it.
 <!-- end -->
 <!-- with reframekit -->
-- A finished video goes to `video` of `reframe_video`, which finds a launch film's timeline or a demo's steps file beside it under its name, and a folder it made, or one file of it, goes to `target` of `check_place_limits`.
+- A finished video goes to `video` of `reframe_video`, which finds a launch film's timeline or a demo's steps file beside it under its name.
+<!-- local -->
+  A folder it made, or one file of it, goes to `target` of `check_place_limits`.
+<!-- end -->
+<!-- hosted -->
+  Its formats.json, which brings the files it lists, or one file of it goes to `target` of `check_place_limits`.
+<!-- end -->
 <!-- end -->
 <!-- with easycaptionkit -->
 - A video goes to `video` of `caption_video`, and words with times to its `words`: a speech-to-text JSON, an SRT or WebVTT file, or a demo's steps file.

@@ -5,7 +5,7 @@ index: analyze_music and fit_music: a track fitted to a film or a demo and laid 
 description: Fits a music track to a video's exact length with musicfit, lands its drop on a chosen moment, ducks it under a voice, sets its loudness and lays it under the video, keeping, voicing or dropping the video's own sound. Use it when a track from the user, a library or a music model has to fit a launch film, a demo or any cut.
 kit: musicfit
 requires: [musicfit, fit_music]
-optional: [easyscreenshotkit, check_video, make_launch_film, plan_launch_film]
+optional: [easyscreenshotkit, reframekit, check_video, make_launch_film, plan_launch_film]
 order: 70
 ---
 # Music fitted to a film or a demo
@@ -191,6 +191,9 @@ Warnings come with a done job, in `FIT.md` too:
 <!-- end -->
 <!-- hosted -->
 - The link to video.mp4, the video with the track under it, or the links to the video and to the track to lay in.
+<!-- end -->
+<!-- with reframekit -->
+- Each place's version made with `reframe_video` from video.mp4, which carries the track, never from the video it went under. No timeline or steps file is beside video.mp4 under its name, so give `reframe_video` the launch film's film.timeline.json as `cuts`, or the demo's steps.json as `steps` (the reframe topic).
 <!-- end -->
 - From `FIT.md`: the length and level, the tempo, where the drop landed, and the moments to listen at.
 <!-- with check_video -->

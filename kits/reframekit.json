@@ -24,7 +24,7 @@
       "description": "Turns one finished video into the version each place takes, with ffmpeg on this machine: 9:16 for TikTok, Reels and Shorts, 4:5 for the feeds, 1:1, and 16:9 for YouTube, X and LinkedIn. In each shot the crop follows what moves, not faces, and a shot whose action or words are wider than the crop is padded, shown whole on a blurred copy of itself. Each file is cut at a shot change to its place's length, kept under its size limit, set to the loudness asked for, given a cover beside it and checked against the limits the place publishes. FORMATS.md, which the result shows, lists every file with its checks; sheet.png, the picture to show first, draws each shape's window on every shot. A launch film's timeline or a demo's steps file beside the video gives its shots. To move a window, plan first and edit crop.json. For a look at the windows before anything renders, use plan_reframe instead.",
       "hostedDescription": "Turns one finished video into the version each place takes: 9:16 for TikTok, Reels and Shorts, 4:5 for the feeds, 1:1, and 16:9 for YouTube, X and LinkedIn. In each shot the crop follows what moves, not faces, and a shot whose action or words are wider than the crop is padded, shown whole on a blurred copy of itself. Each file is cut at a shot change to its place's length, kept under its size limit, set to the loudness asked for, given a cover beside it and checked against the limits the place publishes. FORMATS.md, which the result shows, lists every file with its checks; sheet.png, the picture to show first, draws each shape's window on every shot. A launch film's timeline or a demo's steps file beside the video, as in that job's own files, gives its shots. A window cannot be moved here. For a look at the windows before anything renders, use plan_reframe instead.",
       "args": ["{video}"],
-      "out": { "flag": "--out", "name": "{dir:video}/reframekit-{stem:video}" },
+      "out": { "flag": "--out", "name": "{dir:video}/reframekit-{stem:video}", "runsOf": "video" },
       "destructive": true,
       "params": {
         "video": { "type": "path", "required": true, "description": "The finished video, any file ffmpeg reads, like film.mp4 from a launch film or demo.mp4 from a demo. The film.timeline.json or steps.json beside it, under its name, gives its shots." },
@@ -50,7 +50,7 @@
         "done": [
           "Show {file:sheet.png} to the user before the files go out: the crop follows what moves, not faces, so check that each window holds the person, the product and the words.",
           "FORMATS.md below says which files passed their place's limits and what was cut to length; hand each file over for its place with its cover beside it.",
-          "To move a window, edit {file:crop.json} and call reframe_video again with crop {file:crop.json}, the same video and the same places."
+          "To move a window, edit {file:crop.json} and call reframe_video again with crop {file:crop.json}, the same video and the same other arguments, without mode, cuts or steps, which crop.json holds."
         ]
       },
       "hostedNext": {
@@ -66,9 +66,9 @@
       "asks": "to see a video's crop for each place before it renders",
       "playbook": "reframe",
       "description": "Plans what reframe_video renders, without rendering: finds the shots of a finished video and, for each place's shape, a window that follows what moves in each shot, or a padded shot where a crop would cut too much. Writes crop.json, every shot with its window for each shape, sheet.png, each shape's window drawn on every shot's frames (a solid outline for a crop, a dashed one for a padded shot), with more shots in sheet-2.png and on, and FORMATS.md, which the result shows with the command that renders the plan. Look at the sheet, move a window that misses in crop.json, then give that crop.json to reframe_video as crop. A plan in a folder of an earlier render keeps its files. For the files themselves in one job, use reframe_video instead.",
-      "hostedDescription": "Plans what reframe_video renders, without rendering: finds the shots of a finished video and, for each place's shape, a window that follows what moves in each shot, or a padded shot where a crop would cut too much. Writes crop.json, every shot with its window for each shape, sheet.png, each shape's window drawn on every shot's frames (a solid outline for a crop, a dashed one for a padded shot), with more shots in sheet-2.png and on, and FORMATS.md, which the result shows. A crop.json cannot be changed here, so reframe_video given the same video and places renders the windows as this plan has them. For the files themselves in one job, use reframe_video instead.",
+      "hostedDescription": "Plans what reframe_video renders, without rendering: finds the shots of a finished video and, for each place's shape, a window that follows what moves in each shot, or a padded shot where a crop would cut too much. Writes crop.json, every shot with its window for each shape, sheet.png, each shape's window drawn on every shot's frames (a solid outline for a crop, a dashed one for a padded shot), with more shots in sheet-2.png and on, and FORMATS.md, which the result shows. A crop.json cannot be changed here, so reframe_video given the same arguments renders the windows as this plan has them. For the files themselves in one job, use reframe_video instead.",
       "args": ["{video}", "--plan"],
-      "out": { "flag": "--out", "name": "{dir:video}/reframekit-{stem:video}" },
+      "out": { "flag": "--out", "name": "{dir:video}/reframekit-{stem:video}", "runsOf": "video" },
       "destructive": true,
       "params": {
         "video": { "type": "path", "required": true, "description": "The finished video, any file ffmpeg reads, like film.mp4 from a launch film or demo.mp4 from a demo. The film.timeline.json or steps.json beside it, under its name, gives its shots." },
@@ -90,13 +90,13 @@
       "next": {
         "done": [
           "Look at {file:sheet.png}, or give the user its path, and check that each window holds the person, the product and the words.",
-          "Move a window that misses in {file:crop.json}, then call reframe_video with crop {file:crop.json}, the same video and the same places."
+          "Move a window that misses in {file:crop.json}, then call reframe_video with crop {file:crop.json}, the same video and the same other arguments, without mode, cuts or steps, which crop.json holds."
         ]
       },
       "hostedNext": {
         "done": [
           "Give the user the {name:sheet.png} link from the list below, to check that each window holds the person, the product and the words.",
-          "A crop.json cannot be changed here: when the windows are right, call reframe_video with the same video and places, which renders them as planned."
+          "A crop.json cannot be changed here: when the windows are right, call reframe_video with the same arguments, which renders them as planned."
         ]
       }
     },
@@ -107,14 +107,15 @@
       "asks": "a video checked against a place's limits, or burned captions against a phone app's safe area",
       "playbook": "reframe",
       "description": "Measures finished MP4 files against each place's published limits without changing them: shape, size, frame rate, length, file size, codecs, and whether the MP4 is whole and laid out as Instagram and YouTube ask. Give it a folder reframe_video made, its formats.json, or one MP4 with the places in for. With captions, the ASS, SRT or WebVTT file burned into the video, it checks their timing, and an ASS file's text against each 9:16 place's safe area. It writes CHECK.md, which the result shows, and check.json. A failed check is a normal result, with what failed and the limit's source. It does not say whether a video may be posted. For loudness, black, still and silent stretches, use check_video instead.",
+      "hostedDescription": "Measures finished MP4 files against each place's published limits without changing them: shape, size, frame rate, length, file size, codecs, and whether the MP4 is whole and laid out as Instagram and YouTube ask. Give it the formats.json of a reframe_video job, whose files come with it, or one MP4 with the places in for. With captions, the ASS, SRT or WebVTT file burned into the video, it checks their timing, and an ASS file's text against each 9:16 place's safe area. It writes CHECK.md, which the result shows, and check.json. A failed check is a normal result, with what failed and the limit's source. It does not say whether a video may be posted. For loudness, black, still and silent stretches, use check_video instead.",
       "args": ["check", "{target}"],
       "out": { "flag": "--out", "name": "{dir:target}/reframekit-check-{stem:target}" },
       "destructive": true,
       "check": true,
       "report": "CHECK.md",
       "params": {
-        "target": { "type": "path", "required": true, "description": "What to check: a folder reframe_video made, its formats.json, or one MP4, like captioned.mp4." },
-        "for": { "type": "list", "flag": "--for", "description": "The places to check a lone MP4 against, any of tiktok, reels, shorts, youtube, x, linkedin, feed and square (default: the places of its shape); with a folder, only these." },
+        "target": { "type": "path", "required": true, "description": "What to check: a folder reframe_video made, its formats.json, or one MP4, like captioned.mp4.", "hostedDescription": "What to check: one MP4, like captioned.mp4, or the whole run of a reframe_video job as job:<job_id>/formats.json, whose files come with it. Give an https link to the MP4, or job:<job_id>/<path> for a file an earlier job saved." },
+        "for": { "type": "list", "flag": "--for", "description": "The places to check a lone MP4 against, any of tiktok, reels, shorts, youtube, x, linkedin, feed and square (default: the places of its shape); with a folder, only these.", "hostedDescription": "The places to check a lone MP4 against, any of tiktok, reels, shorts, youtube, x, linkedin, feed and square (default: the places of its shape); with a formats.json, only these." },
         "captions": { "type": "path", "flag": "--captions", "description": "The ASS, SRT or WebVTT file of the captions burned into the video: its timing is checked, and an ASS file's text against each 9:16 place's safe area. caption_video writes captions.ass beside its captioned.mp4." }
       },
       "docs": ["CHECK.md"],

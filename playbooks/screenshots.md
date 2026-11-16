@@ -44,7 +44,7 @@ take_screenshots {"url": "https://linear.app", "pages": 3, "page": ["/pricing"],
 
 - `pages` ({bounds:take_screenshots.pages}, default {default:take_screenshots.pages}) counts every page taken. Above 1, the first is the home page at the site's root, even when `url` is a deeper page; then `url` itself when it is deeper; then each `page`; then pages from the site's menu, buttons and sitemap until `pages` is reached.
 - Each `page` is taken even past `pages`: `pages` 2 with two `page` entries gave three pages.
-- With `pages` 1, only `url` is taken, as given; each `page` must still be a page of the site, or the run stops.
+- With `pages` 1, only `url` and each `page` are taken, as given; a `page` that is not of the site stops the run.
 - A #route (#/ or #!) in `url` or `page` is kept: the page opens on that view, waits for its data and is named after it, like 02-app-plants-desktop.png. A `page` of only a route, like #/plants, is that view of `url`. Any other fragment, like #pricing, is left out with a note. A `page` that comes out the same as a page already taken is left out without a word.
 - Among the pages it finds, it leaves out sign-in pages, an app or a dashboard (counted as sign-in pages), legal pages, careers, contact and help, single blog posts, pages in another language, what robots.txt asks crawlers to skip, and redirects to a sign-in page or to the home page. Give such a page as `url` or `page` to take it.
 

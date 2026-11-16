@@ -2818,3 +2818,113 @@ test('a limit cannot start a sentence, which would start with "a few" on a servi
   kit.tools[0].hostedDescription = '{limit:job_minutes} is the most a job runs here.';
   assert.throws(() => validateKitDefinition(kit), /starts a sentence/);
 });
+
+/** The topics as a client reads them, on the side and with the kits and held tools the options give. */
+async function readTopics(options, topics) {
+  const session = await connect({ definitions: loadKitDefinitions(), ...options });
+  try {
+    return text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics } }));
+  } finally {
+    await session.close();
+  }
+}
+
+test('a film with the user\'s track under it is reframed from the video.mp4 of fit_music, with the film\'s film.timeline.json as cuts, in launch-kit, reframe and music while fit_music is listed', async () => {
+  const hosted = held => ({ where: 'hosted', limits: LIMITS, ...(held ? { held } : {}) });
+  for (const options of [{}, hosted(), hosted(['check_video'])]) {
+    const side = JSON.stringify(options);
+    const kit = await readTopics(options, ['launch-kit']);
+    // fit_music given the film writes the film with the track under it, and that is the file the places' versions are made from.
+    assert.match(kit, /Given the film as `video`, it also writes video\.mp4, the film with the track under it\./, side);
+    assert.doesNotMatch(kit, /writes the sound only/, side);
+    assert.match(kit, /\n {3}When `fit_music` made video\.mp4, reframe that file in place of film\.mp4, whose sound is only the effects of a film planned with `music` false, so each place's file carries the user's track\. video\.mp4 has no timeline under its name, so give `cuts` the film's film\.timeline\.json, as the reframe topic shows\.\n/, side);
+    const reframe = await readTopics(options, ['reframe']);
+    assert.match(reframe, /When `fit_music` laid the user's track under the film as video\.mp4, give `reframe_video` video\.mp4 in place of film\.mp4/, side);
+    assert.match(reframe, options.where === 'hosted'
+      ? /\nreframe_video \{"video": "job:<fit_job_id>\/video\.mp4", "cuts": "job:<film_job_id>\/film\.timeline\.json", "for": \[[^\n]*\]\}\n```\n {3}video\.mp4 is the fit's, film\.timeline\.json the film's\.\n/
+      : /\nreframe_video \{"video": "launch\/film-16x9\/music\/video\.mp4", "cuts": "launch\/film-16x9\/film\.timeline\.json", "for": \[[^\n]*\]\}\n/, side);
+    // A demo with a track under it gives reframe_video its steps.json.
+    assert.match(reframe, /When `fit_music` laid a track under the demo as video\.mp4, give `reframe_video` video\.mp4 and `steps` the demo's steps\.json/, side);
+    assert.match(await readTopics(options, ['music']), /\n- Each place's version made with `reframe_video` from video\.mp4, which carries the track, never from the video it went under\./, side);
+  }
+  // With fit_music held back, no topic names a video.mp4 to reframe, and without reframekit the music topic says nothing of reframing.
+  for (const held of [['fit_music'], ['check_video', 'fit_music']]) {
+    assert.doesNotMatch(await readTopics(hosted(held), ['launch-kit', 'reframe']), /video\.mp4/, held.join());
+  }
+  assert.doesNotMatch(await readTopics({ kits: ['musicfit', 'launch-film'] }, ['music']), /reframe/);
+});
+
+test('take_screenshots says that with pages 1 it takes url and each page, as easyscreenshotkit does, and record_demo_video that a short tour records those pages, on both sides', async () => {
+  for (const where of ['local', 'hosted']) {
+    const session = await connect({ definitions: loadKitDefinitions(), where, ...(where === 'hosted' ? { limits: LIMITS } : {}) });
+    try {
+      const byName = Object.fromEntries(session.tools.map(tool => [tool.name, tool]));
+      const pages = byName.take_screenshots.inputSchema.properties.pages.description;
+      assert.match(pages, /With 1, only url and each page are taken, as given; a page that is not of the site stops the run\.$/, where);
+      assert.doesNotMatch(pages, /only url is taken/, where);
+      assert.match(byName.record_demo_video.inputSchema.properties.timeout_seconds.description, /so a short one records the home page, url and each page alone[.,]/, where);
+      const topic = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['screenshots'] } }));
+      assert.match(topic, /\n- With `pages` 1, only `url` and each `page` are taken, as given; a `page` that is not of the site stops the run\.\n/, where);
+    } finally {
+      await session.close();
+    }
+  }
+});
+
+test('reframekit\'s texts: a render of an edited crop.json keeps the run\'s other arguments, a plan renders again with its own arguments, a hosted check takes a run\'s formats.json and never a folder, and out_dir says which folder the kit takes', async () => {
+  const definitions = loadKitDefinitions();
+  const reframe = definitions.find(kit => kit.kit === 'reframekit');
+  const tool = name => reframe.tools.find(entry => entry.name === name);
+  // crop.json holds the windows, the shots and their modes, and none of the other arguments, which reframekit's own render command carries.
+  for (const name of ['reframe_video', 'plan_reframe']) {
+    const next = tool(name).next.done.join(' ');
+    assert.match(next, /call reframe_video (?:again )?with crop \{file:crop\.json\}, the same video and the same other arguments, without mode, cuts or steps, which crop\.json holds\./, name);
+    assert.doesNotMatch(next, /the same places/, name);
+  }
+  // Hosted, a plan's windows come again only with all of its arguments: mode, cuts, steps, pad and brand move them too.
+  assert.match(tool('plan_reframe').hostedNext.done.join(' '), /call reframe_video with the same arguments, which renders them as planned\./);
+  for (const where of ['local', 'hosted']) {
+    const session = await connect({ definitions, where, ...(where === 'hosted' ? { limits: LIMITS } : {}) });
+    try {
+      const byName = Object.fromEntries(session.tools.map(entry => [entry.name, entry]));
+      const check = byName.check_place_limits;
+      const reframeTopic = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['reframe'] } }));
+      const jobs = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['jobs-and-files'] } }));
+      const captions = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['captions'] } }));
+      if (where === 'hosted') {
+        assert.match(byName.plan_reframe.description, /A crop\.json cannot be changed here, so reframe_video given the same arguments renders the windows as this plan has them\./);
+        // A hosted call gives a file, so a reframe run goes to the check as its formats.json, which brings the files beside it.
+        assert.match(check.description, /Give it the formats\.json of a reframe_video job, whose files come with it, or one MP4 with the places in for\./);
+        assert.match(check.inputSchema.properties.target.description, /job:<job_id>\/formats\.json, whose files come with it/);
+        for (const [what, words] of [['description', check.description], ['target', check.inputSchema.properties.target.description],
+          ['for', check.inputSchema.properties.for.description], ['the reframe topic', reframeTopic], ['jobs-and-files', jobs]]) {
+          assert.doesNotMatch(words, /a folder (?:reframe_video|`reframe_video`|it) made|with a folder/i, what);
+        }
+        assert.match(reframeTopic, /\ncheck_place_limits \{"target": "job:<job_id>\/formats\.json"\}\n/);
+        assert.match(reframeTopic, /When the windows are right, render with the plan's own arguments, which plans the same windows again;/);
+        assert.match(jobs, /A reframe run goes in as job:<job_id>\/formats\.json, with the files it lists\./);
+        // A hosted job's folder is its own, so no run there finds words fixed by hand.
+        assert.doesNotMatch(captions, /holds words fixed by hand/);
+      } else {
+        assert.match(check.inputSchema.properties.target.description, /^What to check: a folder reframe_video made, its formats\.json, or one MP4/);
+        assert.match(reframeTopic, /render with `crop`, the same `video` and the plan's other arguments, without `mode`, `cuts` or `steps`, which crop\.json holds:/);
+        assert.match(reframeTopic, /With nothing to fix, render without `crop` and with the plan's own arguments, which plans the same windows again\./);
+        assert.match(jobs, /and the brand, font, screenshot and reframe kits at any folder that holds neither nothing nor an earlier run of theirs\./);
+        assert.match(captions, /- "holds words fixed by hand"/);
+        // reframekit takes a folder that is empty or holds a run of the same video, by any of its tools, and the check its own report's.
+        for (const name of ['reframe_video', 'plan_reframe']) {
+          assert.match(byName[name].inputSchema.properties.out_dir.description, / The folder must be empty or hold an earlier run of this kit for the same video: any other folder stops it\.$/, name);
+        }
+        assert.doesNotMatch(check.inputSchema.properties.out_dir.description, /must be empty/);
+      }
+    } finally {
+      await session.close();
+    }
+  }
+  // runsOf names a parameter of the tool that takes a file, for a tool whose folder the agent gives and that is not ownOnly.
+  for (const change of [out => { out.runsOf = 'for'; }, out => { out.runsOf = 'film'; }, out => { delete out.flag; }, out => { out.ownOnly = true; }]) {
+    const broken = structuredClone(reframe);
+    change(broken.tools.find(entry => entry.name === 'reframe_video').out);
+    assert.throws(() => validateKitDefinition(broken), /reframe_video: out\.runsOf names the parameter whose file the folder's runs are of, like video/, String(change));
+  }
+});
