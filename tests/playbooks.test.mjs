@@ -202,7 +202,7 @@ const RESULT_FIELDS = new Set(['job_id', 'status', 'next_action', 'files', 'fold
 const COMMON = new Set(['wait_seconds', 'out_dir', 'job_id', 'true', 'false', 'null']);
 // Fields of the files the kits read and write, as their own files hold them (film.json, film.timeline.json,
 // words.json, brand.json, facts.json, fonts.json, a steps file and steps.json, cues.json, manifest.json and a
-// web app manifest, check.json), for the topics that document those formats.
+// web app manifest, check.json, crop.json), for the topics that document those formats.
 const FORMAT_FIELDS = new Set(`
   version url brand look aspect lang music sfx clips kind bars seconds scene type title text image images mode box side items logo icon site volume value
   film start index length
@@ -215,6 +215,7 @@ const FORMAT_FIELDS = new Set(`
   musicfit track mix bpm beats bars hits times sampleRate tempo meter beat bar steady drop time frame found fade sections segments seams crossfade ending voice loudness target integrated truePeak range duration dropCandidates warnings
   takenAt size scale device full themes slug why hidden shots theme cssWidth cssHeight sheet pwa candidates form_factor wide narrow
   pass checks expected stretches verdict audio channels samplePeak cuts hard off onBar cues allow rules black still silence hold lufs onBeat nearBeat report wave
+  windows w h keeps
 `.split(/\s+/).filter(Boolean));
 
 /** Scene types, their fields and icon names, read from the installed launch-film, for the topics about film.json. */
@@ -1487,7 +1488,7 @@ test('a kit tool\'s description says when to use it, what it makes, its topic an
       assert.match(params.wait_seconds.description, where === 'local' ? /Some clients end a call after 60 or 240 seconds; 45 is safe in all of them\.$/ : /Each call waits at most 47 seconds here, whatever this asks\.$/);
       if (where === 'local') {
         assert.equal(params.out_dir.description, `Folder to save into, absolute or relative to ${LOCAL_DIR}. Default: paintkit-<host>, where <host> is the site's host without www or the port. `
-          + 'A run deletes what an earlier run of this tool left there as it starts, so one that fails loses it too: give each version its own out_dir. '
+          + 'A run replaces what an earlier run of this tool left there once it has ended well, and one that fails or is canceled leaves it as it was: give each version its own out_dir. '
           + 'The folder must be empty or hold an earlier run of this tool: any other folder stops it.');
         const check = session.tools.find(entry => entry.name === 'check_picture');
         assert.equal(check.inputSchema.properties.out_dir.description, `Folder to save into, absolute or relative to ${LOCAL_DIR}. Default: <picture-folder>/check, where <picture-folder> is the folder picture is in.`);
@@ -2191,7 +2192,7 @@ test('locally, music for a launch film is fitted into a folder inside the film\'
   const sentence = "and give out_dir a folder inside the film's, like its music/, so the film's folder holds its track.";
   const local = await connect({ definitions: loadKitDefinitions() });
   try {
-    assert.ok(local.tools.find(tool => tool.name === 'fit_music').description.includes(` lay this track in afterwards, ${sentence} fps should`));
+    assert.ok(local.tools.find(tool => tool.name === 'fit_music').description.includes(` with plan_launch_film and music false, so its sound is its effects, ${sentence} Give cues.json`));
     const read = async topic => text(await local.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [topic] } }));
     const music = await read('music');
     assert.match(music, /\n {3}Give `out_dir` a folder inside the film's, like its music\/, so the film's folder holds its track\.\n```call\nfit_music \{[^\n]*"out_dir": "launch\/film-16x9\/music"\}\n```/);
@@ -2213,7 +2214,7 @@ test('locally, music for a launch film is fitted into a folder inside the film\'
   const hosted = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits: LIMITS });
   try {
     const fit = hosted.tools.find(tool => tool.name === 'fit_music').description;
-    assert.match(fit, /A film from plan_launch_film takes no music file, so plan it with music false to lay this track in afterwards\. fps should/);
+    assert.match(fit, /A launch film to carry the track is planned with plan_launch_film and music false, so its sound is its effects, then given as video with video_sound keep\. Give cues\.json/);
     assert.doesNotMatch(fit, /out_dir|film's folder/);
   } finally {
     await hosted.close();
@@ -2263,8 +2264,9 @@ test('each side\'s instructions are held whole: where the kits run, the rules, w
     'Before a job with more than one step, like a launch film or a launch kit, call makersmcp_playbook with its topic, wait for it and follow it.',
     'A tool still working after wait_seconds returns a job_id: call wait_for_job with it, never the same tool again, which would start a second job.',
     'A call that ended with no result may still have started one: call list_jobs before trying again.',
-    "From a website or a file, the kits make a website's brand kit, a page's fonts with their licenses, screenshots, demo videos, launch films, launch pictures, "
-      + 'a check of any video and music fitted to a video.',
+    "From a website or a file, the kits make a website's brand kit, captions burned into a video, subtitle files, a page's fonts with their licenses, screenshots, "
+      + "demo videos, launch films, launch pictures, a check of any video, music fitted to a video, each place's version of a video and a check of a video against "
+      + "each place's limits.",
   ];
   const sides = {
     local: [{ where: 'local' }, [
@@ -2490,18 +2492,25 @@ test('a sentence that holds only while a tool is held back or off is not there w
   for (const held of [['check_video'], ['check_video', 'fit_music']]) {
     assert.doesNotMatch(await read(hosted(held), ['demo-video']), /Pass the video on as job/, held.join());
   }
-  // A demo's times go to a tool as numbers only while fit_music or check_video is listed, and to the user while neither is.
-  const asNumbers = /No tool here takes `steps\.json`: read the times from it in the result and give them as numbers\./;
+  // A demo's times go to a tool as numbers only while fit_music or check_video is listed, and to the user while neither is, nor
+  // a kit that takes steps.json as it is, reframekit or easycaptionkit.
+  const asNumbers = /The check and the music take no `steps\.json`: read the times from it in the result and give them as numbers\./;
   const toUser = /No tool here takes `steps\.json` or its times: give them to the user/;
   for (const options of [{}, { kits: ['easyscreenshotkit', 'musicfit'] }, { kits: ['easyscreenshotkit', 'launch-film'] }, hosted(), hosted(['check_video']), hosted(['fit_music'])]) {
     const demo = await read(options, ['demo-video']);
     assert.match(demo, asNumbers, JSON.stringify(options));
     assert.doesNotMatch(demo, toUser, JSON.stringify(options));
   }
-  for (const options of [{ kits: ['easyscreenshotkit'] }, hosted(['check_video', 'fit_music'])]) {
+  for (const options of [{ kits: ['easyscreenshotkit'] }, { kits: ['easyscreenshotkit'], where: 'hosted', limits: LIMITS }]) {
     const demo = await read(options, ['demo-video']);
     assert.match(demo, toUser, JSON.stringify(options));
-    assert.doesNotMatch(demo, /give them as numbers/, JSON.stringify(options));
+    assert.doesNotMatch(demo, /give them as numbers|`reframe_video` finds `steps\.json`/, JSON.stringify(options));
+  }
+  const takesIt = /`reframe_video` finds `steps\.json` beside `demo\.mp4`/;
+  for (const options of [hosted(['check_video', 'fit_music']), { kits: ['easyscreenshotkit', 'reframekit'] }]) {
+    const demo = await read(options, ['demo-video']);
+    assert.match(demo, takesIt, JSON.stringify(options));
+    assert.doesNotMatch(demo, toUser, JSON.stringify(options));
   }
 });
 

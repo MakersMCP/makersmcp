@@ -81,6 +81,13 @@ function dryRun(kit, tool, extra, folder) {
       // It checks its numbers before it reads the track, and --analyze needs no length.
       // A track that is not there then ends it with 1; a refused value with 2.
       return { args: [...positional, '--analyze', ...extra], ran: run => run.status === 1 };
+    case 'reframekit':
+      // It checks its numbers as it reads its arguments, and its dry run reads no video and starts no ffmpeg: it ends with 0
+      // whether or not the run would go ahead, and a refused value with 2.
+      return { args: [...positional, ...extra, '--dry-run'], ran: run => run.status === 0 };
+    case 'easycaptionkit':
+      // The same, and a caption needs its words, which a dry run does not read.
+      return { args: [...positional, ...(tool.name === 'caption_video' ? ['--words', path.join(folder, 'no-words')] : []), ...extra, '--dry-run'], ran: run => run.status === 0 };
     case 'launch-film': {
       if (tool.name !== 'check_video') return { args: [...positional, ...extra, '--help'], ran: run => run.status === 0 };
       // A check reads its numbers once it has read the video, and writes CHECK.md once it has run.
@@ -103,6 +110,8 @@ const REFUSED = {
   easyscreenshotkit: ['take_screenshots', ['--timeout', '901']],
   musicfit: ['fit_music', ['--lufs', '-4']],
   'launch-film': ['check_video', ['--lufs', '0']],
+  reframekit: ['reframe_video', ['--lufs', '-4']],
+  easycaptionkit: ['caption_video', ['--size', '21']],
 };
 
 function tinyVideo(folder) {
@@ -357,7 +366,7 @@ test('plan_launch_film refuses a kit that is the brand/ folder by another path, 
     for (const [brand, out_dir] of [['alias/brand', 'marketing'], ['marketing/brand', 'alias']]) {
       const aliased = await plan(brand, out_dir);
       assert.equal(aliased.isError, true, brand);
-      assert.match(text(aliased), /not started[\s\S]*is that same folder under another name, so it would be gone before the copy\. Give brand as .*\/brand to use it where it is\./);
+      assert.match(text(aliased), /not started[\s\S]*is that same folder under another name\. Give brand as .*\/brand to use it where it is\./);
       assert.deepEqual(files('marketing/brand'), team);
     }
     // As the refusal says, the kit then uses the folder where it is.
@@ -497,12 +506,15 @@ test('make_launch_stills takes for a film.json what launch-film takes for one, a
 test('render_launch_film and make_launch_stills read the brand and every picture a film.json names, as launch-film\'s loader reads them', () => {
   const source = name => readFileSync(path.join(launchFilm.dir, 'src', name), 'utf8');
   const film = source('film.js');
-  // loadFilm reads the brand from film.json's folder, and each clip's files through fileOf, a list of them like images too.
+  // loadFilm reads the brand from film.json's folder, and each clip's files through fileOf, a list of them like images too,
+  // and from launch-film 0.3 the user's own track that music names, a path from that folder too (musicOf).
   const brand = /readBrand\(path\.resolve\(dir, film\.(\w+)\)\)/.exec(film)?.[1];
   assert.ok(brand && /Array\.isArray\(film\.clips\)/.test(film) && /fileOf\(rel,/.test(film), 'launch-film\'s loadFilm reads its brand and clips another way now');
+  const track = /musicOf\(film\.(\w+), dir, problems\)/.exec(film)?.[1];
+  assert.ok(track && /track: path\.resolve\(dir, value\)/.test(film), 'launch-film\'s loadFilm reads a track another way now');
   const lists = [...film.matchAll(/Array\.isArray\(c\.(\w+)\) \? c\.\1 : \[\]/g)];
-  const places = [brand, ...[...film.matchAll(/fileOf\(c\.(\w+),/g), ...lists].map(match => `clips.${match[1]}`)];
-  assert.deepEqual([...new Set(places)].sort(), ['brand', 'clips.icon', 'clips.image', 'clips.images', 'clips.logo']);
+  const places = [brand, track, ...[...film.matchAll(/fileOf\(c\.(\w+),/g), ...lists].map(match => `clips.${match[1]}`)];
+  assert.deepEqual([...new Set(places)].sort(), ['brand', 'clips.icon', 'clips.image', 'clips.images', 'clips.logo', 'music']);
   assert.match(source('stills.js'), /loadFilm\(filmFile\)/, 'make_launch_stills reads its film.json with loadFilm');
   const tools = kits.find(kit => kit.kit === 'launch-film').tools;
   const folder = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-kits-'));
@@ -511,6 +523,7 @@ test('render_launch_film and make_launch_stills read the brand and every picture
     const filmJson = path.join(folder, 'film', 'film.json');
     writeFileSync(filmJson, JSON.stringify({
       brand: 'brand/brand.json',
+      music: 'music/fitted.wav',
       clips: [
         { kind: 'screen', image: '../shots/01.png' },
         { kind: 'shots', images: ['../store/a.png', '../store/b.png'] },
@@ -518,7 +531,7 @@ test('render_launch_film and make_launch_stills read the brand and every picture
         { kind: 'logo', icon: '../store/icon.png' },
       ],
     }));
-    const named = ['film/brand/brand.json', 'shots/01.png', 'store/a.png', 'store/b.png', 'film/brand/logo-01.png', 'store/icon.png'].map(file => path.join(folder, file));
+    const named = ['film/brand/brand.json', 'film/music/fitted.wav', 'shots/01.png', 'store/a.png', 'store/b.png', 'film/brand/logo-01.png', 'store/icon.png'].map(file => path.join(folder, file));
     for (const [name, param] of [['render_launch_film', 'film'], ['make_launch_stills', 'source']]) {
       const tool = tools.find(entry => entry.name === name);
       assert.deepEqual([...tool.params[param].reads].sort(), [...new Set(places)].sort(), `${name}.${param}`);
@@ -555,13 +568,22 @@ test('easybrandkit reads a deeper page of a site, or its blog, docs or help site
   assert.match(tool.description, /a deeper page is read from the home page/);
 });
 
-test('what launch-film\'s tools take for a brand kit\'s own files, easybrandkit replaces as its own too', () => {
+test('what launch-film\'s tools take for a brand kit\'s own files, easybrandkit writes as its own too', () => {
   const require = createRequire(import.meta.url);
   const { prepareDir } = require('easybrandkit');
-  // The names easybrandkit deletes after a run that failed, whether its kit listed them or not.
-  const cleanUp = /^const RUN_FILE = \/(.+)\/;$/m.exec(readFileSync(require.resolve('easybrandkit'), 'utf8'));
-  assert.ok(cleanUp, 'easybrandkit has no RUN_FILE any more: see which files it deletes after a failed run');
-  const runFile = new RegExp(cleanUp[1]);
+  // The names easybrandkit writes in a kit, which replace a file of that name there whether the earlier kit listed it or
+  // not: its logos, first screen and card, and the pictures of the listings and profiles it reads, one type of
+  // SOURCE_ORDER each, as <type>-icon, <type>-profile or <type>-shot-NN, in the format each picture came in.
+  const lib = path.dirname(require.resolve('easybrandkit'));
+  const code = ['kit.js', 'logos.js', 'stores.js', 'card.js'].map(file => readFileSync(path.join(lib, file), 'utf8')).join('\n');
+  for (const form of ['`logo-${String(written.length + 1).padStart(2, "0")}.png`', 'file.replace(/\\.png$/, ".svg")', '"screen-01.png"', '"card.png"',
+    '`shot-${String(++shot).padStart(2, "0")}`', '`${link.type}-${suffix}.${info.ext}`', 'ext: "png"', 'ext: "jpg"', 'ext: "webp"']) {
+    assert.ok(code.includes(form), `easybrandkit no longer names a file with ${form}: see which files it writes now`);
+  }
+  const order = /^const SOURCE_ORDER = \[([^\]]*)\];$/m.exec(code);
+  assert.ok(order, 'easybrandkit has no SOURCE_ORDER any more: see which listings and profiles it saves pictures of');
+  const types = [...order[1].matchAll(/"([a-z]+)"/g)].map(match => match[1]);
+  const ownName = new RegExp(`^(?:(?:logo|screen)-\\d+\\.png|logo-\\d+\\.svg|card\\.png|(?:${types.join('|')})-(?:icon|profile|shot-\\d+)\\.(?:png|jpg|webp))$`);
   const tools = kits.find(kit => kit.kit === 'launch-film').tools.filter(tool => tool.out?.replaces?.brand);
   assert.deepEqual(tools.map(tool => tool.name), ['make_launch_film', 'plan_launch_film', 'make_launch_stills']);
   // A kit as easybrandkit writes one: a file at each place its brand.json lists them.
@@ -581,7 +603,7 @@ test('what launch-film\'s tools take for a brand kit\'s own files, easybrandkit 
   for (const tool of tools) {
     const kind = tool.out.replaces.brand;
     const named = new RegExp(`^(?:${kind.names})$`);
-    for (const name of names) assert.equal(named.test(name), runFile.test(name), `${tool.name}: ${name}`);
+    for (const name of names) assert.equal(named.test(name), ownName.test(name), `${tool.name}: ${name}`);
 
     const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-kit-'));
     try {
@@ -953,9 +975,9 @@ function kitWords(kit) {
 const literalParts = words => words.split(/\{[a-z][a-z0-9_]*(?::name)?\}/).filter(part => part.trim());
 
 /**
- * What each tool's kit says when it fails after it cleared its folder, in the words of its
- * code. None of them may hold a refusal of the tool's, nor be part of one, or a run that lost
- * an earlier one would be told nothing was deleted.
+ * What each tool's kit says when it fails once it has begun its work, in the words of its
+ * code. None of them may hold a refusal of the tool's, nor be part of one, so a job that ran
+ * gets its failed Next line, never the refused one.
  */
 const AFTER_THE_FOLDER = {
   make_brand_kit: ['No Chrome, Chromium, Edge or Brave found', 'Could not open', 'answered with a bot check', 'still shows no content'],
@@ -966,7 +988,7 @@ const AFTER_THE_FOLDER = {
   make_launch_film: ['No Chrome, Chromium, Edge or Brave found', 'Could not open', 'answered with a bot check', 'still shows no content', 'Chrome was not found', 'film.json has problems'],
 };
 
-test('each refusal a kit file names is words of that kit\'s code, or of a kit it runs, and none is part of what a kit says after it cleared its folder', () => {
+test('each refusal a kit file names is words of that kit\'s code, or of a kit it runs, and none is part of what a kit says once it has begun its work', () => {
   for (const kit of kits) {
     for (const tool of kit.tools) {
       // launch-film passes on easybrandkit's reason when it runs easybrandkit.
@@ -978,7 +1000,7 @@ test('each refusal a kit file names is words of that kit\'s code, or of a kit it
         }
         for (const after of AFTER_THE_FOLDER[tool.name] ?? []) {
           for (const part of literalParts(refusal)) {
-            assert.ok(!after.includes(part.trim()) && !part.includes(after), `${tool.name}.refuses: "${refusal}" is part of "${after}", which comes after the kit cleared its folder`);
+            assert.ok(!after.includes(part.trim()) && !part.includes(after), `${tool.name}.refuses: "${refusal}" is part of "${after}", which comes once the kit has begun its work`);
           }
         }
       }
@@ -1048,7 +1070,7 @@ const REFUSALS = [
   ['take_screenshots', 'is not a page of', { url: SITE, page: ['https://other.example.com/x'] }, EARLIER.shots],
   ['take_screenshots', 'holds no earlier easyscreenshotkit run', { url: SITE }, { 'notes.txt': 'mine' }],
   ['take_screenshots', 'Not a web address', { url: 'https://[bad]/' }, EARLIER.shots],
-  ['record_demo_video', 'needs ffmpeg, and none was found', { url: SITE }, EARLIER.demo, 'none'],
+  ['record_demo_video', 'The demo needs ffmpeg', { url: SITE }, EARLIER.demo, 'none'],
   ['record_demo_video', 'has no H.264 encoder', { url: SITE }, EARLIER.demo, 'no H.264'],
   ['record_demo_video', 'holds no earlier easyscreenshotkit demo', { url: SITE }, { 'notes.txt': 'mine' }, 'H.264'],
   ['record_demo_video', 'Not a web address', { url: 'https://[bad]/' }, EARLIER.demo],
@@ -1058,7 +1080,8 @@ const REFUSALS = [
   ['record_demo_video', '--background takes a colour', { url: SITE, background: '@/backdrop.bmp' }, { ...EARLIER.demo, 'backdrop.bmp': 'BM' }],
   ['record_demo_video', '--background takes a colour', { url: SITE, background: '@/pictures' }, { ...EARLIER.demo, 'pictures/backdrop.png': 'png' }],
   ['make_launch_film', 'is not a command or an address', { url: 'http://localhost:9/' }, EARLIER.film],
-  ['make_launch_film', "not the brand's own site", { url: 'https://x.com/acme' }, EARLIER.film],
+  // launch-film 0.3 looks at the Chrome a film renders with before easybrandkit reads the address, so this one gets a script there.
+  ['make_launch_film', "not the brand's own site", { url: 'https://x.com/acme' }, EARLIER.film, 'a Chrome script'],
   ['make_launch_film', 'no brand.json at', { url: SITE, brand: 'kitless' }, EARLIER.film],
   ['make_launch_film', 'holds no earlier brand kit', { url: SITE }, { ...EARLIER.film, 'brand/notes.txt': 'mine' }],
   ['plan_launch_film', "give the site's address", { url: 'http://localhost:9/' }, EARLIER.film],
@@ -1077,7 +1100,7 @@ test('every refusal a kit file lists has a call here that the kit refuses with i
   for (const [name, words] of REFUSALS) assert.ok(tools.get(name)?.refuses?.includes(words), `REFUSALS: "${words}" is not in ${name}.refuses`);
 });
 
-test('a call a kit refuses before it touches its folder leaves an earlier run there, and its Next line says nothing was deleted; one that fails after says what is gone', { skip: process.platform === 'win32' && 'its launcher needs /usr/bin/env' }, async () => {
+test('a call a kit refuses, or a run that fails, leaves an earlier run in its folder as it was, and its Next line says nothing was deleted', { skip: process.platform === 'win32' && 'its launcher needs /usr/bin/env' }, async () => {
   const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-refused-'));
   // No browser for the kits, which the launcher sets: each kit that gets past its own checks fails as it starts one.
   const env = { ...process.env };
@@ -1085,7 +1108,8 @@ test('a call a kit refuses before it touches its folder leaves an earlier run th
   // An ffmpeg that lists its encoders, with H.264 or without, for the checks the demo makes before its folder.
   const fake = (name, encoders) => {
     const file = path.join(baseDir, name);
-    writeFileSync(file, `#!/bin/sh\nprintf '%s\\n' '${encoders}'\n`);
+    // It says its version when asked, as easyscreenshotkit asks before anything else, and lists its encoders otherwise.
+    writeFileSync(file, `#!/bin/sh\ncase " $* " in *" -version "*) echo 'ffmpeg version 6.1.1 Copyright (c) 2000-2023 the FFmpeg developers' ;; *) printf '%s\\n' '${encoders}' ;; esac\n`);
     chmodSync(file, 0o755);
     return file;
   };
@@ -1099,7 +1123,10 @@ test('a call a kit refuses before it touches its folder leaves an earlier run th
   const sessions = new Map();
   const clientFor = async ffmpeg => {
     if (!sessions.has(ffmpeg)) {
-      const backend = new LocalBackend({ baseDir, kitPaths, env, launcher: launcherWith({ ...noBrowser(baseDir), ...(ffmpeg ? { FFMPEG_PATH: ffmpegs[ffmpeg] } : {}) }) });
+      // A script in launch-film's Chrome's place, which launch-film takes without asking it, as it takes Google Chrome's own launcher.
+      const chrome = ffmpeg === 'a Chrome script' ? { LAUNCH_FILM_CHROME: fake('chrome-script', '') } : {};
+      const program = ffmpeg && ffmpeg !== 'a Chrome script' ? { FFMPEG_PATH: ffmpegs[ffmpeg] } : {};
+      const backend = new LocalBackend({ baseDir, kitPaths, env, launcher: launcherWith({ ...noBrowser(baseDir), ...chrome, ...program }) });
       const server = createMcpServer({ backend });
       const client = new Client({ name: 'test-client', version: '1.0.0' });
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -1144,31 +1171,32 @@ test('a call a kit refuses before it touches its folder leaves an earlier run th
       ['take_screenshots', { url: SITE }, EARLIER.shots],
     ];
     if (hasFfmpeg) failures.push(['record_demo_video', { url: SITE, pages: 1 }, EARLIER.demo]);
+    // Each kit makes a run's files apart and puts them in place only once the run has ended well, so one that fails after it
+    // began its work leaves the earlier run as it was too, as its Next line says.
     for (const [tool, args, earlier] of failures) {
-      const { result, after, next } = await run(tool, args, earlier);
+      const { result, before, after, next } = await run(tool, args, earlier);
       const label = `${tool} ${JSON.stringify(args)}`;
       assert.equal(result.structuredContent?.status, 'failed', `${label}: ${text(result)}`);
       assert.match(text(result), /No Chrome, Chromium, Edge or Brave found/, label);
-      assert.deepEqual(after, [], `${label} deleted the earlier run before it failed`);
-      assert.match(next, / (?:is|are) gone: this run deleted (?:it|them) before it failed/, label);
+      assert.deepEqual(after, before, `${label} left the folder as it was`);
+      assert.doesNotMatch(next, /gone|deleted|emptied/, label);
+      assert.match(next, / leaves \S+ as it was, [\w' ]+ there too\.$/, label);
     }
 
-    // Given a brand kit and the page's words, make_launch_film plans without a browser and fails at the render: the plan's files
-    // are this run's, the film's the earlier one's, as the Next line says.
+    // Given a brand kit and the page's words, make_launch_film plans without a browser and fails at the render: the plan stays
+    // in the run's own folder, and the earlier plan and film are as they were, as the Next line says.
     mkdirSync(path.join(baseDir, 'kit'));
     writeFileSync(path.join(baseDir, 'kit', 'brand.json'), JSON.stringify({ version: 1, name: 'Acme', url: SITE, colors: [{ hex: '#1f6f4a', role: 'button' }, { hex: '#f4efe6', role: 'surface' }], logos: [], screenshots: [] }));
     writeFileSync(path.join(baseDir, 'page-words.json'), JSON.stringify({ lang: 'en', title: 'Acme: plants, remembered', description: 'Acme tells you which plant needs water today.', siteName: 'Acme',
       headings: [{ level: 1, text: 'Keep every plant alive', after: 'Acme tells you which plant needs water today.' }, { level: 2, text: 'Every pot, every window', after: 'It learns from each one.' }], ctas: ['Start for free'], paragraphs: [], jsonld: [] }));
-    const planned = await run('make_launch_film', { url: SITE, brand: 'kit', words: 'page-words.json' }, EARLIER.film);
+    // A script in Chrome's place passes launch-film's look before any work and renders nothing.
+    const planned = await run('make_launch_film', { url: SITE, brand: 'kit', words: 'page-words.json' }, EARLIER.film, 'a Chrome script');
     const folder = path.join(baseDir, `case-${n}`);
     assert.equal(planned.result.structuredContent?.status, 'failed', text(planned.result));
     assert.match(text(planned.result), /Planned \d+ clips in the \w+ look/);
-    assert.match(text(planned.result), /Chrome was not found/);
-    assert.notEqual(readFileSync(path.join(folder, 'film.json'), 'utf8'), EARLIER.film['film.json']);
-    assert.notEqual(readFileSync(path.join(folder, 'words.json'), 'utf8'), EARLIER.film['words.json']);
-    assert.equal(readFileSync(path.join(folder, 'film.mp4'), 'utf8'), EARLIER.film['film.mp4']);
-    assert.equal(readFileSync(path.join(folder, 'film.timeline.json'), 'utf8'), EARLIER.film['film.timeline.json']);
-    assert.ok(planned.next.includes(`When the reason shows "Planned <n> clips", or a clip it rendered, this run replaced film.json, words.json and brand/ in ${folder}, so the film.mp4, film.timeline.json and frames/ there may be of the earlier film`), planned.next);
+    assert.deepEqual(planned.after, planned.before, 'the failed film left its folder as it was');
+    for (const file of ['film.json', 'words.json', 'film.mp4', 'film.timeline.json']) assert.equal(readFileSync(path.join(folder, file), 'utf8'), EARLIER.film[file], file);
+    assert.ok(planned.next.includes(`A run that fails leaves ${folder} as it was: an earlier plan, brand/ and film there are as they were.`), planned.next);
   } finally {
     for (const { client, server } of sessions.values()) {
       await client.close();
@@ -1178,7 +1206,7 @@ test('a call a kit refuses before it touches its folder leaves an earlier run th
   }
 });
 
-test('a file the call gives that a demo run deletes or writes over in its folder, like a steps file saved as its steps.json, stops the call before the job starts', async () => {
+test('a file the call gives that a demo run writes over in its folder, like a steps file saved as its steps.json, stops the call before the job starts', async () => {
   const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-runfiles-'));
   // No browser for the kit, which the launcher sets: a call that starts fails as the kit starts one.
   const posix = process.platform !== 'win32';
@@ -1224,7 +1252,7 @@ test('a file the call gives that a demo run deletes or writes over in its folder
       assert.equal(result.structuredContent, undefined, `${label}: no job started`);
       assert.match(text(result), /^## Demo video of a website: not started\n\n/, label);
       const given = path.join(baseDir, args[param]);
-      assert.ok(text(result).includes(`${param}: ${given} is the ${name} of ${path.join(baseDir, folder)}, where record_demo_video saves, and a run there deletes or writes over that file. Give it another name or folder, or give another out_dir.`), text(result));
+      assert.ok(text(result).includes(`${param}: ${given} is the ${name} of ${path.join(baseDir, folder)}, where record_demo_video saves, and a run there writes over that file. Give it another name or folder, or give another out_dir.`), text(result));
       assert.deepEqual(filesIn(path.join(baseDir, folder)), before, `${label} left the folder as it was`);
     }
     // Under any other name the steps file may sit in the demo's folder: the run starts, and fails here for want of a browser, leaving it.
@@ -1234,7 +1262,7 @@ test('a file the call gives that a demo run deletes or writes over in its folder
       assert.equal(started.structuredContent?.status, 'failed', text(started));
       assert.match(text(started), /No Chrome, Chromium, Edge or Brave found/);
       assert.deepEqual(filesIn(path.join(baseDir, 'four')), ['app.json']);
-      assert.match(started.structuredContent.next, /a steps file it read stays\.$/);
+      assert.match(started.structuredContent.next, /leaves \S+four as it was, an earlier demo there too\.$/);
     }
     // A kit file whose runFiles names anything but a file in the folder itself is refused when it is read.
     const screenshots = kits.find(kit => kit.kit === 'easyscreenshotkit');

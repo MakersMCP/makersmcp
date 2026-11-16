@@ -1,0 +1,113 @@
+{
+  "kit": "easycaptionkit",
+  "package": "easycaptionkit",
+  "field": "video",
+  "about": "Captions burned into a video in the product's own fonts and colors, word by word or line by line, clear of each app's buttons, with the SRT, VTT and ASS files to go with it.",
+  "repository": "https://github.com/MakersMCP/easycaptionkit",
+  "needs": ["chrome", "ffmpeg"],
+  "tools": [
+    {
+      "name": "caption_video",
+      "title": "Captions burned into a video",
+      "makes": ["captions burned into a video"],
+      "asks": "captions or subtitles burned into a video, to read with the sound off, karaoke style or in the brand's fonts, clear of an app's buttons",
+      "playbook": "captions",
+      "description": "Burns captions into a video from words with times the user already has: a speech-to-text JSON with word or line times, from OpenAI, whisper.cpp, Deepgram and others, an SRT or WebVTT file, or a demo's steps file, whose step notes become the captions. It does not listen, and no tool here makes such a file. karaoke shows each caption whole and lights the word being spoken, line shows whole captions, word one word at a time. The captions sit inside the space every place in for leaves free of its buttons, drawn by Chrome on this machine in the fonts and color given and laid over the video in one ffmpeg encode, its sound copied. Writes captioned.mp4, captions.srt, captions.vtt, captions.ass, words.json, sheet.png (captions on their frames, the picture to look at first), safe-zones.png (a frame under each app's buttons) and CAPTIONS.md, which the result shows. For the subtitle files alone, use make_subtitles instead.",
+      "hostedDescription": "Burns captions into a video from words with times the user already has: a speech-to-text JSON with word or line times, from OpenAI, whisper.cpp, Deepgram and others, an SRT or WebVTT file, or a demo's steps file, whose step notes become the captions. It does not listen, and no tool here makes such a file. karaoke shows each caption whole and lights the word being spoken, line shows whole captions, word one word at a time. The captions sit inside the space every place in for leaves free of its buttons, in the fonts and the color given, laid over the video in one encode, its sound copied. Writes captioned.mp4, captions.srt, captions.vtt, captions.ass, words.json, sheet.png (captions on their frames, the picture to look at first), safe-zones.png (a frame under each app's buttons) and CAPTIONS.md, which the result shows. For the subtitle files alone, use make_subtitles instead.",
+      "args": ["{video}"],
+      "out": { "flag": "--out", "name": "{dir:video}/easycaptionkit-{stem:video}" },
+      "destructive": true,
+      "params": {
+        "video": { "type": "path", "required": true, "description": "The video to caption, any file ffmpeg reads. A launch film's film.timeline.json beside it is copied as captioned.timeline.json, so check_video finds its cuts." },
+        "words": { "type": "path", "flag": "--words", "required": true, "description": "The words and their times: a speech-to-text JSON, an SRT or WebVTT file, a demo's steps.json, or the words.json of an earlier run with a misheard word fixed by hand. Not an ASS file.", "hostedDescription": "The words and their times: a speech-to-text JSON, an SRT or WebVTT file, or a demo's steps.json. Not an ASS file. Give an https link to the file, or job:<job_id>/<path> for one an earlier job saved." },
+        "style": { "type": "enum", "flag": "--style", "values": ["karaoke", "line", "word"], "default": "karaoke", "description": "karaoke lights the word being spoken in each whole caption (default {default:caption_video.style}), line shows whole captions in one color, word one word at a time, bigger." },
+        "for": { "type": "list", "flag": "--for", "values": ["tiktok", "reels", "shorts", "youtube", "x", "linkedin", "square"], "description": "The places the video goes to: the captions keep clear of the buttons of every one of them at once (default: the places of the video's shape)." },
+        "position": { "type": "enum", "flag": "--position", "values": ["bottom", "middle", "top"], "default": "bottom", "description": "Where in the free space the captions sit (default {default:caption_video.position}): middle or top when the picture has text or a face at the bottom of it." },
+        "brand": { "type": "path", "flag": "--brand", "description": "A brand kit, its folder or brand.json: its button, link or logo color lights the spoken word, and without fonts or font its heading font is asked for by name, which this machine may not have. make_brand_kit makes one.", "hostedDescription": "A brand kit an earlier job saved, as job:<job_id>/brand.json: its button, link or logo color lights the spoken word, and without fonts or font its heading font is asked for by name. make_brand_kit makes one." },
+        "fonts": { "type": "path", "flag": "--fonts", "description": "A font kit, its folder or fonts.css: the captions are drawn with the site's own font files, its heading font first. make_font_kit makes one.", "hostedDescription": "A font kit an earlier job saved, as job:<job_id>/fonts.css, with its font files: the captions are drawn with the site's own fonts, its heading font first. make_font_kit makes one." },
+        "font": { "type": "string", "flag": "--font", "description": "A font family to draw with, from fonts.css or this machine, like Inter.", "hostedDescription": "A font family to draw with, from the font kit given as fonts, like Inter." },
+        "highlight": { "type": "string", "flag": "--highlight", "description": "The spoken word's color, like #ffd23f, in the karaoke and word styles; a dark one lights the word on a patch of it." },
+        "lines": { "type": "integer", "flag": "--lines", "min": 1, "max": 3, "default": 2, "description": "Lines a caption may take, {bounds:caption_video.lines} (default {default:caption_video.lines}); the word style shows one." },
+        "max_chars": { "type": "integer", "flag": "--max-chars", "min": 8, "max": 80, "default": "what fits the safe width, at most 42", "description": "Characters a line may take, {bounds:caption_video.max_chars} (default: {default:caption_video.max_chars})." },
+        "size": { "type": "number", "flag": "--size", "min": 2, "max": 20, "default": "6.5, or 9.5 for the word style", "description": "The letters' size in percent of a phone's width, or of the frame's short side, {bounds:caption_video.size} (default {default:caption_video.size}). A line too wide for the free space is drawn smaller." },
+        "box": { "type": "boolean", "flag": "--box", "default": false, "description": "A dark box behind the words instead of an outline." },
+        "libass": { "type": "boolean", "flag": "--libass", "default": false, "where": "local", "description": "Draw the captions with ffmpeg's libass instead of Chrome, for a machine where Chrome cannot start; it needs an ffmpeg built with libass and draws no color emoji." }
+      },
+      "docs": ["CAPTIONS.md"],
+      "writes": ["captioned.mp4", "captioned.timeline.json", "captions.srt", "captions.vtt", "captions.ass", "words.json", "captions.json", "sheet.png", "safe-zones.png", "CAPTIONS.md"],
+      "next": {
+        "done": [
+          "Look at {file:sheet.png}, or give the user its path: no caption may cover text or a face in the picture, and one that does moves with position middle or top.",
+          "Show {file:safe-zones.png} to the user: a frame of the video under each app's buttons.",
+          "Tell the user what CAPTIONS.md below says of the font's license and of letters drawn as boxes before the video goes out, and that the captions say what the words file says.",
+          "To fix a misheard word, edit its text in {file:words.json} and call caption_video again with words {file:words.json} and the same video and options."
+        ]
+      },
+      "hostedNext": {
+        "done": [
+          "Give the user the {name:sheet.png} link from the list below: no caption may cover text or a face in the picture, and one that does moves with position middle or top.",
+          "Give the user the {name:safe-zones.png} link: a frame of the video under each app's buttons.",
+          "Tell the user what CAPTIONS.md below says of the font's license and of letters drawn as boxes before the video goes out, and that the captions say what the words file says."
+        ]
+      }
+    },
+    {
+      "name": "make_subtitles",
+      "title": "Subtitle files from words with times",
+      "makes": ["subtitle files"],
+      "asks": "an SRT, VTT or ASS subtitle file for a video",
+      "playbook": "captions",
+      "description": "Writes subtitle files from words with times the user already has, and changes no video: captions.srt and captions.vtt, lines of up to {default:make_subtitles.max_chars} characters for any player or place that takes a captions file, captions.ass with the font, the colors and the place, laid out for the frame of the video given (else a phone's for tiktok, reels or shorts, a square for square alone, and 16:9 for the rest), and words.json, captions.json and CAPTIONS.md, which the result shows with how fast the captions read. The words are a speech-to-text JSON, an SRT or WebVTT file, or a demo's steps file, whose step notes become the captions; without video, a demo's captions end where its steps file says the video does. To burn the captions into the video, use caption_video instead.",
+      "args": ["subtitles", "{words}"],
+      "out": { "flag": "--out", "name": "{dir:words}/easycaptionkit-subtitles-{stem:words}" },
+      "needs": ["ffmpeg"],
+      "destructive": true,
+      "params": {
+        "words": { "type": "path", "required": true, "description": "The words and their times: a speech-to-text JSON, an SRT or WebVTT file, a demo's steps.json, or the words.json of an earlier run with a misheard word fixed by hand.", "hostedDescription": "The words and their times: a speech-to-text JSON, an SRT or WebVTT file, or a demo's steps.json. Give an https link to the file, or job:<job_id>/<path> for one an earlier job saved." },
+        "video": { "type": "path", "flag": "--video", "description": "The video the subtitles are for, read for its size and length only." },
+        "for": { "type": "list", "flag": "--for", "values": ["tiktok", "reels", "shorts", "youtube", "x", "linkedin", "square"], "description": "The places the video goes to, whose free space captions.ass keeps to (default: the places of the video's shape, or of the frame laid out)." },
+        "style": { "type": "enum", "flag": "--style", "values": ["karaoke", "line", "word"], "default": "karaoke", "description": "How captions.ass shows them: karaoke lights the word being spoken (default {default:make_subtitles.style}), line shows whole captions, word one word at a time." },
+        "position": { "type": "enum", "flag": "--position", "values": ["bottom", "middle", "top"], "default": "bottom", "description": "Where in the free space captions.ass puts them (default {default:make_subtitles.position})." },
+        "brand": { "type": "path", "flag": "--brand", "description": "A brand kit, its folder or brand.json, for captions.ass's highlight color and font. make_brand_kit makes one.", "hostedDescription": "A brand kit an earlier job saved, as job:<job_id>/brand.json, for captions.ass's highlight color and font. make_brand_kit makes one." },
+        "fonts": { "type": "path", "flag": "--fonts", "description": "A font kit, its folder or fonts.css, for captions.ass's font. make_font_kit makes one.", "hostedDescription": "A font kit an earlier job saved, as job:<job_id>/fonts.css, for captions.ass's font. make_font_kit makes one." },
+        "font": { "type": "string", "flag": "--font", "description": "A font family for captions.ass, like Inter." },
+        "highlight": { "type": "string", "flag": "--highlight", "description": "The spoken word's color in captions.ass, like #ffd23f." },
+        "lines": { "type": "integer", "flag": "--lines", "min": 1, "max": 3, "default": 2, "description": "Lines a caption may take, {bounds:make_subtitles.lines} (default {default:make_subtitles.lines})." },
+        "max_chars": { "type": "integer", "flag": "--max-chars", "min": 8, "max": 80, "default": 42, "description": "Characters a line of captions.srt and captions.vtt may take, {bounds:make_subtitles.max_chars} (default {default:make_subtitles.max_chars}); captions.ass cuts its lines to what fits across its frame." },
+        "size": { "type": "number", "flag": "--size", "min": 2, "max": 20, "default": "6.5, or 9.5 for the word style", "description": "The letters' size in captions.ass, in percent of a phone's width or of the frame's short side, {bounds:make_subtitles.size} (default {default:make_subtitles.size})." },
+        "box": { "type": "boolean", "flag": "--box", "default": false, "description": "A dark box behind the words in captions.ass instead of an outline." }
+      },
+      "docs": ["CAPTIONS.md"],
+      "writes": ["captions.srt", "captions.vtt", "captions.ass", "words.json", "captions.json", "CAPTIONS.md"],
+      "next": {
+        "done": [
+          "Give {file:captions.srt} or {file:captions.vtt} to the place that takes a captions file, like YouTube or LinkedIn; {file:captions.ass} carries the font, the colors and the place.",
+          "Tell the user how fast the captions read, from CAPTIONS.md below, and that they say what the words file says."
+        ]
+      },
+      "hostedNext": {
+        "done": [
+          "Give the user the {name:captions.srt} or {name:captions.vtt} link from the list below for the place that takes a captions file, like YouTube or LinkedIn; {name:captions.ass} carries the font, the colors and the place.",
+          "Tell the user how fast the captions read, from CAPTIONS.md below, and that they say what the words file says."
+        ]
+      }
+    },
+    {
+      "name": "list_caption_styles",
+      "title": "Caption styles and each place's margins",
+      "asks": "the caption styles, or the margins an app's buttons leave free",
+      "playbook": "captions",
+      "description": "Lists easycaptionkit's caption styles with what each suits, its options, and every place's margins, in pixels of the screen or frame they are for, each with its source and the day it was read. It reads no file and runs no browser or ffmpeg. Use it to pick a style and the places for caption_video, or to tell the user where an app's buttons sit.",
+      "args": ["styles"],
+      "needs": [],
+      "readOnly": true,
+      "params": {},
+      "writes": [],
+      "next": {
+        "done": [
+          "Give caption_video the style and the places in for; the margins above are the apps' ad guides or estimates, so tell the user to check one post on a phone."
+        ]
+      }
+    }
+  ]
+}

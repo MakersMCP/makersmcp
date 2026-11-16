@@ -5,7 +5,7 @@ index: long jobs, calls that end early, cancelling, folders, passing one job's f
 description: Explains how a MakersMCP job runs and ends, how to wait for a long one, what to do after a call that ended with no result, what cancel_job and list_jobs do, where each job's files go and, locally, what a new run replaces, and how one job's files go into the next. Use it before running jobs side by side, after a call ended early, before reusing a folder, or when a file from one job has to go into another.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music, make_launch_film, plan_launch_film]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, reframekit, easycaptionkit, check_video, fit_music, make_launch_film, plan_launch_film]
 order: 80
 ---
 # Jobs, waits and files
@@ -37,13 +37,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 - `cancel_job` on a job that has ended returns it as it is.
 <!-- local -->
 - `list_jobs` shows the jobs this makersmcp started since it was launched: those still running, and the last 50 that ended. Jobs end when makersmcp ends, as when the client closes or restarts it. Their ids go with them, and `wait_for_job` then answers "No job <job_id>", but the files they saved stay in their folders.
-- `cancel_job` stops a running job and the browser or ffmpeg it started. Files it saved stay. An earlier run's files that the kit cleared when it started are gone.
-<!-- with easybrandkit -->
-  A brand kit canceled part way can leave some of its files without its brand.json, and `make_brand_kit` then refuses that folder: give the next run another `out_dir`.
-<!-- end -->
-<!-- with easyscreenshotkit -->
-  Screenshots canceled part way can leave some of the pictures without their manifest.json, and `take_screenshots` then refuses that folder: give the next run another `out_dir`.
-<!-- end -->
+- `cancel_job` stops a running job and the browser or ffmpeg it started. The kits put a run's files in place only once it has ended well, so a canceled run leaves its folder as it was, an earlier run's files there too. A kit stopped before it could tidy up can leave a hidden folder of its own there, which its next run in that folder removes.
 - Jobs run side by side as far as the machine allows: four jobs that each opened Chrome have run at once. Two jobs never write into one folder, nor one into a folder inside the other's, since each would list the other's files as its own: the second is refused with "<job_id> (<tool>) is still writing to <folder>" and "Wait for it with wait_for_job (job_id <job_id>), or give another out_dir." The same call made again while its job runs is told that job is its own, to wait for, and offered no other folder. A call that gives a file from a running job's folder is refused too, wherever it saves, since that job may still change the file. A file not there now counts too, since that job may write it later or have cleared it to write it again. Such a call, and one that cannot save anywhere else, gets "Wait for it with wait_for_job (job_id <job_id>), then call <tool> again." instead.
 <!-- with launch-film -->
   The brand and the pictures a film.json names count as files `render_launch_film` and `make_launch_stills` are given. So a check of a film waits for a render, `make_launch_film` or pictures that save in the film's folder, whatever its `out_dir`, and a render or pictures wait for a check in check/ next to the film: run them one after the other.
@@ -80,16 +74,26 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- with launch-film -->
 <!-- local -->
 - `plan_launch_film`, `make_launch_film` and `make_launch_stills` given an address save in launch-film-<host>. `render_launch_film` saves next to its film.json, `make_launch_stills` given a film.json saves in stills/ next to it, and `check_video` saves in check/ next to the video.
-- A new plan replaces film.json, words.json and brand/ in its folder, and leaves an earlier film.mp4, film.timeline.json, frames/ and stills/ there, which no longer match it. Given `brand`, these tools copy that kit into brand/, and a brand/ that holds a file of the user's stops the call before anything changes. Without `brand`, a plan that fails while reading the site may leave brand/ empty. The launch-film topic has the rest.
+- A new plan replaces film.json, words.json and brand/ in its folder, and leaves an earlier film.mp4, film.timeline.json, frames/ and stills/ there, which no longer match it. Given `brand`, these tools copy that kit into brand/, and a brand/ that holds a file of the user's stops the call before anything changes. The launch-film topic has the rest.
 <!-- end -->
 <!-- end -->
 <!-- with musicfit -->
 <!-- local -->
-- `fit_music` and `analyze_music` share musicfit-<track's name>. Each deletes fitted.wav, mix.wav, cues.json, seams.png and FIT.md there before it writes and leaves other files alone, so `analyze_music` after `fit_music` on the same track deletes the fitted track.
+- `fit_music` saves in musicfit-<track's name> and `analyze_music` in musicfit-<track's name>.analysis. A run replaces the files an earlier run of musicfit wrote there, and stops at a file of the user's under a name it writes.
+<!-- end -->
+<!-- end -->
+<!-- with reframekit -->
+<!-- local -->
+- `reframe_video` and `plan_reframe` save in reframekit-<video's name> next to the video, which holds the runs of that one video: a run there replaces the files it makes again and keeps the other places' files. `check_place_limits` saves in reframekit-check-<name> next to what it checks.
+<!-- end -->
+<!-- end -->
+<!-- with easycaptionkit -->
+<!-- local -->
+- `caption_video` saves in easycaptionkit-<video's name> next to the video, and `make_subtitles` in easycaptionkit-subtitles-<words file's name> next to the words file. A run replaces the files an earlier run wrote there.
 <!-- end -->
 <!-- end -->
 <!-- local -->
-- The brand, font and screenshot kits clear what an earlier run left in the folder as they start, so a run of theirs that fails or is canceled loses it too. musicfit, a render and a check replace their files only when they succeed. Before a run into a folder that holds a result the user wants, give another `out_dir`.
+- Every kit puts a run's files in place only once the run has ended well, so one that fails or is canceled leaves its folder as it was. A kit stops before any work at a file of the user's under a name it writes, and the brand, font and screenshot kits at any folder that holds neither nothing nor an earlier run of theirs. A run that ends well replaces an earlier result there, so before a run into a folder that holds a result the user wants, give another `out_dir`.
 - A result lists the files the job saved or changed in its folder, without hidden files: 40 in the text and up to 200 in `files`. The kit's notes come after them. The list and the notes stay as they were when the job ended: what a later job saves in that folder, or in one inside it, never shows under this one, though it may have replaced some of these files since.
 <!-- end -->
 
@@ -107,6 +111,9 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 <!-- with easyscreenshotkit -->
   Manifest screenshots go in as job:<job_id>/pwa/manifest-screenshots.json.
+<!-- end -->
+<!-- with easyfontkit -->
+  A font kit goes in as job:<job_id>/fonts.css, with its font files.
 <!-- end -->
 - Other files go as https links where a parameter takes a file: a public address, at most 200 MB, sent within 5 minutes. A parameter that takes an address or a file reads a link as the address.
 - Nothing here uploads a file the assistant wrote, so a file goes in only as a link the user gives or as a file an earlier job saved, used as it is. Say so instead of offering to change one.
@@ -143,6 +150,22 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 <!-- end -->
 <!-- with check_video -->
 - cues.json of `fit_music` or `analyze_music` goes to `cues` of `check_video`.
+<!-- end -->
+- A video goes to `video` of `fit_music`, which lays the track under it.
+<!-- end -->
+<!-- with reframekit -->
+- A finished video goes to `video` of `reframe_video`, which finds a launch film's timeline or a demo's steps file beside it under its name, and a folder it made, or one file of it, goes to `target` of `check_place_limits`.
+<!-- end -->
+<!-- with easycaptionkit -->
+- A video goes to `video` of `caption_video`, and words with times to its `words`: a speech-to-text JSON, an SRT or WebVTT file, or a demo's steps file.
+<!-- with easybrandkit -->
+  The brand kit of `make_brand_kit` goes to its `brand`.
+<!-- end -->
+<!-- with easyfontkit -->
+  The font kit of `make_font_kit` goes to its `fonts`.
+<!-- end -->
+<!-- with reframekit -->
+  A file of each shape of `reframe_video` goes to `caption_video` with its places in `for`, the 9:16 one with tiktok, reels and shorts together, and the captioned.mp4 with its captions.ass to `check_place_limits` as `target` and `captions`.
 <!-- end -->
 <!-- end -->
 

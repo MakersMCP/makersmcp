@@ -1,14 +1,14 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.EminBudak/makersmcp",
+  "name": "io.github.MakersMCP/makersmcp",
   "title": "MakersMCP",
-  "description": "Free kits for makers: brand kits, fonts, screenshots, demo videos, films and music.",
+  "description": "Free kits for makers: brand kits, fonts, screenshots, films, music, captions and video formats.",
   "repository": {
-    "url": "https://github.com/EminBudak/makersmcp",
+    "url": "https://github.com/MakersMCP/makersmcp",
     "source": "github"
   },
   "websiteUrl": "https://makersmcp.com",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "icons": [
     {
       "src": "https://makersmcp.com/assets/favicon.svg",
@@ -25,7 +25,7 @@
     {
       "registryType": "npm",
       "identifier": "makersmcp",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "transport": {
         "type": "stdio"
       },

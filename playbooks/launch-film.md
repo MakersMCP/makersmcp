@@ -6,7 +6,7 @@ description: Plans, renders and hands over a short launch film made from a produ
 kit: launch-film
 requires: [launch-film]
 any: [make_launch_film, plan_launch_film]
-optional: [easybrandkit, check_video, fit_music]
+optional: [easybrandkit, check_video, fit_music, reframekit]
 order: 65
 ---
 # Launch films and launch pictures
@@ -31,12 +31,18 @@ launch_film_guide {"topic": "looks"}
 ```
 - `seconds` aims the plan at a length, {bounds:plan_launch_film.seconds}. Clips last whole bars and the plan never stretches one to fill the time, so the film can end several seconds away from it, often short. `film.timeline.json` has the real length.
 - `aspect` is 16:9 or 9:16. For both, make a second plan with the other `aspect` and `words` set to the first plan's `words.json`, so both films say the same.
-- The sound is the look's own bed and sound effects, made in code. `film.json` takes no track: a file named in its music field is ignored without a word. For the user's own track, plan with `music` false.
+<!-- with reframekit -->
+  For a 4:5 feed, a square or a place's length and size, `reframe_video` makes each place's version of the rendered film (the reframe topic).
+<!-- end -->
+- The sound is the look's own bed and sound effects, made in code, at {fact:launch-film.lufs} LUFS. For the user's own track, plan with `music` false, so the film's sound is its effects alone.
 <!-- with fit_music -->
-  The music topic fits the track to the film.
+  The music topic fits the track to the rendered film and lays it under it.
 <!-- local -->
   Give `fit_music` an `out_dir` inside the film's folder, like its music/, so that folder holds the film's track.
 <!-- end -->
+<!-- end -->
+<!-- local -->
+  `film.json` takes a track too: its `music` field may name an audio file at least as long as the film, by a path from its folder, which a render plays in place of the bed. The film-json topic has the field.
 <!-- end -->
 <!-- with easybrandkit -->
 <!-- local -->
@@ -124,7 +130,7 @@ make_launch_film {"url": "https://linear.app", "aspect": "9:16", "wait_seconds":
 
 ## The other parameters
 
-- `brand`, on `make_launch_film` and `plan_launch_film`, takes a brand kit, which the kit copies into brand/ in the film's folder; without it, the kit reads the brand from the site. `words` takes a `words.json` from an earlier plan instead of reading the page again. `music` false leaves out the bed and `sfx` false the sound effects; the plan writes both into `film.json`.
+- `brand`, on `make_launch_film` and `plan_launch_film`, takes a brand kit, which the kit copies into brand/ in the film's folder; without it, the kit reads the brand from the site. `words` takes a `words.json` from an earlier plan instead of reading the page again. `music` false leaves out the bed and `sfx` false the sound effects; the plan writes both into `film.json`, and a render plays what `film.json` says.
 - `render_launch_film` takes `film`, the `film.json`, and writes `film.mp4` and `film.timeline.json` next to it.
 <!-- local -->
 - `jobs` is the number of clips `make_launch_film` and `render_launch_film` render at once, {default:render_launch_film.jobs} unless given; 1 suits a slow machine.
@@ -135,7 +141,7 @@ make_launch_film {"url": "https://linear.app", "aspect": "9:16", "wait_seconds":
 - `make_launch_stills` takes `source`, a `film.json` or the site's address, and `for`, the places.
 <!-- local -->
 - `keep` keeps each clip's MP4 in a launch-film-work- folder in the system's temp folder, which the summary names.
-- `out_dir` is the film's folder, launch-film-<host> unless given. Give each film its own: a second plan there replaces `film.json`, `words.json` and brand/ and leaves the old `film.mp4`, `film.timeline.json`, frames/ and stills/, which no longer match it; a render replaces `film.mp4` and `film.timeline.json`. Given a `film.json`, `make_launch_stills` saves next to it and takes no `out_dir`.
+- `out_dir` is the film's folder, launch-film-<host> unless given. Give each film its own: a second plan there replaces `film.json`, `words.json` and brand/ and leaves the old `film.mp4`, `film.timeline.json`, frames/ and stills/, which no longer match it; a render replaces `film.mp4` and `film.timeline.json`. A run puts its files in place only once it has ended well: one that fails or is canceled leaves the folder as it was. Given a `film.json`, `make_launch_stills` saves next to it and takes no `out_dir`.
 - Given `brand`, the kit deletes brand/ in `out_dir` and copies the kit in its place, and makersmcp does not start it while that brand/ holds a file of the user's the copy would not bring back. To use the kit already in brand/, give `brand` as `out_dir` with /brand added. Without `brand`, the kit makes brand/ again where it is, replacing a kit's own files and keeping the others, except for an App Store page, which gets a new brand/.
 <!-- end -->
 
@@ -151,7 +157,7 @@ make_launch_film {"url": "https://linear.app", "aspect": "9:16", "wait_seconds":
 | frames/ | make | two stills a clip and `frames/sheet.jpg`, for review; a render leaves them as they were |
 | stills/ | `make_launch_stills` | the launch pictures and `stills/STILLS.md` |
 
-frames/ is for review and stills/ for the places, though both are called stills. The sound is normalized to {fact:launch-film.lufs_target} LUFS under a {fact:launch-film.true_peak} dBTP ceiling before it is encoded, and a film measures about {fact:launch-film.lufs} LUFS, with a true peak that can pass {fact:launch-film.check_true_peak} dBTP. Rendering again changes neither.
+frames/ is for review and stills/ for the places, though both are called stills. The sound is set to {fact:launch-film.lufs_target} LUFS, the level YouTube, X and most social apps play at, with its true peak at {fact:launch-film.true_peak} dBTP or under: the film is measured once encoded and encoded again while it is off, so it measures about {fact:launch-film.lufs} LUFS. Rendering again changes neither.
 
 ## Launch pictures
 
@@ -201,7 +207,7 @@ A run writes only the places it is given, and `stills/STILLS.md` lists only thos
 <!-- end -->
 <!-- local -->
 - `<tool> replaces the brand folder in <folder> with a copy of <kit>, deleting what is there, and <folder>/brand holds <files>, which its brand.json does not list and the copy would not bring back. Give another out_dir, or move those files first.` Nothing was deleted: give another `out_dir`, or give `brand` as that brand/ folder to use it where it is. The same holds for `<tool> makes the brand folder in <folder> again`, where a file of the user's has a name the kit writes.
-- `<kit> is that same folder under another name, so it would be gone before the copy. Give brand as <folder>/brand to use it where it is.`
+- `<kit> is that same folder under another name. Give brand as <folder>/brand to use it where it is.`: give `brand` that way.
 - `out_dir: with these arguments make_launch_stills saves in <folder> and cannot save anywhere else. Leave out_dir out.`
 <!-- end -->
 

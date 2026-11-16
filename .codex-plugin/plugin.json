@@ -1,19 +1,19 @@
 {
   "name": "makersmcp",
-  "version": "0.1.1",
-  "description": "Free kits for makers in one MCP: brand kits, fonts, screenshots, demo videos, launch films and fitted music, made on your own machine.",
+  "version": "0.2.0",
+  "description": "Free kits for makers in one MCP: brand kits, fonts, screenshots, demo videos, launch films, fitted music, a video in each place's shape and burned captions, made on your own machine.",
   "author": {
     "name": "Emin Budak",
     "url": "https://eminbudak.com"
   },
-  "repository": "https://github.com/EminBudak/makersmcp",
+  "repository": "https://github.com/MakersMCP/makersmcp",
   "license": "MIT",
-  "keywords": ["mcp", "brand", "fonts", "screenshots", "video", "music", "design"],
+  "keywords": ["mcp", "brand", "fonts", "screenshots", "video", "music", "captions", "design"],
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "MakersMCP",
     "shortDescription": "Free kits for makers, one MCP",
-    "longDescription": "Gives your agent the MakersMCP kits through one MCP server: a website's brand kit and fonts, clean screenshots and a demo video, a launch film with its pictures, a video check and music fitted to a cut. Everything runs on your machine with the Chrome and ffmpeg you have, with no account or key.",
+    "longDescription": "Gives your agent the MakersMCP kits through one MCP server: a website's brand kit and fonts, clean screenshots and a demo video, a launch film with its pictures, a video check, music fitted to a cut and laid under it, a video in the shape each place takes, and captions in the brand's fonts. Everything runs on your machine with the Chrome and ffmpeg you have, with no account or key.",
     "developerName": "Emin Budak",
     "category": "Creativity",
     "capabilities": ["Read", "Write"],

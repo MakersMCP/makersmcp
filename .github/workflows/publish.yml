@@ -79,7 +79,7 @@ jobs:
           echo "::error::npm has not served makersmcp@$version for 10 minutes, so the MCP Registry was not updated."
           exit 1
 
-      # io.github.EminBudak is a GitHub namespace: the registry takes this job's OIDC token,
+      # io.github.MakersMCP is a GitHub namespace: the registry takes this job's OIDC token,
       # which id-token: write gives, so no secret is needed. It reads server.json, whose
       # versions npm test holds to package.json, and mcpName in package.json.
       - name: Publish to the MCP Registry

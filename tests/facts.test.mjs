@@ -83,6 +83,9 @@ function sceneMax(dir, read, key) {
 
 const SHOTS = 'skills/easyscreenshotkit/scripts/lib';
 
+/** reframekit's places, as its places.js exports them. */
+const reframekitPlaces = dir => createRequire(path.join(dir, 'package.json'))('./skills/reframekit/scripts/lib/places.js');
+
 /** A device of easyscreenshotkit, by name, in a file of it: [width, height, scale]. */
 function device(read, file, name) {
   const match = new RegExp(`${name}: \\{ width: (\\d+), height: (\\d+), scale: ([\\d.]+)`).exec(read(`skills/easyscreenshotkit/scripts/lib/${file}`));
@@ -188,7 +191,8 @@ const READERS = [
     return stated(read(`${SHOTS}/pwa.js`), new RegExp(`const ${name} = ([\\d.]+);`), 'pwa.js');
   }],
   ['easyscreenshotkit', /^demo\.window$/, ({ read }) => stated(read(`${SHOTS}/demo.js`), /const viewport = \{ width: (\d+), height: (\d+) \}/, 'demo.js')],
-  ['easyscreenshotkit', /^demo\.time_left$/, ({ read }) => millis(read(`${SHOTS}/demo.js`), /timeLeft\(\) < ([\d_]+)\) throw new Error\("time ran out while recording/, 'demo.js')],
+  // The time a step of a demo starts within: a minute, or a quarter of a shorter run's time.
+  ['easyscreenshotkit', /^demo\.time_left$/, ({ read }) => millis(read(`${SHOTS}/demo.js`), /const reserve = Math\.min\(([\d_]+), timeLimit \/ 4\);/, 'demo.js')],
   ['easyscreenshotkit', /^tour\.pick_seconds$/, ({ read }) => millis(read(`${SHOTS}/tour.js`), /visits < wanted \* 3 && timeLeft\(\) > ([\d_]+)\)/, 'tour.js')],
   // A steps file's limits, as steps.js reads one, and how long a step waits for its target.
   ['easyscreenshotkit', /^steps\.\w+$/, ({ read, key }) => {
@@ -212,7 +216,7 @@ const READERS = [
   ['launch-film', /^ph_frames_max$/, ({ read }) => stated(read('src/stills.js'), /while \(list\.length > (\d+)\)/, 'src/stills.js')],
   ['launch-film', /^music_volume$/, ({ read }) => stated(read('src/film.js'), /film\.music\.volume\) : ([\d.]+)/, 'src/film.js')],
   // launch-film's guide: the level to check a film against for social apps, and how long a scene takes to read.
-  ['launch-film', /^lufs_social$/, ({ read }) => stated(read('skills/launch-film/SKILL.md'), /launch-film@latest check [^\n]*--lufs (-\d+)/, 'SKILL.md')],
+  ['launch-film', /^lufs_social$/, ({ read }) => stated(read('skills/launch-film/SKILL.md'), /launch-film@[\w.]+ check [^\n]*--lufs (-\d+)/, 'SKILL.md')],
   ['launch-film', /^read_(?:letters_per_second|extra_seconds)$/, ({ read, key }) => {
     const match = /about (\d+) letters a second plus (a second and a half|[\d.]+ seconds)/.exec(read('skills/launch-film/SKILL.md'));
     assert.ok(match, 'SKILL.md no longer says how long a scene takes to read');
@@ -226,6 +230,18 @@ const READERS = [
   ['easyfontkit', /^run_seconds$/, ({ read }) => phrase(read('skills/easyfontkit/SKILL.md'), /A run takes (\d+ to \d+) seconds\./, 'SKILL.md')],
   ['launch-film', /^plan_seconds$/, ({ read }) => phrase(read('skills/launch-film/SKILL.md'), /This takes (\d+ to \d+) seconds\. It runs easybrandkit/, 'SKILL.md')],
   ['launch-film', /^render_minutes$/, ({ read }) => phrase(read('skills/launch-film/SKILL.md'), /a 30 second film takes ([a-z]+ to [a-z]+ minutes)\./, 'SKILL.md')],
+  // Each place's size and the longest it takes, from PLACES in places.js, as reframekit makes and checks its files.
+  ['reframekit', /^(?:size|seconds)\.\w+$/, ({ dir, key }) => {
+    const [kind, name] = key.split('.');
+    const place = reframekitPlaces(dir).PLACES[name];
+    assert.ok(place, `places.js has no place ${name}`);
+    return kind === 'size' ? size(place.width, place.height) : place.limits.seconds?.max;
+  }],
+  ['reframekit', /^places_max$/, ({ dir }) => reframekitPlaces(dir).MAX_PLACES],
+  ['reframekit', /^side_min$/, ({ read }) => stated(read('skills/reframekit/scripts/lib/places.js'), /width < (\d+) \|\| height < \d+ \|\| width > \d+/, 'places.js')],
+  ['reframekit', /^side_max$/, ({ read }) => stated(read('skills/reframekit/scripts/lib/places.js'), /width < \d+ \|\| height < \d+ \|\| width > (\d+)/, 'places.js')],
+  ['reframekit', /^shots_a_sheet$/, ({ read }) => stated(read('skills/reframekit/scripts/lib/sheet.js'), /const SHOTS_PER_PAGE = (\d+);/, 'sheet.js')],
+  ['reframekit', /^limits_read$/, ({ read }) => phrase(read('skills/reframekit/scripts/lib/places.js'), /const READ = "([\d-]+)";/, 'places.js')],
   ['musicfit', /^analyze_fps$/, ({ read }) => stated(read('skills/musicfit/scripts/musicfit.js'), /raw\.fps !== undefined \? parseFps\(raw\.fps\) : (\d+)/, 'musicfit.js')],
 ];
 
@@ -282,6 +298,7 @@ test('the readers find what they look for in the installed kits', () => {
     ['musicfit', ['sample_rate', 'channels', 'length_min', 'length_max', 'hit_tail', 'true_peak', 'analyze_fps']],
     ['easybrandkit', ['screen_size', 'card_size', 'logo_min_side', 'facts_timeout', 'slow_timeout', 'run_seconds', 'facts_run_minutes']],
     ['easyfontkit', ['late_timeout', 'free_matches', 'run_seconds']],
+    ['reframekit', ['size.tiktok', 'seconds.x', 'places_max', 'side_min', 'side_max', 'shots_a_sheet', 'limits_read']],
   ];
   const reached = new Set();
   const value = (owner, key) => {
@@ -300,7 +317,7 @@ test('the readers find what they look for in the installed kits', () => {
   // The numbers the design gives, as the kits have them today.
   assert.equal(value('launch-film', 'fps'), 25);
   assert.equal(value('launch-film', 'size_9_16'), '1080x1920');
-  assert.equal(value('launch-film', 'lufs_target'), -16);
+  assert.equal(value('launch-film', 'lufs_target'), -14);
   assert.equal(value('launch-film', 'look_bpm.journal'), 90);
   assert.equal(value('launch-film', 'bar_seconds.launch'), 2.143);
   assert.equal(value('launch-film', 'still_size.play'), '1024x500');
@@ -322,6 +339,9 @@ test('the readers find what they look for in the installed kits', () => {
   assert.equal(value('easyscreenshotkit', 'demo.time_left'), 60);
   assert.equal(value('musicfit', 'analyze_fps'), 30);
   assert.equal(value('musicfit', 'true_peak'), -1);
+  assert.equal(value('reframekit', 'size.feed'), '1080x1350');
+  assert.equal(value('reframekit', 'seconds.x'), 140);
+  assert.equal(value('reframekit', 'places_max'), 12);
   // The phrases the guides say, word for word.
   assert.equal(value('easybrandkit', 'run_seconds'), '20 to 90');
   assert.equal(value('launch-film', 'plan_seconds'), '30 to 90');
@@ -419,7 +439,7 @@ test('a two clip film renders at the size, frame rate and loudness launch-film\'
     assert.equal(rendered.structuredContent?.status, 'done', text(rendered));
     const size = fact('launch-film', 'size_16_9') ?? '1920x1080';
     const fps = fact('launch-film', 'fps') ?? 25;
-    const target = fact('launch-film', 'lufs_target') ?? -16;
+    const target = fact('launch-film', 'lufs_target') ?? -14;
     const checked = await finished(client, 'check_video', { film: 'film.mp4', expect: `${size}@${fps}` });
     assert.equal(checked.structuredContent?.status, 'done', text(checked));
     const report = measured(path.join(outDir, 'film.mp4'));
@@ -437,10 +457,10 @@ test('a two clip film renders at the size, frame rate and loudness launch-film\'
     assert.deepEqual(cuts.map(row => Number.parseFloat(row.split('|')[2])), timeline.clips.map(clip => clip.start));
     const { integrated, truePeak } = report.audio;
     t.diagnostic(`the film measures ${integrated} LUFS and a true peak of ${truePeak} dBTP; launch-film aims at ${target} LUFS and ${fact('launch-film', 'true_peak')} dBTP`);
-    // loudnorm lands above its target on these films: this 20 second one measured -14.2 LUFS
-    // with a true peak of -0.8 dBTP, one of 8 seconds -13.6 LUFS and the baseline's 29 second
-    // film -15.1, all aiming at -16 and -1.5. So the target is checked loosely, and lufs, what
-    // a film measures, within the 1.5 LU a check of a film has to allow.
+    // launch-film 0.3 measures the film once it is encoded and encodes it again while it is off,
+    // so a film lands within a few tenths of its target, where 0.2's loudnorm landed above it.
+    // The target is still checked loosely, and lufs, what a film measures, within the 1.5 LU a
+    // check of a film has to allow.
     assert.ok(Math.abs(integrated - target) <= 3, `the film measures ${integrated} LUFS, and launch-film aims at ${target}`);
     const lufs = fact('launch-film', 'lufs');
     if (lufs !== undefined) assert.ok(Math.abs(integrated - lufs) <= 1.5, `the film measures ${integrated} LUFS, and lufs says ${lufs}`);

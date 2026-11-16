@@ -52,7 +52,7 @@ A number the page states is a scene of its own, after the headline or the featur
 - `look`: launch, aurora, gridline, pop or journal. It sets the style and the tempo, and so how long a bar lasts: {fact:launch-film.bar_seconds.launch} seconds in launch, {fact:launch-film.bar_seconds.aurora} in aurora, {fact:launch-film.bar_seconds.gridline} in gridline, {fact:launch-film.bar_seconds.pop} in pop and {fact:launch-film.bar_seconds.journal} in journal.
 - `aspect`: "16:9" or "9:16".
 - `clips`: played in order.
-- `music`: true plays the look's own bed, false leaves it out, and an object with a `volume` sets its level, {fact:launch-film.music_volume} unless given. A file named here is ignored without a word, and the bed plays.
+- `music`: true plays the look's own bed, false leaves it out, and an object with a `volume` sets its level, {fact:launch-film.music_volume} unless given. The path of an audio file, from the folder of `film.json`, plays that track in place of the bed: one at least as long as the film, with its effects over it, and the film's sound then set to its level as the bed's is.
 - `sfx`: true or false, the sound effects.
 - `lang`: the page's two letter language code, which the logo close is drawn in. A scene object can carry its own.
 - `version` and `url` are the plan's own.

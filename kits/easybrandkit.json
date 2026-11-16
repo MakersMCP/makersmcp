@@ -3,7 +3,7 @@
   "package": "easybrandkit",
   "field": "design",
   "about": "A website's brand kit: its real logo files, colors, fonts and first screen.",
-  "repository": "https://github.com/EminBudak/easybrandkit",
+  "repository": "https://github.com/MakersMCP/easybrandkit",
   "needs": ["chrome"],
   "facts": {
     "screen_size": "3200x1800",
@@ -51,7 +51,7 @@
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
-          "Any kit an earlier run left in {folder} is gone: this run deleted it before it failed."
+          "A run that fails leaves {folder} as it was, an earlier kit there too."
         ]
       },
       "hostedNext": {

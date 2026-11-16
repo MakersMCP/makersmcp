@@ -1181,8 +1181,8 @@ test('given a brand kit, a tool replaces brand/ only when that holds a kit\'s ow
       // The kit to use, or another file the call names, is inside the folder it would delete.
       [{ brand: 'site/brand/acme', out_dir: 'site' }, /and .*site\/brand\/acme is inside it/],
       [{ brand: 'kit', words: 'words/brand/words.json', out_dir: 'words' }, /words\/brand\/words\.json is inside it/],
-      // The kit given through a link to brand/ is brand/ itself, which the kit would delete before the copy.
-      [{ brand: 'kit-link', out_dir: 'earlier' }, /kit-link is that same folder under another name, so it would be gone before the copy\. Give brand as .*earlier\/brand to use it where it is\.$/],
+      // The kit given through a link to brand/ is brand/ itself, given by another path than the one to use it where it is.
+      [{ brand: 'kit-link', out_dir: 'earlier' }, /kit-link is that same folder under another name\. Give brand as .*earlier\/brand to use it where it is\.$/],
       // A path through a brand/ that is a link leads into the copy once the link is gone.
       [{ brand: 'kit', words: 'mirror/brand/BRAND.md', out_dir: 'mirror' }, /mirror\/brand\/BRAND\.md is inside it/],
       // Through a link, what it leads to counts.
@@ -1301,7 +1301,7 @@ test('for any other address a tool lets easybrandkit make brand/ again where it 
     for (const input of taken) assert.ok(call(input).args.includes('--out'), JSON.stringify(input));
     assert.ok(call({ source: 'https://acme.com', out_dir: 'notes' }, stills).args.includes('--out'));
 
-    // A file of the user's named like one easybrandkit writes would be replaced, or deleted when the run fails.
+    // A file of the user's named like one easybrandkit writes would be replaced.
     assert.throws(
       () => call({ out_dir: 'named' }),
       /: plan_launch_film makes the brand folder in .*named again, which replaces a kit's own files there and any file named like one in any letter case, and .*named\/brand holds logo-07\.png and x-profile\.jpg, which its brand\.json does not list\. Give another out_dir, or move those files first\.$/,
@@ -1392,7 +1392,7 @@ test('given brand/ itself by another path, a tool refuses to delete it before th
     // A second path to each through a link to the folder above it.
     symlinkSync(path.join(baseDir, 'marketing'), path.join(baseDir, 'alias'));
     symlinkSync(path.join(baseDir, 'pure'), path.join(baseDir, 'pure-alias'));
-    const same = (given, use) => new RegExp(`, and ${literally(path.join(baseDir, given))} is that same folder under another name, so it would be gone before the copy\\. Give brand as ${literally(path.join(baseDir, use))} to use it where it is\\.$`);
+    const same = (given, use) => new RegExp(`, and ${literally(path.join(baseDir, given))} is that same folder under another name\\. Give brand as ${literally(path.join(baseDir, use))} to use it where it is\\.$`);
     for (const [input, given, use] of [
       [{ brand: 'alias/brand', out_dir: 'marketing' }, 'alias/brand', 'marketing/brand'],
       [{ brand: 'alias/brand/brand.json', out_dir: 'marketing' }, 'alias/brand', 'marketing/brand/brand.json'],
@@ -1422,7 +1422,7 @@ function withAliasFolders(callback) {
   });
 }
 
-const SAME = /, and .* is that same folder under another name, so it would be gone before the copy\. Give brand as .* to use it where it is\.$/;
+const SAME = /, and .* is that same folder under another name\. Give brand as .* to use it where it is\.$/;
 
 test('on a disk that ignores letter case, brand/ given in other letters is still brand/, and a file in it is still in it', () => {
   withAliasFolders(({ baseDir, call }) => {

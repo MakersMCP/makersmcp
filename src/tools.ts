@@ -207,8 +207,8 @@ function outDirHelp(tool: ToolDefinition, baseDir: string | undefined): string {
   let help = `Folder to save into, absolute or relative to ${baseDir ?? BASE_DIR_IN_WORDS}. Default: ${templateInWords(out.name)}${parts.length ? `, where ${inWords(parts)}` : ''}.`;
   // The screenshot kit tells its screenshots and its demos apart, so the earlier run is this tool's.
   if (out.ownOnly) {
-    // These kits clear the folder as they start, so a run that then fails has cleared it too.
-    help += ' A run deletes what an earlier run of this tool left there as it starts, so one that fails loses it too: give each version its own out_dir.'
+    // These kits put a run's files in place of the earlier run's once it has ended well, and take no other folder.
+    help += ' A run replaces what an earlier run of this tool left there once it has ended well, and one that fails or is canceled leaves it as it was: give each version its own out_dir.'
       + ' The folder must be empty or hold an earlier run of this tool: any other folder stops it.';
   } else if (!tool.check) {
     // A check writes only its report; the other kits replace their earlier files once they have new ones.

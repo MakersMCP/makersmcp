@@ -264,9 +264,9 @@ function valuesAt(json: unknown, place: string): unknown[] {
 }
 
 /**
- * Refuses a call that gives the kit one of the files a run writes in its folder and deletes
- * there when it fails (out.runFiles), like a steps file saved as the demo's own steps.json:
- * the kit would delete it or write over it. A file is told by its identity on the disk, so
+ * Refuses a call that gives the kit one of the files a run writes in its folder (out.runFiles),
+ * like a steps file saved as the demo's own steps.json: the kit would write over it once the
+ * run ends well. A file is told by its identity on the disk, so
  * the same file by another path, in other letters on a disk that ignores case or through a
  * link, counts.
  */
@@ -276,7 +276,7 @@ function refuseRunFiles(tool: ToolDefinition, folder: string, inputs: Record<str
     if (own === undefined) continue;
     for (const [param, file] of Object.entries(inputs)) {
       if (identity(file) !== own) continue;
-      throw new ArgumentError(`${param}: ${file} is the ${name} of ${folder}, where ${tool.name} saves, and a run there deletes or writes over that file. Give it another name or folder, or give another out_dir.`);
+      throw new ArgumentError(`${param}: ${file} is the ${name} of ${folder}, where ${tool.name} saves, and a run there writes over that file. Give it another name or folder, or give another out_dir.`);
     }
   }
 }
@@ -321,8 +321,8 @@ function refuseReplacing(tool: ToolDefinition, folder: string, values: Record<st
       if (typeof deleted === 'string') {
         why = deleted;
       } else if (from !== undefined && from === identity(dir, false) && deleted.has(from)) {
-        // The kit tells the two apart by their paths, so it would delete the folder it copies.
-        why = `${copied} is that same folder under another name, so it would be gone before the copy`;
+        // Given by another path, it is told as that folder by the path makersmcp checks it by.
+        why = `${copied} is that same folder under another name`;
         then = `Give ${kind.from} as ${isFolder(given) ? dir : path.join(dir, path.basename(given))} to use it where it is.`;
       } else if (from !== undefined && deleted.has(from)) {
         why = `${copied} is inside it`;

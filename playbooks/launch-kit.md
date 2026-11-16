@@ -6,7 +6,7 @@ description: Runs the whole set of launch files for a product's site with the Ma
 kit: makersmcp
 requires: [launch-film]
 any: [make_launch_film, plan_launch_film]
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, musicfit, check_video, fit_music]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, musicfit, reframekit, easycaptionkit, check_video, fit_music]
 order: 20
 ---
 # Everything a launch needs
@@ -18,7 +18,7 @@ A launch kit is the set of files a launch takes, all made from the product's own
 - The site: the product's own address with https://, like https://linear.app. An App Store or Google Play listing works as the film's address too; a social profile is refused.
 - The places it is for. The place map below says what each one takes. When the user names none, make the film and the pictures for every place, and say which places those are.
 - The shape of the film: 16:9, 9:16 for phones, or both, which is two plans.
-- The music: the film's own, or a track of the user's laid in after the render.
+- The music: the film's own, or a track of the user's fitted under the rendered film.
 <!-- with easybrandkit -->
 - The claims: when copy for the launch needs the site's numbers, customers, quotes or prices, run `make_brand_kit` with `facts`. The film reads the page itself and does not use them.
 <!-- end -->
@@ -185,21 +185,34 @@ make_launch_stills {"source": "job:<job_id>/film.json", "for": ["ph", "og", "x"]
 <!-- local -->
    Give `fit_music` an `out_dir` inside the film's folder, like its music/, so that folder holds the film's track.
 ```call
-fit_music {"track": "music/track.mp3", "length": "24", "hit": "18.667", "fps": {fact:launch-film.fps}, "out_dir": "launch/film-16x9/music"}
+fit_music {"track": "music/track.mp3", "length": "24", "hit": "18.667", "fps": {fact:launch-film.fps}, "video": "launch/film-16x9/film.mp4", "video_sound": "keep", "out_dir": "launch/film-16x9/music"}
 ```
-   The music topic says how to lay it under the film when you can run commands. Then check the new file with `check_video`, `cues` set to the fitted track's cues.json, `cuts` to the film's film.timeline.json, which a file under another name does not find by itself, and an `out_dir` of its own, since check/ next to it holds the film's report.
+   Give it the film as `video`, with `video_sound` keep for a film planned with `music` false, whose sound is its effects: video.mp4 is then the film with the track under it. Check that file with `check_video`, `cues` set to the fitted track's cues.json and `cuts` to the film's film.timeline.json, which a file under another name does not find by itself.
 <!-- end -->
 <!-- hosted -->
 ```call
-fit_music {"track": "https://example.com/track.mp3", "length": "24", "hit": "18.667", "fps": {fact:launch-film.fps}}
+fit_music {"track": "https://example.com/track.mp3", "length": "24", "hit": "18.667", "fps": {fact:launch-film.fps}, "video": "job:<job_id>/film.mp4", "video_sound": "keep"}
 ```
-   No tool here lays it under the film: hand over the film and fitted.wav together.
+   film.mp4 is the render's. video.mp4 is then the film with the track under it, `video_sound` keep holding the effects of a film planned with `music` false.
 <!-- end -->
 <!-- end -->
 <!-- without fit_music -->
 6. A track of the user's cannot be fitted here. Hand over the film with its own music, or the film planned with `music` false and the length the track must have.
 <!-- end -->
-7. Check the rest before the hand over.
+<!-- with reframekit -->
+7. For the 4:5 feeds, a square post, X or LinkedIn, make each place's version of the 16:9 film with `reframe_video`, and show its sheet.png: a 9:16 plan suits TikTok, Reels and Shorts better than a crop (the reframe topic).
+<!-- local -->
+```call
+reframe_video {"video": "launch/film-16x9/film.mp4", "for": ["feed", "square", "x", "linkedin"]}
+```
+<!-- end -->
+<!-- hosted -->
+```call
+reframe_video {"video": "job:<job_id>/film.mp4", "for": ["feed", "square", "x", "linkedin"]}
+```
+<!-- end -->
+<!-- end -->
+8. Check the rest before the hand over.
 <!-- with easyscreenshotkit -->
    - `check_pwa_screenshots` with `manifest` the pwa/manifest-screenshots.json of `take_screenshots`.
 <!-- with check_video -->
@@ -237,6 +250,9 @@ Give each piece its own folder under one launch folder, so no run replaces anoth
 - launch/film-16x9 and launch/film-9x16, one for each plan
 <!-- with musicfit -->
 - launch/film-16x9/music, the fitted track, inside the film's folder
+<!-- end -->
+<!-- with reframekit -->
+- launch/film-16x9/reframekit-film, each place's version of the film, which `reframe_video` makes next to it
 <!-- end -->
 
 A new plan in a folder that holds a render leaves that film.mp4, film.timeline.json, frames/ and stills/ beside the new film.json, which no longer match it, so give a second plan or a new look a new folder.

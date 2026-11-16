@@ -3,7 +3,7 @@
   "package": "musicfit",
   "field": "sound",
   "about": "A music track fitted to a video cut: the right length, the drop on the hit, ducked under a voice.",
-  "repository": "https://github.com/EminBudak/musicfit",
+  "repository": "https://github.com/MakersMCP/musicfit",
   "needs": ["ffmpeg"],
   "facts": {
     "sample_rate": 48000,
@@ -21,8 +21,8 @@
       "makes": ["music fitted to a video"],
       "asks": "a music track made as long as a video, its drop on a moment, or music ducked under a voice",
       "playbook": "music",
-      "description": "Fits a music track to a video cut: makes it exactly the given length by cutting or looping whole bars, lands its drop on the hit, ends it on a beat, ducks it under a voice and sets its loudness, without changing its tempo or pitch. Writes fitted.wav, mix.wav with a voice (the voice over the ducked music), cues.json (every beat, bar, seam and the hit, in seconds and in frames at fps), seams.png (the picture to show the user) and FIT.md (what was done and where to listen). It makes the sound only: no tool here lays it under a video. A film from plan_launch_film takes no music file, so plan it with music false to lay this track in afterwards, and give out_dir a folder inside the film's, like its music/, so the film's folder holds its track. fps should be the video's, {fact:launch-film.fps} for a launch film. Give cues.json to check_video to check the cuts land on the beat. To read a track's tempo, drop and ending without fitting it, use analyze_music instead.",
-      "hostedDescription": "Fits a music track to a video cut: makes it exactly the given length by cutting or looping whole bars, lands its drop on the hit, ends it on a beat, ducks it under a voice and sets its loudness, without changing its tempo or pitch. Writes fitted.wav, mix.wav with a voice (the voice over the ducked music), cues.json (every beat, bar, seam and the hit, in seconds and in frames at fps), seams.png (the picture to show the user) and FIT.md (what was done and where to listen). It makes the sound only: no tool here lays it under a video. A film from plan_launch_film takes no music file, so plan it with music false to lay this track in afterwards. fps should be the video's, {fact:launch-film.fps} for a launch film. Give cues.json to check_video to check the cuts land on the beat. To read a track's tempo, drop and ending without fitting it, use analyze_music instead.",
+      "description": "Fits a music track to a video cut: makes it exactly the given length by cutting or looping whole bars, lands its drop on the hit, ends it on a beat, ducks it under a voice and sets its loudness, without changing its tempo or pitch. Writes fitted.wav, mix.wav with a voice (the voice over the ducked music), cues.json (every beat, bar, seam and the hit, in seconds and in frames at fps), seams.png (the picture to show the user) and FIT.md (what was done and where to listen). Given the video, it also writes video.mp4, the video's picture as it was with the track under it and its own sound as video_sound says. A launch film to carry the track is planned with plan_launch_film and music false, so its sound is its effects, and give out_dir a folder inside the film's, like its music/, so the film's folder holds its track. Give cues.json to check_video to check the cuts land on the beat. To read a track's tempo, drop and ending without fitting it, use analyze_music instead.",
+      "hostedDescription": "Fits a music track to a video cut: makes it exactly the given length by cutting or looping whole bars, lands its drop on the hit, ends it on a beat, ducks it under a voice and sets its loudness, without changing its tempo or pitch. Writes fitted.wav, mix.wav with a voice (the voice over the ducked music), cues.json (every beat, bar, seam and the hit, in seconds and in frames at fps), seams.png (the picture to show the user) and FIT.md (what was done and where to listen). Given the video, it also writes video.mp4, the video's picture as it was with the track under it and its own sound as video_sound says. A launch film to carry the track is planned with plan_launch_film and music false, so its sound is its effects, then given as video with video_sound keep. Give cues.json to check_video to check the cuts land on the beat. To read a track's tempo, drop and ending without fitting it, use analyze_music instead.",
       "args": ["{track}"],
       "out": { "flag": "--out", "name": "musicfit-{stem:track}" },
       "destructive": true,
@@ -31,9 +31,11 @@
         "length": { "type": "string", "flag": "--length", "required": true, "description": "The video's exact length, as text: seconds like \"29.333\" or \"32s\", frames at fps like \"733f\", or \"1:05\"; from {fact:musicfit.length_min} to {fact:musicfit.length_max} seconds. A launch film's is seconds in its film.timeline.json, a demo's video.duration in its steps.json." },
         "hit": { "type": "string", "flag": "--hit", "description": "Where the drop lands in the result, as text in seconds like \"24\" or frames like \"600f\", inside length and at least {fact:musicfit.hit_tail} s before its end. A launch film's logo close is the start of its logo clip in film.timeline.json, a demo's click its pressedAt in steps.json. Without it the track starts as it starts." },
         "drop": { "type": "string", "flag": "--drop", "description": "Where the drop is in the track, as text in seconds like \"41.3\" or frames, when the one found is not the one wanted (default: found). analyze_music lists the other candidates." },
-        "fps": { "type": "number", "flag": "--fps", "min": 1, "max": 240, "default": 30, "description": "The video's frame rate, like 25 or 29.97: the frames in cues.json and FIT.md count at it, and length, hit and drop given in frames are read at it. {fact:launch-film.fps} for a launch film, the fps in a demo's steps.json (default {default:fit_music.fps})." },
+        "fps": { "type": "number", "flag": "--fps", "min": 1, "max": 240, "default": "the video's with video, else 30", "description": "The video's frame rate, like 25 or 29.97: the frames in cues.json and FIT.md count at it, and length, hit and drop given in frames are read at it. {fact:launch-film.fps} for a launch film, the fps in a demo's steps.json (default: {default:fit_music.fps})." },
         "voice": { "type": "path", "flag": "--voice", "description": "A voice track on the video's timeline, from its first frame. The music dips under it, and the run adds mix.wav, the voice over the ducked music at lufs; fitted.wav is then the ducked music alone." },
-        "duck": { "type": "number", "flag": "--duck", "min": 0, "max": 40, "default": 10, "description": "How far the music dips under the voice, in dB (default {default:fit_music.duck})." },
+        "duck": { "type": "number", "flag": "--duck", "min": 0, "max": 40, "default": 10, "description": "How far the music dips under the voice, in dB (default {default:fit_music.duck}), and the most it dips under the video's own sound with video_sound keep." },
+        "video": { "type": "path", "flag": "--video", "description": "The video to lay the result under, length long to a frame: the run also writes video.mp4, its picture copied as it was with the track under it at lufs. Its frames count at its own frame rate unless fps is given." },
+        "video_sound": { "type": "enum", "flag": "--video-sound", "values": ["keep", "voice", "drop"], "description": "What becomes of the video's own sound, needed when it has more than a faint room tone: keep, for sound effects, each set a little over the music, which dips under one by duck at most where it must; voice, for speech, set to lufs with the music ducked under it; drop, for music of its own, left out. Ask the user when it is not known." },
         "lufs": { "type": "number", "flag": "--lufs", "min": -40, "max": -5, "default": -14, "description": "Loudness of the result in LUFS (default {default:fit_music.lufs}). A limiter keeps the true peaks at {fact:musicfit.true_peak} dBTP or lower, so a peaky track can come out a little quieter; FIT.md says." },
         "end": { "type": "enum", "flag": "--end", "values": ["auto", "natural", "fade"], "default": "auto", "description": "How it ends: auto takes the track's own ending, its last hit ringing out, when it has one and there is room for it, and a fade otherwise; natural asks for that ending, fade for a fade (default {default:fit_music.end})." },
         "fade": { "type": "number", "flag": "--fade", "min": 0.1, "max": 30, "description": "Length of the closing fade in seconds, rounded to whole beats and at least one, a bar by default, ending on the last beat before the end; for a track with no steady beat, as given, 2 by default. It is used only when the result ends with a fade." },
@@ -41,19 +43,21 @@
         "meter": { "type": "enum", "flag": "--meter", "values": ["3", "4"], "description": "Beats to a bar, \"3\" or \"4\", when FIT.md warns the bars may have the other (default: found)." }
       },
       "docs": ["FIT.md"],
-      "writes": ["fitted.wav", "mix.wav", "cues.json", "seams.png", "FIT.md"],
+      "writes": ["fitted.wav", "mix.wav", "video.mp4", "cues.json", "seams.png", "FIT.md"],
       "next": {
         "done": [
           "Show {file:seams.png} to the user and tell them to listen at the start, the seams, the hit and the end that FIT.md lists below.",
-          "{file:fitted.wav} is the sound only: no tool here lays it under the video, and the {topic} playbook says how to.",
-          "With the voice, {file:mix.wav} is the voice over the ducked music, to lay under the video in its place."
+          "{file:video.mp4} is the video with the track under it: that is the file to hand over, once the user has heard it.",
+          "{file:fitted.wav} is the fitted track alone; the {topic} playbook says how it goes under a video.",
+          "With the voice, {file:mix.wav} is the voice over the ducked music, to use in place of fitted.wav."
         ]
       },
       "hostedNext": {
         "done": [
           "Show the user the {name:seams.png} link from the list below and tell them to listen at the start, the seams, the hit and the end that FIT.md lists below.",
-          "fitted.wav is the sound only and no tool here lays it under the video: give the user its link, to put under the whole video from its first frame without trimming it.",
-          "{name:mix.wav} is the voice over the ducked music: give the user its link instead of fitted.wav's."
+          "{name:video.mp4} is the video with the track under it: give the user its link from the list below to watch and hand over.",
+          "{name:fitted.wav} is the fitted track alone, to put under the whole video from its first frame without trimming it.",
+          "{name:mix.wav} is the voice over the ducked music, to use in place of fitted.wav."
         ]
       }
     },
@@ -62,10 +66,10 @@
       "title": "Read a music track",
       "asks": "a track's tempo, beats, bars, drop or ending",
       "playbook": "music",
-      "description": "Reads a music track's tempo, beats, bars, drop and ending, and writes FIT.md (the tempo, the drop and the other drop candidates, where sections start, how it ends and any warning), cues.json (beats and bars in seconds, and as frames at {fact:musicfit.analyze_fps} a second) and seams.png (the track with its bars). It changes no track, but its default folder is fit_music's for the same track and it replaces the files a fit left there, fitted.wav and mix.wav too, so give it its own out_dir. Its tempo tells which launch film look the track suits. Use it before fit_music to pick hit and drop. To fit the track, use fit_music instead.",
+      "description": "Reads a music track's tempo, beats, bars, drop and ending, and writes FIT.md (the tempo, the drop and the other drop candidates, where sections start, how it ends and any warning), cues.json (beats and bars in seconds, and as frames at {fact:musicfit.analyze_fps} a second) and seams.png (the track with its bars). It changes no track, and saves in a folder of its own, apart from fit_music's for the same track. Its tempo tells which launch film look the track suits. Use it before fit_music to pick hit and drop. To fit the track, use fit_music instead.",
       "hostedDescription": "Reads a music track's tempo, beats, bars, drop and ending, and writes FIT.md (the tempo, the drop and the other drop candidates, where sections start, how it ends and any warning), cues.json (beats and bars in seconds, and as frames at {fact:musicfit.analyze_fps} a second) and seams.png (the track with its bars). It changes no track. Its tempo tells which launch film look the track suits. Use it before fit_music to pick hit and drop. To fit the track, use fit_music instead.",
       "args": ["{track}", "--analyze"],
-      "out": { "flag": "--out", "name": "musicfit-{stem:track}" },
+      "out": { "flag": "--out", "name": "musicfit-{stem:track}.analysis" },
       "destructive": true,
       "params": {
         "track": { "type": "path", "required": true, "description": "The music file, or a video whose sound to read." },

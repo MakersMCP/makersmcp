@@ -97,9 +97,9 @@ export interface OutDefinition {
    */
   ownOnly?: boolean;
   /**
-   * The files a run writes in the folder and deletes there when it fails, by name, like the
-   * demo's demo.mp4 and steps.json. makersmcp does not start the kit when a file the call
-   * gives is one of them, since the kit would delete it or write over it.
+   * The files a run writes in the folder, by name, like the demo's demo.mp4 and steps.json.
+   * makersmcp does not start the kit when a file the call gives is one of them, since the kit
+   * would write over it.
    */
   runFiles?: string[];
   /**

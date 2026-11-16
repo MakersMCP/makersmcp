@@ -3,7 +3,7 @@
   "package": "easyscreenshotkit",
   "field": "image",
   "about": "Clean screenshots of a website, a demo video of it, and screenshots for its web app manifest.",
-  "repository": "https://github.com/EminBudak/easyscreenshotkit",
+  "repository": "https://github.com/MakersMCP/easyscreenshotkit",
   "needs": ["chrome", "ffmpeg"],
   "facts": {
     "size": { "desktop": "3200x1800", "mobile": "1080x1920", "iphone": "1320x2868" },
@@ -24,21 +24,21 @@
       "title": "Screenshots of a website",
       "asks": "screenshots of a site, App Store or Google Play screenshots, Product Hunt gallery images, or a web app manifest's screenshots",
       "playbook": "screenshots",
-      "description": "Opens a website in a headless browser, picks the pages worth showing (home, pricing, features and the like), hides cookie banners, chat bubbles and other floating boxes, and saves desktop, phone and whole-page screenshots in one folder. sheet.png, every page on one picture, is the picture to show first; SCREENSHOTS.md lists each page with why it was picked, its files and its headings. url and page are paths of one public site: a #route is dropped, nothing behind a login is reached, and above one page it starts at the site's root. clean hides everything fixed on the screen but a top bar and a side bar, so an app's own tab bar too. iphone is {fact:easyscreenshotkit.size.iphone}, the App Store's 6.9 inch size; mobile is {fact:easyscreenshotkit.size.mobile}, for Google Play phones. For the Google Play feature graphic and Chrome Web Store tiles, use make_launch_stills instead. For a view behind a click or a #route, use record_demo_video with steps.",
+      "description": "Opens a website in a headless browser, picks the pages worth showing (home, pricing, features and the like), hides cookie banners, chat bubbles and other floating boxes, and saves desktop, phone and whole-page screenshots in one folder. sheet.png, every page on one picture, is the picture to show first; SCREENSHOTS.md lists each page with why it was picked, its files and its headings. url and page are pages of one public site: a #route, like /app/#/plants, opens that view of a web app, nothing behind a login is reached, and above one page it starts at the site's root. clean hides everything fixed on the screen but a top bar and a side bar, so an app's own tab bar too. iphone is {fact:easyscreenshotkit.size.iphone}, the App Store's 6.9 inch size; mobile is {fact:easyscreenshotkit.size.mobile}, for Google Play phones. For the Google Play feature graphic and Chrome Web Store tiles, use make_launch_stills instead. For a view behind a click, use record_demo_video with steps.",
       "args": ["{url}"],
       "needs": ["chrome"],
       "out": { "flag": "--out", "name": "easyscreenshotkit-{host}", "ownOnly": true },
       "destructive": true,
       "params": {
-        "url": { "type": "url", "required": true, "description": "The website, like https://linear.app, or a page of it. A #route in it is dropped, so a view an app shows behind one is not reached." },
+        "url": { "type": "url", "required": true, "description": "The website, like https://linear.app, or a page of it. A #route in it, like https://acme.app/app/#/plants, opens that view of the app; another fragment, like #pricing, is left out." },
         "pages": { "type": "integer", "flag": "--pages", "min": 1, "max": 12, "default": 5, "description": "How many pages, the home page included (default {default:take_screenshots.pages}). Above 1 the site's root comes first, then url when it is a deeper page, then each page, then pages from the site's menu. With 1, only url is taken, though a page that is not of the site still stops the run." },
-        "page": { "type": "repeat", "flag": "--page", "description": "Pages of the same site to take too, like /pricing. Each counts toward pages and is taken even past it, but not with pages 1. A #route or a query is dropped, so /app/#/plants is /app/." },
+        "page": { "type": "repeat", "flag": "--page", "description": "Pages of the same site to take too, like /pricing, or views of a web app by their #route, like /app/#/plants; #/plants alone is that view of url. Each counts toward pages and is taken even past it, and with pages 1 only url and these are taken. Another fragment, like #pricing, is left out." },
         "sizes": { "type": "list", "flag": "--sizes", "default": "desktop, mobile and full", "description": "Any of desktop ({fact:easyscreenshotkit.size.desktop}), mobile ({fact:easyscreenshotkit.size.mobile}, a Google Play phone screenshot), iphone ({fact:easyscreenshotkit.size.iphone}, the App Store's 6.9 inch size), full (the whole page at 1x), mobile-full (the whole phone page at 2x), or WxH from {fact:easyscreenshotkit.custom.side_min} to {fact:easyscreenshotkit.custom.side_max} a side, like 1270x760 for a Product Hunt gallery image. Each takes an optional @scale from {fact:easyscreenshotkit.custom.scale_min} to {fact:easyscreenshotkit.custom.scale_max}, and each size goes in once (default {default:take_screenshots.sizes})." },
         "theme": { "type": "enum", "flag": "--theme", "values": ["light", "dark", "both"], "default": "light", "description": "The site's light or dark look, or both, which adds a -dark twin of every picture (default {default:take_screenshots.theme}). A site without a dark theme looks the same in both." },
         "lang": { "type": "string", "flag": "--lang", "description": "The site's version in this language, when it has one: a language code like de, tr or pt-BR." },
         "hide": { "type": "repeat", "flag": "--hide", "description": "CSS selectors of more elements to hide, like .promo-bar, when something still covers a page." },
         "reduced_motion": { "type": "boolean", "flag": "--reduced-motion", "default": false, "description": "Ask the site for its reduced-motion version." },
-        "clean": { "type": "boolean", "flag": "--no-clean", "when": false, "default": true, "description": "Set to false to take the pages as they come. Otherwise cookie banners, chat bubbles and everything else fixed on the screen are hidden, except a bar along its top and a tall bar down a side, so an app's own bottom tab bar is hidden too." },
+        "clean": { "type": "boolean", "flag": "--no-clean", "when": false, "default": true, "description": "Set to false to take the pages as they come; hide still hides what it names. Otherwise cookie banners, chat bubbles and everything else fixed on the screen are hidden, except a bar along its top and a tall bar down a side, so an app's own bottom tab bar is hidden too." },
         "pwa": { "type": "boolean", "flag": "--pwa", "default": false, "description": "Also save screenshots for a web app manifest in pwa/: each page's first screen at {fact:easyscreenshotkit.pwa.wide} and on a phone at {fact:easyscreenshotkit.pwa.narrow}, at most {fact:easyscreenshotkit.pwa.max} in all, checked against Chrome's rules for its richer install dialog, with the manifest entries in pwa/manifest-screenshots.json." },
         "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 30, "max": 900, "default": 300, "description": "Give up after this many seconds (default {default:take_screenshots.timeout_seconds}). A run takes two or three minutes, up to five on very long pages, and a slow site can take {fact:easyscreenshotkit.slow_timeout}.", "hostedDescription": "Give up after this many seconds (default {default:take_screenshots.timeout_seconds}). A job here stops after {limit:job_minutes} whatever this says, so more does not help." }
       },
@@ -53,7 +53,7 @@
         ],
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
-          "Any screenshots an earlier run left in {folder} are gone: this run deleted them before it failed."
+          "A run that fails leaves {folder} as it was, earlier screenshots there too."
         ]
       },
       "hostedNext": {
@@ -81,7 +81,7 @@
         "url": { "type": "url", "required": true, "description": "The website, like https://linear.app. It replaces a steps file's url line and starts a file whose first step is no visit; a visit to a whole address, as every visit in a tour's demo.yaml, still opens that address." },
         "steps": { "type": "path", "flag": "--steps", "description": "A YAML or JSON file of steps to follow instead of a tour, one action a step: visit, scroll, click, type, key, hover or wait. A target is a CSS selector or text=<words>, and a selector that starts with # goes in quotes. demo.yaml from an earlier tour is one to start from. Not with pages or page.", "hostedDescription": "A YAML or JSON file of steps to follow instead of a tour, used as it is, like the demo.yaml of a tour an earlier job recorded. One action a step: visit, scroll, click, type, key, hover or wait; a target is a CSS selector or text=<words>. Not with pages or page. Give an https link to the file, or job:<job_id>/<path> for a file an earlier job saved." },
         "pages": { "type": "integer", "flag": "--pages", "min": 1, "max": 8, "default": 4, "description": "Pages in the tour, the home page included (default {default:record_demo_video.pages}). A page that scrolls takes about {fact:easyscreenshotkit.tour.page_seconds} seconds and one that fits on the screen about {fact:easyscreenshotkit.tour.short_page_seconds}. The tour starts at the site's root and puts pricing last. For a tour only." },
-        "page": { "type": "repeat", "flag": "--page", "description": "Pages of the same site to take in the tour, like /pricing, each taken even past pages. A #route is dropped: a view behind one needs steps. For a tour only." },
+        "page": { "type": "repeat", "flag": "--page", "description": "Pages of the same site to take in the tour, like /pricing, or views of a web app by their #route, like /app/#/plants, each taken even past pages. For a tour only." },
         "zoom": { "type": "number", "flag": "--zoom", "min": 1, "max": 2.5, "default": 1.5, "description": "How far a click zooms in, {bounds:record_demo_video.zoom} (default {default:record_demo_video.zoom}). 1 means no zoom. A step in a steps file can set its own." },
         "background": { "type": "text_or_path", "flag": "--background", "pattern": "\\s*(?:#[0-9a-fA-F]{3,8}|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([\\d\\s.,%/+-]+\\)|[a-zA-Z]{3,30})(?:\\s*,\\s*(?:#[0-9a-fA-F]{3,8}|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([\\d\\s.,%/+-]+\\)|[a-zA-Z]{3,30})){0,2}\\s*", "description": "Behind the window, by default a gradient, dark behind a light site and light behind a dark one: a colour like #0f172a, two or three colours for a gradient, or a .png, .jpg, .jpeg, .webp, .gif, .avif or .svg picture file." },
         "frame": { "type": "boolean", "flag": "--no-frame", "when": false, "default": true, "description": "Set to false for the page alone, filling the video, without the window and the backdrop." },
@@ -90,12 +90,12 @@
         "lang": { "type": "string", "flag": "--lang", "description": "The site's version in this language, when it has one: a language code like de or pt-BR." },
         "hide": { "type": "repeat", "flag": "--hide", "description": "CSS selectors of more elements to hide, on top of any under hide in steps." },
         "reduced_motion": { "type": "boolean", "flag": "--reduced-motion", "default": false, "description": "Ask the site for its reduced-motion version." },
-        "clean": { "type": "boolean", "flag": "--no-clean", "when": false, "default": true, "description": "Set to false to keep the banners and bubbles. Otherwise everything fixed on the screen is hidden but a bar along its top and one down a side, so a step that clicks in an app's bottom tab bar needs this false." },
+        "clean": { "type": "boolean", "flag": "--no-clean", "when": false, "default": true, "description": "Set to false to keep the banners and bubbles; hide still hides what it names. Otherwise everything fixed on the screen is hidden but a bar along its top and one down a side, so a step that clicks in an app's bottom tab bar needs this false." },
         "gif": { "type": "boolean", "flag": "--no-gif", "when": false, "default": true, "description": "Set to false to skip demo.gif, which is made smaller until it is {fact:easyscreenshotkit.demo.gif_max_mb} MB at most." },
-        "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 60, "max": 1800, "default": 900, "description": "Give up after this many seconds (default {default:record_demo_video.timeout_seconds}). A tour looks for more pages only while more than {fact:easyscreenshotkit.tour.pick_seconds} seconds are left, so a short one records the home page alone, and every step needs {fact:easyscreenshotkit.demo.time_left} seconds left.", "hostedDescription": "Give up after this many seconds (default {default:record_demo_video.timeout_seconds}). A job here stops after {limit:job_minutes} whatever this says, so more does not help. A tour looks for more pages only while more than {fact:easyscreenshotkit.tour.pick_seconds} seconds are left, so a short one records the home page alone." }
+        "timeout_seconds": { "type": "integer", "flag": "--timeout", "min": 60, "max": 1800, "default": 900, "description": "Give up after this many seconds (default {default:record_demo_video.timeout_seconds}). A tour looks for more pages only while more than {fact:easyscreenshotkit.tour.pick_seconds} seconds are left, so a short one records the home page, url and each page alone, and a step starts while {fact:easyscreenshotkit.demo.time_left} seconds are left, or a quarter of a shorter run's time.", "hostedDescription": "Give up after this many seconds (default {default:record_demo_video.timeout_seconds}). A job here stops after {limit:job_minutes} whatever this says, so more does not help. A tour looks for more pages only while more than {fact:easyscreenshotkit.tour.pick_seconds} seconds are left, so a short one records the home page alone." }
       },
       "docs": [{ "file": "steps.json", "site": true }],
-      "refuses": ["needs ffmpeg, and none was found", "has no H.264 encoder", "holds no earlier easyscreenshotkit demo", "Not a web address", "easyscreenshotkit demo: {steps:name}: ", "could not read {steps}: ", "--background takes a colour"],
+      "refuses": ["The demo needs ffmpeg", "has no H.264 encoder", "holds no earlier easyscreenshotkit demo", "Not a web address", "easyscreenshotkit demo: {steps:name}: ", "could not read {steps}: ", "--background takes a colour"],
       "writes": ["demo.mp4", "demo.gif", "poster.png", "steps.json", "demo.yaml"],
       "next": {
         "done": [
@@ -107,7 +107,7 @@
         "failed": [
           "makersmcp_playbook {topic} lists this tool's errors and their fixes.",
           "A step that failed is named with its number: check its target against the page, write words as text=<words>, or wait for it first.",
-          "Any video an earlier run left in {folder} is gone: this run deleted it before it failed, and demo.yaml too when this run was a tour; a steps file it read stays."
+          "A run that fails leaves {folder} as it was, an earlier demo there too."
         ]
       },
       "hostedNext": {

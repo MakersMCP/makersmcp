@@ -5,7 +5,7 @@ index: record_demo_video: a tour or a steps file, the timing in steps.json, what
 description: Records a short demo video of a website with easyscreenshotkit, as a tour of its pages or from a steps file of visits, clicks, typing, keys and scrolls, and explains steps.json, the times that music, a voice and captions are laid on. Use it when the user wants a demo video, a walkthrough, a GIF of a site, or footage of the real product for a launch video.
 kit: easyscreenshotkit
 requires: [easyscreenshotkit]
-optional: [check_video, fit_music]
+optional: [reframekit, easycaptionkit, check_video, fit_music]
 order: 55
 ---
 # Demo video of a website
@@ -14,7 +14,7 @@ order: 55
 
 ## Decide first
 
-- A tour or steps. A tour fits a demo of a site: the home page, then the pages its menu puts forward, pricing last, each with a rest on its first screen and a scroll to a section or two. Steps fit a flow the user describes, a search typed in, or a view behind a click or a #route.
+- A tour or steps. A tour fits a demo of a site: the home page, then the pages its menu puts forward, pricing last, each with a rest on its first screen and a scroll to a section or two. Steps fit a flow the user describes, a search typed in, or a view behind a click; a view of a web app by its #route is a `page` of a tour too.
 - The length. No parameter sets it. In a tour a page that scrolls takes about {fact:easyscreenshotkit.tour.page_seconds} seconds and one that fits on the screen about {fact:easyscreenshotkit.tour.short_page_seconds}; four pages of real sites came to {fact:easyscreenshotkit.tour.four_pages_seconds} seconds. Set `pages` from the length asked for. A steps file lasts as long as its steps.
 - Only what anyone can open is reached: a step behind a login fails.
 - A voice or music goes on afterwards, timed from `steps.json`, since the video has no sound.
@@ -111,14 +111,14 @@ After a tour, `demo.yaml` is a complete file to start from.
 
 ## Every other parameter
 
-- `pages` and `page` are for a tour: either one next to `steps` stops the run. `pages` counts the home page, each `page` is taken even past it, and a #route in a `page` is dropped.
+- `pages` and `page` are for a tour: either one next to `steps` stops the run. `pages` counts the home page, and each `page` is taken even past it, a view of a web app by its #route, like /app/#/plants, too.
 - `clean` also hides a box that floats up later, unless a click or a key just opened it or it shows by the pointer. A step that clicks in an app's bottom tab bar matches nothing while `clean` hides that bar, so set `clean` false for it.
-- `timeout_seconds`: keep the default, {default:record_demo_video.timeout_seconds}. A tour looks for more pages only while more than {fact:easyscreenshotkit.tour.pick_seconds} seconds are left, so a short one records the home page alone without a word, and each step needs {fact:easyscreenshotkit.demo.time_left} seconds left to start.
+- `timeout_seconds`: keep the default, {default:record_demo_video.timeout_seconds}. A tour looks for more pages only while more than {fact:easyscreenshotkit.tour.pick_seconds} seconds are left, so a short one records the home page, `url` and each `page` alone, and a step of a steps file starts only while {fact:easyscreenshotkit.demo.time_left} seconds are left, or a quarter of a shorter run's time.
 <!-- hosted -->
   A job here stops after {limit:job_minutes} whatever this says, and a stopped job keeps no files.
 <!-- end -->
 <!-- local -->
-- `out_dir`: by default easyscreenshotkit-demo-<host> in {base_dir}. It must be empty or hold an earlier demo, which a run deletes as it starts, so one that fails loses it too; a steps file kept there stays, and a tour replaces `demo.yaml`.
+- `out_dir`: by default easyscreenshotkit-demo-<host> in {base_dir}. It must be empty or hold an earlier demo, which a run replaces once it has ended well: one that fails or is canceled leaves it as it was. A steps file kept there stays, and a tour replaces `demo.yaml`.
 <!-- end -->
 - `zoom`, `background`, `frame`, `fps`, `theme`, `lang`, `hide`, `reduced_motion` and `gif` do what their descriptions say. `steps.json` counts its frames at `fps`, and `demo.gif` is made smaller until it is {fact:easyscreenshotkit.demo.gif_max_mb} MB at most, with a note when it cannot be.
 
@@ -140,6 +140,12 @@ After a tour, `demo.yaml` is a complete file to start from.
 - `check_video` takes clicks as `cuts`, their `pressedAt` joined by commas like 1.246,2.645. It refuses `steps.json` itself as cuts.
 <!-- end -->
 - The steps' notes, in order, are the script for a voice.
+<!-- with easycaptionkit -->
+- `caption_video` takes `steps.json` as its `words`: each step's note, or its label when no step has one, shows as a caption while the step plays (the captions topic).
+<!-- end -->
+<!-- with reframekit -->
+- `reframe_video` finds `steps.json` beside `demo.mp4` and follows each page and click in a 9:16, 4:5 or 1:1 version of the demo (the reframe topic).
+<!-- end -->
 
 ## Check before you hand it over
 
@@ -172,13 +178,13 @@ Each error as the result shows it, then the fix.
 - A steps file the kit cannot read stops it before the site opens, naming the file and the step, with reasons like "a target is a CSS selector or text=<words>, not <value>", "unknown key <key>; <action> takes <keys>", "one action per step, got <actions>" or "<word> is read as a comment; put a selector that starts with # in quotes: <step>". Fix that step.
 <!-- local -->
 - "<folder> is not empty and holds no earlier easyscreenshotkit demo. Pick another folder with out_dir.": give another `out_dir`.
-- "<param>: <file> is the <name> of <folder>, where record_demo_video saves, and a run there deletes or writes over that file.": nothing started. Give the steps file or the picture another name, or the demo another `out_dir`.
+- "<param>: <file> is the <name> of <folder>, where record_demo_video saves, and a run there writes over that file.": nothing started. Give the steps file or the picture another name, or the demo another `out_dir`.
 <!-- end -->
 
 ## Files
 
 <!-- local -->
-`steps` is a path, absolute or relative to {base_dir}. The file may sit in the demo's own folder under any name but `demo.mp4`, `demo.gif`, `poster.png` and `steps.json`, which a run deletes or writes over there; `demo.yaml` is safe, since a run from a steps file never touches it.
+`steps` is a path, absolute or relative to {base_dir}. The file may sit in the demo's own folder under any name but `demo.mp4`, `demo.gif`, `poster.png` and `steps.json`, which a run writes over there; `demo.yaml` is safe, since a run from a steps file never touches it.
 <!-- with check_video -->
 Pass `demo.mp4` on by its path.
 <!-- end -->
@@ -191,10 +197,12 @@ Pass the video on as job:<job_id>/demo.mp4.
 Give job:<job_id>/demo.yaml as `steps` to record a tour again as it was.
 <!-- end -->
 <!-- with check_video, fit_music -->
-No tool here takes `steps.json`: read the times from it in the result and give them as numbers.
+The check and the music take no `steps.json`: read the times from it in the result and give them as numbers.
 <!-- end -->
 <!-- without check_video, fit_music -->
+<!-- without reframekit, easycaptionkit -->
 No tool here takes `steps.json` or its times: give them to the user for the app they edit the video in.
+<!-- end -->
 <!-- end -->
 
 ## Hand over

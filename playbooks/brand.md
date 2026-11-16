@@ -117,6 +117,7 @@ Each error as the result shows it, then the fix.
 <!-- end -->
 - "<url> still shows no content after 30 s, so nothing was read. Try again, or check the page in a browser.": run once more with `timeout_seconds` {fact:easybrandkit.slow_timeout}, then ask the user to check the page.
 - "Could not open <url>: <reason>": the address does not answer, as with net::ERR_NAME_NOT_RESOLVED. Check it with the user.
+- "<url> answered <status>, so no kit was made.": the page answered an error, like 404, whose page is no brand's. Check the address with the user.
 - "<url> is a page on <host>, not the brand's own site. Give the brand's website, or its App Store or Google Play listing.": find the product's own site, or ask for it.
 - "<url> could not be read: <reason>.": a store listing that is removed, private or not answering. Give the product's website instead.
 <!-- local -->
@@ -133,13 +134,13 @@ Notes in a finished result:
 <!-- end -->
 - "<url> is not the home page, so <home> was read instead: the home page carries the brand's own header and colors.": nothing to fix, unless <home> is a language or country chooser; then ask for the site's home page in the user's language, as step 4 says.
 - "<url> is a store listing that names no website, so only the listing was read: the kit has the app icon and screenshots but no logos, colors or fonts. Give the product's website for those.": make the kit again from the website.
-- A note that starts "Did not read" names a fact page left out. With "the site's robots.txt asks tools not to read it", the kit kept to robots.txt, so `FACTS.md` holds nothing from that page. With "the run ran out of time; give timeout_seconds more seconds", run again with a longer `timeout_seconds`.
+- A note that starts "Did not read" names a fact page left out. With "the site's robots.txt asks tools not to read it", the kit kept to robots.txt, so `FACTS.md` holds nothing from that page. With "too little of the run's time was left to read it", run again with a longer `timeout_seconds`.
 
 ## Files
 
 <!-- local -->
 - The kit saves into `out_dir`, absolute or relative to {base_dir}. The default folder is named after the host without www or the port, like easybrandkit-linear.app, so all App Store apps share easybrandkit-apps.apple.com and all Google Play apps easybrandkit-play.google.com.
-- A run deletes the kit an earlier run left in its folder before it opens the site, so a failed run loses a good kit too; only a refused address or folder leaves it. Give each site, app or version its own `out_dir`, like launch/brand.
+- A run makes the new kit apart and puts it in place of an earlier one only once it has ended well: a run that fails, is refused or is canceled leaves the folder as it was. Give each site, app or version its own `out_dir`, like launch/brand, since a run that ends well replaces the kit there.
 - A folder that holds files but no earlier brand kit stops the kit, so it never mixes into the user's files.
 <!-- end -->
 <!-- hosted -->

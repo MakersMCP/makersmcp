@@ -5,7 +5,7 @@ index: setup, the errors the tools return and their fixes, the kits' flag names
 description: Explains how a MakersMCP result shows a problem, from an argument the schema refused to a job that failed or a check that did not pass, lists the errors makersmcp itself returns with their fixes, says what check_setup reports and how to fix the setup, and maps the command line flags kit messages may name to the parameters they mean. Use it when a tool returns an error, a job fails, a tool is missing, or a message names a flag.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, check_video, fit_music, analyze_music, make_launch_film, plan_launch_film, launch_film_guide]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, launch-film, musicfit, reframekit, easycaptionkit, check_video, fit_music, analyze_music, make_launch_film, plan_launch_film, launch_film_guide]
 order: 90
 ---
 # When a tool fails
@@ -14,7 +14,7 @@ Read the result before anything else: its first line says what happened, and the
 
 ## What the first line says
 
-- "Input validation error: Invalid arguments for tool <tool>: <reason> at <param>": the arguments did not fit and nothing started. Fix that parameter: "an address starting with http:// or https://" wants the whole address, like https://linear.app, and "Too small: expected number to be >=30" wants a value inside the parameter's bounds. An argument the tool does not have is dropped without a word, so check the names.
+- "Input validation error: Invalid arguments for tool <tool>: <reason> at <param>": the arguments did not fit and nothing started. Fix that parameter: "an address starting with http:// or https://" wants the whole address, like https://linear.app, and "Too small: expected number to be >=30" wants a value inside the parameter's bounds. An argument the tool does not have is refused too, with the one it most likely meant and the arguments the tool takes, and nothing starts.
 - "Tool <tool> not found": that tool is not on this server. `check_setup` lists the kits that are on.
 - "<title>: not started": makersmcp refused the call before a kit ran, so nothing changed. The reason follows.
 - "<title>: failed after <time> (exit code <n>)": the kit ran and stopped, and what it said follows. Exit code 2 means it refused an argument before it changed anything.
@@ -51,7 +51,7 @@ Read the result before anything else: its first line says what happened, and the
 
 - Read the kit's own words after the first line: they name what was wrong and, mostly, the fix. The topic of the tool that failed lists its errors.
 <!-- local -->
-- The brand, font and screenshot kits clear what an earlier run left in their folder as they start, so a failed run of theirs into a folder that held a good result leaves it empty, while musicfit, a render and a check keep the earlier files until they succeed. Give the next run a folder of its own when a result there is still wanted.
+- A run that fails or is canceled leaves its folder as it was, a good result of an earlier run there too: every kit puts a run's files in place only once it has ended well.
 <!-- end -->
 <!-- hosted -->
 - "It ran longer than <time> and was stopped.": a job here stops after {limit:job_minutes}, so ask for less, like fewer pages or a shorter film. "Something went wrong on our side. Try again in a while.": tell the user. A failed job keeps no files.
@@ -85,7 +85,14 @@ Read the result before anything else: its first line says what happened, and the
   launch-film says "Chrome was not found. Install Google Chrome or Chromium, or set LAUNCH_FILM_CHROME to its path." CHROME_PATH reaches it too, unless LAUNCH_FILM_CHROME names another browser, which a line "launch-film's Chrome: <path>" then shows.
 <!-- end -->
 - "<name> did not start. Try again, or point CHROME_PATH at another browser.": the browser was found and did not start. Try once more, then ask the user to point CHROME_PATH at another browser's program.
-- ffmpeg "not found on PATH. Install ffmpeg or set FFMPEG_PATH.": the kits that write video or sound stop, with "musicfit needs ffmpeg", "The demo needs ffmpeg, and none was found", a crash that names spawn ffmpeg ENOENT, or "<file> could not be read as a video" from a check. Ask the user to install ffmpeg, or to set FFMPEG_PATH.
+- ffmpeg "not found on PATH. Install ffmpeg or set FFMPEG_PATH.": the kits that write video or sound stop, with "musicfit needs ffmpeg", "The demo needs ffmpeg, and none was found", a crash that names spawn ffmpeg ENOENT, or "<file> could not be read as a video" from a check.
+<!-- with reframekit -->
+  reframekit says "reframekit needs ffmpeg and ffprobe", and needs an ffmpeg built with --enable-gpl, as Ubuntu's is.
+<!-- end -->
+<!-- with easycaptionkit -->
+  easycaptionkit says "easycaptionkit needs ffmpeg" or "easycaptionkit needs ffprobe", and without a Chrome "easycaptionkit needs Chrome to draw the captions, and none was found".
+<!-- end -->
+  Ask the user to install ffmpeg, or to set FFMPEG_PATH.
 - A line "<setting>: <value> is no program file, so the kits that read <setting> cannot run it. Point it at the program, or take it out.": that setting leads to a folder, like a whole Google Chrome.app, to no file, or to a command name that is not on PATH. makersmcp then starts no tool that reads a program from it, even while the line above names a program found elsewhere: the call ends "<title>: not started" with that same line, and nothing changed. A tool that reads no program from that setting still runs. Ask the user to point the setting at the program itself, or to take it out.
 <!-- with launch-film -->
 - ffprobe "not found beside ffmpeg or on PATH.": launch-film reads videos and pictures with it, and makersmcp gives it the ffprobe this line names. Without one, a check says "<file> could not be read as a video", and a render stops at its logo clip with "clip <n>: no logo could close the film: <reasons>", each reason saying "could not be read as a picture". The launch pictures of `make_launch_stills` stop with that same error when `for` holds ph, as it does by default, since those are drawn from the film's clips; for places without ph, like og, x, play or chrome, they end done with the note "No logo could be used (<reasons>), so the name stands in for it." and lack the logo and the screen. Ask the user for an ffmpeg that comes with ffprobe, or to set LAUNCH_FILM_FFPROBE to it, then render or make the pictures again. A line "launch-film's ffmpeg: <path>" means LAUNCH_FILM_FFMPEG names another ffmpeg than FFMPEG_PATH, and launch-film runs that one.
@@ -130,6 +137,12 @@ Kit messages can name the kit's command line flags, like --timeout or --page. A 
 <!-- end -->
 <!-- with fit_music -->
 - `fit_music` and `analyze_music`: the music topic.
+<!-- end -->
+<!-- with reframekit -->
+- `reframe_video`, `plan_reframe` and `check_place_limits`: the reframe topic.
+<!-- end -->
+<!-- with easycaptionkit -->
+- `caption_video`, `make_subtitles` and `list_caption_styles`: the captions topic.
 <!-- end -->
 <!-- with analyze_music -->
 <!-- without fit_music -->

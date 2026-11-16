@@ -5,7 +5,7 @@ index: check_video: what to expect of each video, cuts on the beat, reading CHEC
 description: Measures a video's size, frame rate, length, black, still and silent stretches, loudness, true peak, clipping and cuts on the beat with launch-film's check, and says what to ask of a launch film, a demo or a copy with music laid in, how to read the report and its contact sheet, and what the check does not measure. Use it before handing over any video, or when the user asks whether a video meets a platform's limits.
 kit: launch-film
 requires: [launch-film, check_video]
-optional: [easyscreenshotkit, fit_music, analyze_music, make_launch_film, plan_launch_film]
+optional: [easyscreenshotkit, fit_music, analyze_music, make_launch_film, plan_launch_film, reframekit]
 order: 67
 ---
 # Checking a video before it goes out
@@ -15,6 +15,9 @@ order: 67
 ## Decide first
 
 - `check_video` measures size, frame rate, length, black, still and silent stretches, loudness, true peak, clipping, and, with a track's cues, whether the cuts land on the beat. It does not measure file size, codec, bitrate or the space an app's buttons cover. When the user asks whether a video passes a platform's limits, check what it measures and say what it does not, without stating a platform's rule as fact.
+<!-- with reframekit -->
+  `check_place_limits` measures what this leaves out against each place's own published limits: shape, length, file size, codecs and burned captions against a 9:16 place's safe area (the reframe topic).
+<!-- end -->
 - `expect` is the size and frame rate as WxH@fps, WxH alone or @fps alone. A launch film is {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16: its {fact:launch-film.fps} frames a second are its own, never a fault.
 <!-- with easyscreenshotkit -->
   A demo from `record_demo_video` is {fact:easyscreenshotkit.demo.size} at the `fps` it was recorded with, {default:record_demo_video.fps} unless given.
@@ -23,7 +26,7 @@ order: 67
 <!-- with make_launch_film, plan_launch_film -->
   A launch film's exact length is the seconds field of its `film.timeline.json`.
 <!-- end -->
-- `lufs` is the integrated loudness to check, within {fact:launch-film.check_lufs_tolerance} LU. Give it only when the user needs a level. A launch film measures about {fact:launch-film.lufs} LUFS as it was rendered, and nothing here changes that. launch-film's own guide gives {fact:launch-film.lufs_social} as the level YouTube, X and most social apps play at.
+- `lufs` is the integrated loudness to check, within {fact:launch-film.check_lufs_tolerance} LU. Give it only when the user needs a level. launch-film's own guide gives {fact:launch-film.lufs_social} as the level YouTube, X and most social apps play at, and a launch film is rendered to it.
 - `allow` lists stretches meant to hold still, black or silent, in seconds, like 27-30,0-0.5.
 
 ## Steps
@@ -117,7 +120,7 @@ check_video {"film": "https://example.com/with-music.mp4", "cues": "https://exam
 
 ## A launch film's own numbers
 
-Its sound is normalized to {fact:launch-film.lufs_target} LUFS under a {fact:launch-film.true_peak} dBTP ceiling before it is encoded, and the film comes out louder: about {fact:launch-film.lufs} LUFS here, with a true peak that sometimes passes {fact:launch-film.check_true_peak} dBTP. A loudness or true peak failure on a launch film is how it was rendered: tell the user the measurement, and never render it again for that, since a render gives the same. A launch film planned with `music` false fails the silence check until a track is under it; with `sfx` false too it is silent throughout, which only warns, as above.
+Its sound is set to {fact:launch-film.lufs_target} LUFS with its true peak at {fact:launch-film.true_peak} dBTP or under, measured once the film is encoded and encoded again while it is off, so a film measures about {fact:launch-film.lufs} LUFS. A sound of little but short peaks can come out quieter. A loudness or true peak failure on a launch film is how it was rendered: tell the user the measurement, and never render it again for that, since a render gives the same. A launch film planned with `music` false fails the silence check until a track is under it; with `sfx` false too it is silent throughout, which only warns, as above.
 
 ## When the check cannot run
 

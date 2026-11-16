@@ -10,24 +10,26 @@ Each kit lives in its own repository and works on its own too, as a CLI and an a
 
 | Field | Kit | Tools |
 | --- | --- | --- |
-| Design | [easybrandkit](https://github.com/EminBudak/easybrandkit): a website's logo files, colors, fonts and first screen | `make_brand_kit` |
-| Design | [easyfontkit](https://github.com/EminBudak/easyfontkit): a site's fonts with their licenses and free look-alikes | `make_font_kit` |
-| Image | [easyscreenshotkit](https://github.com/EminBudak/easyscreenshotkit): clean screenshots and a short demo video of a website | `take_screenshots`, `record_demo_video`, `check_pwa_screenshots` |
-| Video | [launch-film](https://github.com/EminBudak/launch-film): a launch film with music, the launch pictures, and a check for any video | `make_launch_film`, `plan_launch_film`, `render_launch_film`, `make_launch_stills`, `check_video`, `launch_film_guide` |
-| Sound | [musicfit](https://github.com/EminBudak/musicfit): a music track cut to fit your video | `fit_music`, `analyze_music` |
+| Design | [easybrandkit](https://github.com/MakersMCP/easybrandkit): a website's logo files, colors, fonts and first screen | `make_brand_kit` |
+| Design | [easyfontkit](https://github.com/MakersMCP/easyfontkit): a site's fonts with their licenses and free look-alikes | `make_font_kit` |
+| Image | [easyscreenshotkit](https://github.com/MakersMCP/easyscreenshotkit): clean screenshots and a short demo video of a website | `take_screenshots`, `record_demo_video`, `check_pwa_screenshots` |
+| Video | [launch-film](https://github.com/MakersMCP/launch-film): a launch film with music, the launch pictures, and a check for any video | `make_launch_film`, `plan_launch_film`, `render_launch_film`, `make_launch_stills`, `check_video`, `launch_film_guide` |
+| Video | [reframekit](https://github.com/MakersMCP/reframekit): one finished video in the shape, length and size each place takes, and a check of any file against a place's limits | `reframe_video`, `plan_reframe`, `check_place_limits` |
+| Video | [easycaptionkit](https://github.com/MakersMCP/easycaptionkit): captions burned into a video in the brand's fonts, clear of each app's buttons, with the subtitle files | `caption_video`, `make_subtitles`, `list_caption_styles` |
+| Sound | [musicfit](https://github.com/MakersMCP/musicfit): a music track cut to fit your video and laid under it | `fit_music`, `analyze_music` |
 
 More kits are on the way.
 
 ## Set it up
 
-You need Node 22 or newer and the Chrome, Chromium, Edge or Brave you already have. Demo videos, launch films and music also need ffmpeg. Every setup runs `npx -y makersmcp@0.1.1`: keep the version in it, since `npx` can otherwise go on using an older copy it cached.
+You need Node 22 or newer and the Chrome, Chromium, Edge or Brave you already have. Demo videos, launch films, music, reframed videos and captions also need ffmpeg, which comes with ffprobe. Every setup runs `npx -y makersmcp@0.2.0`: keep the version in it, since `npx` can otherwise go on using an older copy it cached.
 
 Then ask your agent for what you need, like "make a launch film for linear.app" or "get the brand kit and the fonts of stripe.com".
 
 ### Claude Code
 
 ```bash
-claude mcp add makersmcp -- npx -y makersmcp@0.1.1
+claude mcp add makersmcp -- npx -y makersmcp@0.2.0
 ```
 
 Check it with `claude mcp get makersmcp`, or `/mcp` inside Claude Code.
@@ -42,7 +44,7 @@ Add this to `claude_desktop_config.json`, then quit Claude Desktop fully and ope
     "makersmcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "makersmcp@0.1.1"]
+      "args": ["-y", "makersmcp@0.2.0"]
     }
   }
 }
@@ -59,7 +61,7 @@ Open the command palette (Cmd+Shift+P, or Ctrl+Shift+P on Windows and Linux), ru
   "mcpServers": {
     "makersmcp": {
       "command": "npx",
-      "args": ["-y", "makersmcp@0.1.1"]
+      "args": ["-y", "makersmcp@0.2.0"]
     }
   }
 }
@@ -68,13 +70,13 @@ Open the command palette (Cmd+Shift+P, or Ctrl+Shift+P on Windows and Linux), ru
 ### VS Code
 
 ```bash
-code --add-mcp '{"name":"makersmcp","command":"npx","args":["-y","makersmcp@0.1.1"]}'
+code --add-mcp '{"name":"makersmcp","command":"npx","args":["-y","makersmcp@0.2.0"]}'
 ```
 
 ### Codex
 
 ```bash
-codex mcp add makersmcp -- npx -y makersmcp@0.1.1
+codex mcp add makersmcp -- npx -y makersmcp@0.2.0
 ```
 
 ### Windsurf
@@ -91,7 +93,7 @@ Add it under `mcp.servers` in your OpenClaw config:
     "servers": {
       "makersmcp": {
         "command": "npx",
-        "args": ["-y", "makersmcp@0.1.1"]
+        "args": ["-y", "makersmcp@0.2.0"]
       }
     }
   }
@@ -108,18 +110,18 @@ Add it under `mcp_servers` in `~/.hermes/config.yaml`, then run `/reload-mcp`:
 mcp_servers:
   makersmcp:
     command: "npx"
-    args: ["-y", "makersmcp@0.1.1"]
+    args: ["-y", "makersmcp@0.2.0"]
     timeout: 60
 ```
 
 ### Other clients
 
-Any MCP client that runs stdio servers can start it with `npx -y makersmcp@0.1.1`.
+Any MCP client that runs stdio servers can start it with `npx -y makersmcp@0.2.0`.
 
 ### Run it from source
 
 ```bash
-git clone https://github.com/EminBudak/makersmcp.git
+git clone https://github.com/MakersMCP/makersmcp.git
 cd makersmcp
 npm install
 npm run build
@@ -132,24 +134,24 @@ In any setup above, use `node` as the command and the full path of `dist/index.j
 Every kit is on unless you say otherwise. To give your agent fewer tools, name the kits you use:
 
 ```bash
-npx -y makersmcp@0.1.1                                   # every kit
-npx -y makersmcp@0.1.1 --kits all                        # every kit, the same
-npx -y makersmcp@0.1.1 --kits easybrandkit,launch-film   # only these two
+npx -y makersmcp@0.2.0                                   # every kit
+npx -y makersmcp@0.2.0 --kits all                        # every kit, the same
+npx -y makersmcp@0.2.0 --kits easybrandkit,launch-film   # only these two
 ```
 
-In a client's settings, the same goes at the end of `args`, like `["-y", "makersmcp@0.1.1", "--kits", "easybrandkit,launch-film"]`.
+In a client's settings, the same goes at the end of `args`, like `["-y", "makersmcp@0.2.0", "--kits", "easybrandkit,launch-film"]`.
 
 ## Where the files go
 
-Every tool saves its files in a folder and returns the folder, the files it saved there and the kit's own notes, like BRAND.md. The folders go where makersmcp starts, which is your project for a coding agent, or `~/makersmcp` when it can't write there; a folder that is not there yet is made with the first job. Choose another place with `--out <dir>` or `MAKERSMCP_OUT`, or give a tool its own `out_dir`. A call with an argument the tool does not take, like `output_dir`, is refused with the one it most likely meant, and starts nothing.
+Every tool saves its files in a folder and returns the folder, the files it saved there and the kit's own notes, like BRAND.md. The folders go where makersmcp starts, which is your project for a coding agent, or `~/makersmcp` when it can't write there; a folder that is not there yet is made with the first job. A tool given a video, like `reframe_video` or `caption_video`, saves in a folder next to that video. Every kit puts a run's files in place only once the run has ended well, so a run that fails or is canceled leaves its folder as it was. Choose another place with `--out <dir>` or `MAKERSMCP_OUT`, or give a tool its own `out_dir`. A call with an argument the tool does not take, like `output_dir`, is refused with the one it most likely meant, and starts nothing.
 
-launch-film keeps the brand kit a film uses in a `brand/` folder next to film.json. When it plans from a brand kit you give it, or from an App Store page, it deletes that folder and makes it again; from any other site, easybrandkit makes the kit again in it, replacing only a kit's own files. Its tools tell the client they may replace files, and they do not start when makersmcp finds they would lose anything in that `brand/` but a kit's own files: a file you added, a file named like a kit's own in other letters or with a character that does not show, a link the kit would delete files through, or a kit you give that is that same `brand/` folder under another name, holds it, or has its brand.json as a link into it. To use a `brand/` folder where it is, give it as `brand` written the way `out_dir` is, with `/brand` added. makersmcp looks only before the kit starts, and a folder mounted from the same disk, inside `brand/` or as the `out_dir`, can still hide from it where it really is, so keep files you care about outside `brand/`.
+launch-film keeps the brand kit a film uses in a `brand/` folder next to film.json. When it plans from a brand kit you give it, it deletes that folder and makes it again, and from an App Store page it may; from any other site, easybrandkit makes the kit again in it, replacing only a kit's own files. Its tools tell the client they may replace files, and they do not start when makersmcp finds they would lose anything in that `brand/` but a kit's own files: a file you added, a file named like a kit's own in other letters or with a character that does not show, a link the kit would delete files through, or a kit you give that is that same `brand/` folder under another name, holds it, or has its brand.json as a link into it. To use a `brand/` folder where it is, give it as `brand` written the way `out_dir` is, with `/brand` added. makersmcp looks only before the kit starts, and a folder mounted from the same disk, inside `brand/` or as the `out_dir`, can still hide from it where it really is, so keep files you care about outside `brand/`.
 
 A long job, like rendering a film, keeps going after the tool returns. The tool then gives back a `job_id`, and your agent calls `wait_for_job` with it until the job ends. `list_jobs` and `cancel_job` do what they say, and `check_setup` tells what is missing when a kit fails to start. When the client closes makersmcp, or makersmcp ends some other way, its jobs stop too, with the browsers and ffmpeg they started.
 
 ## When something fails
 
-- The tools don't appear: check that `node --version` says 22 or newer, then restart the client. `npx -y makersmcp@0.1.1 --check` lists what makersmcp found.
+- The tools don't appear: check that `node --version` says 22 or newer, then restart the client. `npx -y makersmcp@0.2.0 --check` lists what makersmcp found.
 - A kit's tools are missing: `--check` says why. Every kit comes with makersmcp, so look at `--kits` and `--kit-path`, and from source run `npm install` again after a pull.
 - A kit can't find Chrome or ffmpeg: set `CHROME_PATH` and `FFMPEG_PATH` in the server's `env`. makersmcp gives them to every kit, to launch-film as `LAUNCH_FILM_CHROME` and `LAUNCH_FILM_FFMPEG` too, with `LAUNCH_FILM_FFPROBE` the ffprobe beside that ffmpeg. Without them, it gives each kit the Chrome and the ffmpeg `--check` shows. A setting names a program by its path, or by a command name on PATH like `ffmpeg`. `--check` also names a setting that leads to no program, and until it is fixed makersmcp starts no tool that reads a program from it.
 - A long job meets the client's time limit: no call waits longer than `wait_seconds`, 45 by default, counted from the start of the call. A job still running then comes back with a `job_id` and `next_action: wait_for_job`, and the agent should call that, never the first tool again, which would start a second job. A call the client gave up on is still covered: the same call again within 10 minutes continues its job, and says so, instead of starting another. Where a client lets you set a tool timeout, keep it above 45 seconds.

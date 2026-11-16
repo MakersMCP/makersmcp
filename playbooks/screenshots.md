@@ -19,7 +19,7 @@ order: 50
 <!-- with make_launch_film, plan_launch_film -->
 - The Google Play feature graphic, Chrome Web Store tiles, an og:image and an X picture are drawn pictures, not screenshots: `make_launch_stills` makes them (the launch-film topic). The launch-kit topic maps every place of a launch.
 <!-- end -->
-- A view an app shows behind a click or a #route, like /app/#/plants, is out of reach, since `url` and `page` are read as paths. Ask the user for those screens, or record them with `record_demo_video` and a steps file (the demo-video topic).
+- A view of a web app by its #route, like /app/#/plants, is a page of its own: give it as `url` or in `page`, and `pages` 1 takes only those, as for three views of an app for store screenshots. Set `clean` false for an app's own screens. A view behind a click is out of reach: record it with `record_demo_video` and a steps file (the demo-video topic).
 - Never draw, retype or invent a screen, and never present a screenshot as the product's when it came neither from this tool nor from the user: the user would publish a screen the product does not have.
 
 ## Steps
@@ -45,7 +45,7 @@ take_screenshots {"url": "https://linear.app", "pages": 3, "page": ["/pricing"],
 - `pages` ({bounds:take_screenshots.pages}, default {default:take_screenshots.pages}) counts every page taken. Above 1, the first is the home page at the site's root, even when `url` is a deeper page; then `url` itself when it is deeper; then each `page`; then pages from the site's menu, buttons and sitemap until `pages` is reached.
 - Each `page` is taken even past `pages`: `pages` 2 with two `page` entries gave three pages.
 - With `pages` 1, only `url` is taken, as given; each `page` must still be a page of the site, or the run stops.
-- A #route is dropped from `url` and `page`, and a query from `page`, so /app/#/plants is /app/. A `page` that comes out the same as a page already taken is left out without a word.
+- A #route (#/ or #!) in `url` or `page` is kept: the page opens on that view, waits for its data and is named after it, like 02-app-plants-desktop.png. A `page` of only a route, like #/plants, is that view of `url`. Any other fragment, like #pricing, is left out with a note. A `page` that comes out the same as a page already taken is left out without a word.
 - Among the pages it finds, it leaves out sign-in pages, an app or a dashboard (counted as sign-in pages), legal pages, careers, contact and help, single blog posts, pages in another language, what robots.txt asks crawlers to skip, and redirects to a sign-in page or to the home page. Give such a page as `url` or `page` to take it.
 
 ## Sizes
@@ -73,7 +73,7 @@ take_screenshots {"url": "https://linear.app", "pages": 3, "page": ["/pricing"],
   A job here stops after {limit:job_minutes} whatever this says.
 <!-- end -->
 <!-- local -->
-- `out_dir`: by default easyscreenshotkit-<host> in {base_dir}. It must be empty or hold an earlier run of this tool, which a run deletes as it starts, so one that fails loses it too. Give each set its own `out_dir`, like launch/screenshots.
+- `out_dir`: by default easyscreenshotkit-<host> in {base_dir}. It must be empty or hold an earlier run of this tool, which a run replaces once it has ended well: one that fails or is canceled leaves it as it was. Give each set its own `out_dir`, like launch/screenshots.
 <!-- end -->
 - `hide` and `reduced_motion` do what their descriptions say.
 

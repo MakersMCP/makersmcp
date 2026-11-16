@@ -5,7 +5,7 @@ index: which tool fits which request, how jobs, waits and files work, and what t
 description: Explains what MakersMCP's kits make from a website or a file and what they never make, which tool answers which request, how a job runs and how to wait for it, where the files go, the rules for using what the kits made, and what to tell the user at the end. Use it when a request names no tool, when it is unclear whether these kits can do it, or before a first job.
 kit: makersmcp
 requires: []
-optional: [easybrandkit, easyfontkit, easyscreenshotkit, musicfit, check_video, fit_music, analyze_music, make_launch_film, plan_launch_film]
+optional: [easybrandkit, easyfontkit, easyscreenshotkit, musicfit, reframekit, easycaptionkit, check_video, fit_music, analyze_music, make_launch_film, plan_launch_film]
 order: 10
 ---
 # Getting started with MakersMCP
@@ -44,7 +44,7 @@ A whole launch is the launch-kit topic.
    Here at most {limit:jobs_at_once} run or wait at once, and a start past that is refused: start the next one when one ends.
 <!-- end -->
 
-Reading a page or a track takes seconds to a minute or two; screenshots, demos and film renders can take minutes.
+Reading a page or a track takes seconds to a minute or two; screenshots and making a video can take minutes.
 <!-- hosted -->
 Here a call returns within {limit:max_wait}, and a job keeps running when the connection closes.
 <!-- end -->
@@ -52,7 +52,7 @@ Here a call returns within {limit:max_wait}, and a job keeps running when the co
 ## Files
 
 <!-- local -->
-Each tool saves into a folder under {base_dir}, named after the site or the file unless the call names one, and relative paths are read from there. A run replaces what an earlier run of its kit left in that folder, so give each version its own folder: the brand, font and screenshot kits clear it as they start, so a failed run of theirs loses it too.
+Each tool saves into a folder named after the site or the file, in {base_dir} or next to the file it was given, unless the call names one, and relative paths are read from {base_dir}. A run that ends well replaces what an earlier run of its kit left in that folder, so give each version its own; one that fails or is canceled leaves it as it was.
 <!-- end -->
 <!-- hosted -->
 Each job saves into a folder of its own, and its result has a link to each file, which works for {limit:keep_days} for anyone who holds it. A file an earlier job saved goes into the next job as job:<job_id>/<path>, with the path its file list shows.
@@ -88,6 +88,12 @@ jobs-and-files has the rest.
 <!-- end -->
 <!-- with musicfit -->
 - Never call a track cleared for use: nothing here checks its rights.
+<!-- end -->
+<!-- with reframekit -->
+- Show a reframe's `sheet.png` before its files go out: its crop follows motion, not faces.
+<!-- end -->
+<!-- with easycaptionkit -->
+- Captions say what the words file says: nothing here listens to the speech.
 <!-- end -->
 
 ## When something fails
