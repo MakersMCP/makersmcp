@@ -103,6 +103,7 @@ plan_launch_film {"url": "https://linear.app", "brand": "job:<job_id>/brand.json
 2. Read the plan in the result, which holds `film.json`, `words.json` and `brand/BRAND.md`. Check the brand's name first: the kit takes it from the site's name, its title or its host, and the film shows it. Then check every word on screen against `words.json`. A plan cannot be changed here and renders as it was planned, so when the name or a word is wrong, or the brand came from a cookie wall, a login page or a page with no logo, tell the user what came back before rendering, and ask for the product's own site when the address is not it, or whether to go on with it. A render takes the plan's film.json only until the time the plan's result gives: when the user takes longer to decide, plan again.
 <!-- with easybrandkit -->
    The brand topic says which address of a site gives its brand.
+   A plan made again takes a brand kit's brand.json only until the time that job's result gave: past it, plan without `brand`, which reads the brand from the site itself, or make the brand kit again right before.
 <!-- end -->
 3. Render it, which takes longer here than the {fact:launch-film.render_minutes} a 30 second film takes with two clips at a time, then call `wait_for_job` with the `job_id` until it is done:
 ```call

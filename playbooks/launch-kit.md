@@ -53,7 +53,7 @@ Store and gallery screenshots come from `take_screenshots`, one `sizes` entry pe
 ## The order
 
 <!-- hosted -->
-Here a person's jobs run one at a time, in the order they were started, and a job takes an earlier job's files as job:<job_id>/<path> when a worker takes it, only until the time that job's result gives, {limit:keep_time} after it ended, when its links stop too. So give the user each job's links as soon as it ends, with the time they stop, check a job's files right after that job, and start a step that needs an earlier job's file right after that job, before any other. When the user takes longer to decide than that time, as on the brand or the plan, make that earlier step again first.
+Here a person's jobs run one at a time, in the order they were started, and a job takes an earlier job's files as job:<job_id>/<path> when a worker takes it, only until the time that job's result gives, {limit:keep_time} after it ended, when its links stop too. So give the user each job's links as soon as it ends, with the time they stop, check a job's files right after that job, and start a step that needs an earlier job's file right after that job, before any other. When the user takes longer to decide than that time, as on the brand or the plan, make that earlier step again first. A step made again takes earlier jobs' files only within their time too: make again first, in order, each step whose files it takes and whose time has passed, or leave such a file out where the step does without it, as a plan without `brand` reads the brand from the site itself.
 <!-- end -->
 
 <!-- with easybrandkit, easyscreenshotkit, easyfontkit -->
@@ -160,6 +160,9 @@ plan_launch_film {"url": "https://linear.app", "brand": "job:<job_id>/brand.json
 <!-- end -->
 <!-- hosted -->
    Read the plan in the result. A plan renders as it was planned here, so when a word or the name is wrong, tell the user before rendering. When the user takes longer to decide than the time the plan's result gives, plan again.
+<!-- with easybrandkit -->
+   A plan made again takes the brand kit's brand.json only until the time the brand kit's result gave: past it, plan without `brand`, which reads the brand from the site itself, or make the brand kit again right before.
+<!-- end -->
 <!-- end -->
 4. Make the pictures with `make_launch_stills`, with `source` the plan's film.json, the 16:9 one when there are two, and `for` the places, so they match the film's look and words: they need the plan, not its render. They go to stills/ next to that film.json, with `stills/STILLS.md` saying which file is for which place.
 <!-- local -->
@@ -179,7 +182,7 @@ make_launch_stills {"source": "job:<job_id>/film.json", "for": ["ph", "og", "x"]
 <!-- end -->
 <!-- hosted -->
 <!-- with fit_music, reframekit -->
-   With two plans, render the 9:16 one first and the 16:9 one last, so that each step below that takes the 16:9 film's files starts right after the one before it, before any other job. When the time the 16:9 plan's result gave has passed by then, plan it again first.
+   With two plans, render the 9:16 one first and the 16:9 one last, so that each step below that takes the 16:9 film's files starts right after the one before it, before any other job. When the time the 16:9 plan's result gave has passed by then, plan it again first, as the start of this order says for a step made again, with `words` the 9:16 plan's words.json while that plan's time lasts, so both films say the same.
 <!-- end -->
 <!-- end -->
 <!-- local -->

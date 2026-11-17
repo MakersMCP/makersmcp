@@ -3372,7 +3372,7 @@ test('hosted with a keep time of 15 minutes, the launch kit gives each job\'s li
   // file when a worker takes it, refused once that job's keep time has passed (worker-job.js keepsFiles): 15 minutes on Free.
   const hosted = { where: 'hosted', limits: { ...LIMITS, keepSeconds: 900 } };
   const kit = await readTopics(hosted, ['launch-kit']);
-  assert.ok(kit.includes("Here a person's jobs run one at a time, in the order they were started, and a job takes an earlier job's files as job:<job_id>/<path> when a worker takes it, only until the time that job's result gives, 15 minutes after it ended, when its links stop too. So give the user each job's links as soon as it ends, with the time they stop, check a job's files right after that job, and start a step that needs an earlier job's file right after that job, before any other. When the user takes longer to decide than that time, as on the brand or the plan, make that earlier step again first."));
+  assert.ok(kit.includes("Here a person's jobs run one at a time, in the order they were started, and a job takes an earlier job's files as job:<job_id>/<path> when a worker takes it, only until the time that job's result gives, 15 minutes after it ended, when its links stop too. So give the user each job's links as soon as it ends, with the time they stop, check a job's files right after that job, and start a step that needs an earlier job's file right after that job, before any other. When the user takes longer to decide than that time, as on the brand or the plan, make that earlier step again first. A step made again takes earlier jobs' files only within their time too: make again first, in order, each step whose files it takes and whose time has passed, or leave such a file out where the step does without it, as a plan without `brand` reads the brand from the site itself."));
   // The checks of the screenshots and the demo come right after their jobs in the first step, not after two plans, two renders,
   // the pictures, the music and the places' versions.
   const first = kit.indexOf('\n1. ');
@@ -3410,6 +3410,12 @@ test('hosted with a keep time of 15 minutes, the launch kit gives each job\'s li
   assert.doesNotMatch(jobsTopic.description, /side by side/);
   const film = await readTopics(hosted, ['launch-film']);
   assert.ok(film.includes("A render takes the plan's film.json only until the time the plan's result gives: when the user takes longer to decide, plan again."));
+  // A plan made again past the brand kit's time, with that kit as its brand, would be queued, as Start checks only the form of a
+  // job reference, then fail in the worker with "There is no job <job_id> with files to use." and use up one of the jobs of any
+  // 24 hours.
+  const remade = 'A plan made again takes a brand kit\'s brand.json only until the time that job\'s result gave: past it, plan without `brand`, which reads the brand from the site itself, or make the brand kit again right before.';
+  assert.ok(film.includes(remade));
+  assert.ok(!(await readTopics({ ...hosted, kits: ['launch-film'] }, ['launch-film'])).includes(remade));
   assert.match(film, /\n5\. Make the pictures from the same plan when the user wants them, before the time the plan's result gives:\n/);
   // Locally the files stay and jobs in their own folders run side by side; the checks still come right after their jobs.
   const local = await readTopics({}, ['launch-kit', 'getting-started']);
@@ -3423,7 +3429,12 @@ test('hosted with two plans, the launch kit renders the 16:9 one last, so the fi
   // A render takes minutes there, so the second render and its check between the 16:9 render and the steps that take its film.mp4
   // and film.timeline.json could outlast that render's keep time, 15 minutes on Free, and the fit or the reframe would then fail as
   // it starts, with "There is no job <job_id> with files to use.", use up one of the day's jobs and need the film rendered again.
-  const order = 'With two plans, render the 9:16 one first and the 16:9 one last, so that each step below that takes the 16:9 film\'s files starts right after the one before it, before any other job. When the time the 16:9 plan\'s result gave has passed by then, plan it again first.';
+  // A 16:9 plan made again then takes the 9:16 plan's words while that plan's time lasts, and the brand kit only within that
+  // job's own time, as the order's start and the plan's step say: a plan given a job whose files are due fails in the worker and
+  // uses up one of the jobs of any 24 hours.
+  const order = 'With two plans, render the 9:16 one first and the 16:9 one last, so that each step below that takes the 16:9 film\'s files starts right after the one before it, before any other job. When the time the 16:9 plan\'s result gave has passed by then, plan it again first, as the start of this order says for a step made again, with `words` the 9:16 plan\'s words.json while that plan\'s time lasts, so both films say the same.';
+  const remade = 'A step made again takes earlier jobs\' files only within their time too: make again first, in order, each step whose files it takes and whose time has passed, or leave such a file out where the step does without it, as a plan without `brand` reads the brand from the site itself.';
+  const brand = 'A plan made again takes the brand kit\'s brand.json only until the time the brand kit\'s result gave: past it, plan without `brand`, which reads the brand from the site itself, or make the brand kit again right before.';
   const hosted = { where: 'hosted', limits: { ...LIMITS, keepSeconds: 900 } };
   for (const options of [hosted, { ...hosted, limits: SERVER_LIMITS }, { ...hosted, held: ['check_video'] }, { ...hosted, held: ['fit_music'] }, { ...hosted, kits: ['easybrandkit', 'launch-film', 'reframekit'] }]) {
     const side = JSON.stringify(options);
@@ -3432,6 +3443,10 @@ test('hosted with two plans, the launch kit renders the 16:9 one last, so the fi
     const render = kit.indexOf('Render each plan with `render_launch_film`.');
     const said = kit.indexOf(order);
     assert.ok(render > 0 && said > render && said < kit.indexOf('render_launch_film {'), side);
+    // The rule for a step made again comes at the order's start, and the brand kit's own in the plan's step, before the renders.
+    assert.ok(kit.indexOf(remade) > 0 && kit.indexOf(remade) < kit.indexOf('make_brand_kit {'), side);
+    const planned = kit.indexOf("When the user takes longer to decide than the time the plan's result gives, plan again.");
+    assert.ok(planned > 0 && kit.indexOf(brand) > planned && kit.indexOf(brand) < render, side);
     for (const call of ['fit_music {', 'reframe_video {']) assert.ok(!kit.includes(call) || kit.indexOf(call) > said, `${side}: ${call}`);
   }
   // With neither fit_music nor reframekit, no step after the renders takes a film's files, so no order is said; and locally the
@@ -3439,6 +3454,9 @@ test('hosted with two plans, the launch kit renders the 16:9 one last, so the fi
   for (const options of [{ ...hosted, kits: ['easybrandkit', 'launch-film'] }, {}]) {
     assert.ok(!(await readTopics(options, ['launch-kit'])).includes('With two plans, render'), JSON.stringify(options));
   }
+  // Without easybrandkit no plan takes a brand kit, so the plan's step says nothing of one.
+  const plain = await readTopics({ ...hosted, kits: ['launch-film', 'reframekit'] }, ['launch-kit']);
+  assert.ok(plain.includes(order) && plain.includes(remade) && !plain.includes(brand));
   // The track is read before the plan on both sides, as Tempo says, so no job that needs none of the render's files comes
   // between the 16:9 render and the fit.
   for (const options of [{}, hosted]) {
