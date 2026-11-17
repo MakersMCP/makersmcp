@@ -3568,7 +3568,7 @@ test('hosted, the refusals past a person\'s job limits and of a job whose files 
   assert.ok(read.includes('or "<tool> is not available right now: <why>.", for a tool held back for now: tell the user, and try again later.'));
 });
 
-test('hosted, music says the fit itself counts toward a job\'s memory as MakersMCP-Api bounds it, a fit under a video as long as the video, and troubleshooting what to do when a job\'s inputs left its kit no time', async () => {
+test('hosted, music says the fit itself counts toward a job\'s memory as MakersMCP-Api bounds it, a fit under a video as long as the video, by the length its file states for its picture, a Matroska or WebM picture counting as the whole file, a length musicfit refuses refused as the call is made, and troubleshooting what to do when a job\'s inputs left its kit no time', async () => {
   const errors = readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors.map(entry => entry.text);
   for (const words of [
     'length asks for a fit of <time> from <sound>, and fit_music here makes a fit of at most <time> from that much sound in a job',
@@ -3603,12 +3603,29 @@ test('hosted, music says the fit itself counts toward a job\'s memory as MakersM
   const [pastWithOne, pastWithBoth] = [fitHeldSeconds / copies.voice / 60, fitHeldSeconds / copies.both / 60];
   assert.ok(music.includes('give a shorter `length` or a shorter track, and with a `video`, whose length the fit takes, a shorter cut of the video with `length` set to it.'));
   assert.ok(music.includes(`A fit longer than ${pastWithOne} minutes with a \`voice\` or a \`video\`, or ${pastWithBoth} with both, passes the hour whatever the track, and its call is refused before any job starts when \`length\` is in seconds, or in frames with \`fps\`.`));
-  // A video whose file states a length past musicfit's longest takes no fit here, as a fit is as long as its video, so MakersMCP-Api
-  // refuses it whatever the length asked, before it counts the fit (video-bounds.js fitOf and soundProblem, since its 228d666 and
-  // e740c16), asking for a shorter cut; musicfit on the user's own machine measures the picture and takes a length within a frame of it.
-  const lengthMax = loadKitDefinitions().find(kit => kit.kit === 'musicfit').facts.length_max;
-  assert.ok(errors.includes(`video runs <time>, and fit_music makes a fit only as long as its video, to a frame, and of ${lengthMax / 60} minutes at most, and here of at most <time> with <what> in a job. Give a shorter cut of the video with length set to it.`));
-  assert.ok(music.includes(`A fit is as long as its \`video\` and \`length\` is ${lengthMax} seconds at most, so a video whose file states a longer length takes no fit here, whatever \`length\` asks: its job fails the same way with "fit_music makes a fit only as long as its video", which asks for a shorter cut of it. musicfit on the user's own machine measures the picture itself and takes a \`length\` within a frame of it.`));
+  // A video that runs past musicfit's longest takes no fit here, as a fit is as long as its video, so MakersMCP-Api refuses it under
+  // any length musicfit takes, once the video is read and before it counts the fit (video-bounds.js fitOf and soundProblem, since
+  // its 228d666 and e740c16), asking for a shorter cut. It counts the length the file states for the video's picture, and for a
+  // Matroska or WebM picture, whose own length the worker does not ask ffprobe for, the whole file's, which ffprobe gives the
+  // picture or which counts where it gives none (videoLength and readMedia, 9135762): an MP4 of 30 seconds of picture under 2 hours
+  // of sound takes a fit of 30 seconds there with its sound dropped, while a Matroska of the same streams is refused. The topic
+  // no longer says that musicfit on the user's own machine measures the picture and takes a length within a frame of it: it
+  // takes none under a picture past the hour either (video.js fits and musicfit.js check), so that promised a run there to every
+  // video this refuses.
+  const { length_min: lengthMin, length_max: lengthMax } = loadKitDefinitions().find(kit => kit.kit === 'musicfit').facts;
+  const fixture = readJson(path.join(here, 'fixtures', 'hosted-errors.json'));
+  const pastHour = fixture.errors.find(entry => entry.text === `video runs <time>, and fit_music makes a fit only as long as its video, to a frame, and of ${lengthMax / 60} minutes at most, and here of at most <time> with <what> in a job. Give a shorter cut of the video with length set to it.`);
+  assert.ok(pastHour);
+  assert.match(pastHour.from, /past the hour by the length ffprobe states, with or without a voice, under any length musicfit takes \(one it refuses is refused before, with lengthProblem's sentences\), before the fit or the sounds count/);
+  assert.doesNotMatch(pastHour.from, /whatever the length asked/);
+  assert.ok(music.includes(`A fit is as long as its \`video\` and \`length\` is ${lengthMax} seconds at most, so a video whose picture runs longer by what its file states, a Matroska or WebM picture counting as long as the whole file, takes no fit here, whatever \`length\` asks: under a \`length\` musicfit takes, its job fails the same way with "fit_music makes a fit only as long as its video", which asks for a shorter cut of it. A fit longer than`));
+  assert.doesNotMatch(music, /a video whose file states a longer length takes no fit|takes a `length` within a frame of it/);
+  // A length musicfit refuses as it reads its arguments, before it reads any sound, is refused at Start, in its words with the
+  // parameter's name for its flag (video-bounds.js lengthProblem, 9135762), a 2 hour video's own "7200" among them.
+  assert.ok(fixture.errors.some(entry => entry.text === 'length takes 1 second to an hour.' && /lengthProblem \(LENGTH_OUTSIDE\), a 400 from Kits\/Start/.test(entry.from)));
+  assert.ok(fixture.errors.some(entry => entry.text === 'length takes a time such as 32, 32.5s, 960f or 1:05, not <value>.' && /lengthProblem, a 400 from Kits\/Start/.test(entry.from)));
+  assert.match(fixture.about, /and the one for a fit under a video that runs past the hour at 228d666, and the two for a length musicfit refuses as it reads its arguments at 9135762;/);
+  assert.ok(music.includes(`A \`length\` outside ${lengthMin} to ${lengthMax} seconds, or one musicfit cannot read as a time, is refused as the call is made, in musicfit's own words: "length takes 1 second to an hour" or "length takes a time such as 32, 32.5s, 960f or 1:05".`));
   const trouble = await readTopics(hosted, ['troubleshooting']);
   assert.ok(trouble.includes('A failure that says the time this job has left "is too little for <tool> to start on it" means its inputs took the rest of the job\'s time to come in: start it again, with a link that downloads faster if one was slow.'));
   assert.ok(trouble.includes(`A fit too long for that much sound fails the same way, with "fit_music here makes a fit of at most" and the longest that fits: offer a shorter \`length\`, or with a \`video\` a shorter cut of the video with \`length\` set to it. A fit longer than ${pastWithOne} minutes with a \`voice\` or a \`video\`, or ${pastWithBoth} with both, is refused as the call is made, before any job starts, when \`length\` is in seconds, or in frames with \`fps\`.`));
