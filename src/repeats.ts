@@ -24,7 +24,10 @@ export interface StartRecord {
   settled?: StartOutcome;
   /** Calls serving this job right now. */
   active: number;
-  /** When a call serving it last ended without its answer reaching the client. */
+  /**
+   * When a call serving it last ended without the job's result reaching its client: cancelled,
+   * cut off, or in an error after the job started.
+   */
   unansweredAt?: number;
   /** The record this one took the key from, put back when this one is let go. */
   displaced?: StartRecord;
@@ -34,7 +37,10 @@ export interface StartRecord {
 export type CallOutcome = 'answered' | 'unanswered' | 'failed';
 
 export interface RepeatTiming {
-  /** How long after a call ended unanswered an identical call continues its job. */
+  /**
+   * How long after a call ended unanswered, cancelled, cut off or in an error after its job
+   * started, so that its client did not get the job's result, an identical call continues its job.
+   */
   unansweredWindowMs: number;
   /**
    * How long after an identical call began, while it still waits, a new call counts as its
@@ -71,9 +77,9 @@ export class StartLedger {
   private readonly records = new Map<string, StartRecord>();
 
   /**
-   * The job an identical call should continue: one whose last call ended without its answer
-   * reaching the client, within the window, or one an identical call still waits for, begun
-   * at least retryAfterMs before.
+   * The job an identical call should continue: one whose last call ended without the job's
+   * result reaching its client, cancelled, cut off or in an error after the job started, within
+   * the window, or one an identical call still waits for, begun at least retryAfterMs before.
    */
   find(key: string, timing: RepeatTiming, now = Date.now()): StartRecord | undefined {
     this.prune(timing, now);
@@ -116,8 +122,9 @@ export class StartLedger {
 
   /**
    * A call stops serving the job. answered: its client got the job, so an identical call
-   * after it is a new one. unanswered: its client did not, so an identical call soon after
-   * continues it. failed: there is no job to continue.
+   * after it is a new one. unanswered: its client did not get the job's result, as when the
+   * call was cancelled or cut off, or ended in an error after the job started, so an identical
+   * call soon after continues it. failed: there is no job to continue.
    */
   release(record: StartRecord, outcome: CallOutcome, now = Date.now()): void {
     record.active = Math.max(0, record.active - 1);

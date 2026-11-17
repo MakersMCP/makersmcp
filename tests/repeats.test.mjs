@@ -356,3 +356,23 @@ test('the package exports the ledger\'s times and the most calls it keeps, and t
   assert.equal(keys.length, makersmcp.MAX_REPEAT_RECORDS);
   assert.deepEqual([keys[0], keys.at(-1)], ['key-5', `key-${makersmcp.MAX_REPEAT_RECORDS + 4}`]);
 });
+
+// A service author reads the repeatTiming option and the ledger in the typings the package ships, so they say what the ledger
+// does: a call that ended in an error after its job started leaves that job for an identical call to continue, as a call
+// cancelled or cut off does (the test above of a wait that ended in an error), where they said only a call whose client got no
+// answer, which told such an author that an error lets the job go.
+test('the typings say that an identical call continues the job of a call that ended in an error after its job started, as of one cancelled or cut off', () => {
+  const docOf = (file, declaration) => {
+    const source = readFileSync(path.join(here, '..', 'dist', file), 'utf8');
+    const at = source.indexOf(declaration);
+    assert.ok(at > 0, `${file} has no ${declaration}`);
+    return source.slice(source.lastIndexOf('/**', at) + 3, source.lastIndexOf('*/', at)).split('\n').map(line => line.replace(/^\s*\*\s?/, '')).join(' ').replace(/\s+/g, ' ').trim();
+  };
+  assert.equal(docOf('server.d.ts', 'repeatTiming?:'), 'When a kit tool call identical to an earlier one of the same backend identity continues that call\'s job instead of starting another: within unansweredWindowMs of that call ending with no answer that reached its client or in an error after its job started, or while it still waits, once retryAfterMs have passed since it began. Default: REPEAT_TIMING, 10 minutes and 10 seconds.');
+  assert.equal(docOf('repeats.d.ts', 'unansweredWindowMs:'), 'How long after a call ended unanswered, cancelled, cut off or in an error after its job started, so that its client did not get the job\'s result, an identical call continues its job.');
+  assert.equal(docOf('repeats.d.ts', 'unansweredAt?:'), 'When a call serving it last ended without the job\'s result reaching its client: cancelled, cut off, or in an error after the job started.');
+  assert.equal(docOf('repeats.d.ts', 'find(key:'), 'The job an identical call should continue: one whose last call ended without the job\'s result reaching its client, cancelled, cut off or in an error after the job started, within the window, or one an identical call still waits for, begun at least retryAfterMs before.');
+  assert.equal(docOf('repeats.d.ts', 'release(record:'), 'A call stops serving the job. answered: its client got the job, so an identical call after it is a new one. unanswered: its client did not get the job\'s result, as when the call was cancelled or cut off, or ended in an error after the job started, so an identical call soon after continues it. failed: there is no job to continue.');
+  // markUnanswered is what a cancel or a closed connection calls, and says so.
+  assert.equal(docOf('repeats.d.ts', 'markUnanswered(record:'), 'A call serving the job lost its client, so its answer will not arrive.');
+});

@@ -106,8 +106,9 @@ export interface MakersMcpOptions {
   /**
    * When a kit tool call identical to an earlier one of the same backend identity continues
    * that call's job instead of starting another: within unansweredWindowMs of that call ending
-   * with no answer that reached its client, or while it still waits, once retryAfterMs have
-   * passed since it began. Default: REPEAT_TIMING, 10 minutes and 10 seconds.
+   * with no answer that reached its client or in an error after its job started, or while it
+   * still waits, once retryAfterMs have passed since it began. Default: REPEAT_TIMING, 10
+   * minutes and 10 seconds.
    */
   repeatTiming?: Partial<RepeatTiming>;
 }
