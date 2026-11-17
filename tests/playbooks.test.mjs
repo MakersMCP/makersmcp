@@ -3611,15 +3611,18 @@ test('hosted, music says the fit itself counts toward a job\'s memory as MakersM
   // of sound takes a fit of 30 seconds there with its sound dropped, while a Matroska of the same streams is refused. The topic
   // no longer says that musicfit on the user's own machine measures the picture and takes a length within a frame of it: it
   // takes none under a picture past the hour either (video.js fits and musicfit.js check), so that promised a run there to every
-  // video this refuses.
+  // video this refuses. It says so where a failed job's reason is looked up, beside musicfit's own refusal of a picture more
+  // than a frame past the hour, which a picture that runs past what its file states can still meet here, with their one fix:
+  // a cut of an hour or less.
   const { length_min: lengthMin, length_max: lengthMax } = loadKitDefinitions().find(kit => kit.kit === 'musicfit').facts;
   const fixture = readJson(path.join(here, 'fixtures', 'hosted-errors.json'));
   const pastHour = fixture.errors.find(entry => entry.text === `video runs <time>, and fit_music makes a fit only as long as its video, to a frame, and of ${lengthMax / 60} minutes at most, and here of at most <time> with <what> in a job. Give a shorter cut of the video with length set to it.`);
   assert.ok(pastHour);
   assert.match(pastHour.from, /past the hour by the length ffprobe states, with or without a voice, under any length musicfit takes \(one it refuses is refused before, with lengthProblem's sentences\), before the fit or the sounds count/);
   assert.doesNotMatch(pastHour.from, /whatever the length asked/);
-  assert.ok(music.includes(`A fit is as long as its \`video\` and \`length\` is ${lengthMax} seconds at most, so a video whose picture runs longer by what its file states, a Matroska or WebM picture counting as long as the whole file, takes no fit here, whatever \`length\` asks: under a \`length\` musicfit takes, its job fails the same way with "fit_music makes a fit only as long as its video", which asks for a shorter cut of it. A fit longer than`));
-  assert.doesNotMatch(music, /a video whose file states a longer length takes no fit|takes a `length` within a frame of it/);
+  assert.ok(music.includes('\n- "longer than the hour length takes at most", or "fit_music makes a fit only as long as its video" for a video whose picture runs past the hour by what its file states, a Matroska or WebM picture counting as long as the whole file: ask the user for a cut of an hour or less, with `length` set to its length.\n'));
+  assert.ok(music.includes('a shorter cut of the video with `length` set to it. A fit longer than'));
+  assert.doesNotMatch(music, /a video whose file states a longer length takes no fit|takes a `length` within a frame of it|whatever `length` asks/);
   // A length musicfit refuses as it reads its arguments, before it reads any sound, is refused at Start, in its words with the
   // parameter's name for its flag (video-bounds.js lengthProblem, 9135762), a 2 hour video's own "7200" among them.
   assert.ok(fixture.errors.some(entry => entry.text === 'length takes 1 second to an hour.' && /lengthProblem \(LENGTH_OUTSIDE\), a 400 from Kits\/Start/.test(entry.from)));
@@ -3631,4 +3634,92 @@ test('hosted, music says the fit itself counts toward a job\'s memory as MakersM
   assert.ok(trouble.includes(`A fit too long for that much sound fails the same way, with "fit_music here makes a fit of at most" and the longest that fits: offer a shorter \`length\`, or with a \`video\` a shorter cut of the video with \`length\` set to it. A fit longer than ${pastWithOne} minutes with a \`voice\` or a \`video\`, or ${pastWithBoth} with both, is refused as the call is made, before any job starts, when \`length\` is in seconds, or in frames with \`fps\`.`));
   assert.doesNotMatch(await readTopics({ ...hosted, held: ['fit_music'] }, ['troubleshooting']), /makes a fit of at most/);
   assert.doesNotMatch(await readTopics({}, ['music', 'troubleshooting']), /makes a fit of at most|too little for/);
+});
+
+// musicfit refuses a video that is not length long to a frame with one of three reasons (video.js fits): the length in seconds
+// to give, the one length takes nearest the video's when it comes within a frame of it, as the hour does for a picture at most a
+// frame past the hour and a second for one at most a frame under a second; a cut of an hour or less for a picture more than a
+// frame past the hour; and no fit for one more than a frame under a second. A failed fit_music job's Next line sends the agent
+// to the music topic for the fix, so each reason, as a result shows it, meets one line there on each side, whose fix a run of
+// the installed musicfit takes. Hosted, MakersMCP-Api refuses a picture that runs past the hour by what its file states before
+// the kit starts, with a sentence of its own that the same line names; a picture whose packets run past what its file states
+// meets musicfit's own sentence there.
+test('music gives each reason musicfit gives for a video that is not length long a line on both sides, whose fix the installed musicfit takes', async () => {
+  const definition = loadKitDefinitions().find(kit => kit.kit === 'musicfit');
+  const fitTool = definition.tools.find(tool => tool.name === 'fit_music');
+  const { fits } = createRequire(path.join(resolveKit(definition).dir, 'package.json'))('./skills/musicfit/scripts/lib/video.js');
+  const { length_min: least, length_max: most } = definition.facts;
+  // The reason the installed musicfit gives for a video of `frames` at a steady `fps` given `length`, as a result on `where`
+  // shows it, with its flags written as their parameters, or null for a video it takes.
+  const reason = (frames, fps, length, where) => {
+    try {
+      fits({ name: 'cut.mp4', seconds: frames / fps, fps, frames, constant: true }, length, fps);
+      return null;
+    } catch (error) {
+      return inParameterWords(error.message, flagWords(definition, fitTool, where));
+    }
+  };
+  const offered = said => Number(/: give length (\d+(?:\.\d+)?)(?:, or \d+f)?$/.exec(said)?.[1]);
+  const lines = {
+    offer: '- "and length is <length> s: give length <seconds>": give `length` those seconds.',
+    hour: {
+      local: '- "longer than the hour length takes at most": ask the user for a cut of an hour or less, with `length` set to its length.',
+      hosted: '- "longer than the hour length takes at most", or "fit_music makes a fit only as long as its video" for a video whose picture runs past the hour by what its file states, a Matroska or WebM picture counting as long as the whole file: ask the user for a cut of an hour or less, with `length` set to its length.',
+    },
+    short: '- "shorter than the 1 second length takes at least": ask the user for a longer cut.',
+  };
+  const cases = [
+    // A video longer than length, given its length in seconds and in its frames at the rate this run counts at.
+    { frames: 725, fps: 25, length: 12, line: 'offer', give: 29 },
+    // A picture a frame past the hour, and one a frame under a second: the end of what length takes is within a frame of it.
+    { frames: 3601, fps: 1, length: 12, line: 'offer', give: most },
+    { frames: 49, fps: 50, length: 12, line: 'offer', give: least },
+    // More than a frame past the hour, or under a second: no length that length takes is within a frame of it.
+    { frames: 3602, fps: 1, length: 12, line: 'hour', cut: { frames: most, fps: 1, length: most } },
+    { frames: 22, fps: 24, length: 12, line: 'short', cut: { frames: 24, fps: 24, length: least } },
+  ];
+  const errors = readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors.map(entry => entry.text);
+  for (const [where, options] of [['local', {}], ['hosted', { where: 'hosted', limits: SERVER_LIMITS }], ['hosted', { where: 'hosted', limits: LIMITS }]]) {
+    const music = await readTopics(options, ['music']);
+    const wrong = sections(music).find(section => section.heading === 'When something goes wrong');
+    assert.ok(wrong, where);
+    // The lines of that section with a quote the reason holds, as a topic's quote stands for a result's text.
+    const linesFor = said => wrong.text.split('\n').filter(line => line.startsWith('- ') && doubleQuoted(line).some(quote => quotedPattern(quote).test(said)));
+    for (const { frames, fps, length, line, give, cut } of cases) {
+      const said = reason(frames, fps, length, where);
+      const at = `${where}, ${frames} frames at ${fps} fps given ${length}: ${said}`;
+      assert.ok(said, at);
+      const expected = typeof lines[line] === 'string' ? lines[line] : lines[line][where];
+      assert.deepEqual(linesFor(said), [expected], at);
+      if (give !== undefined) {
+        // The length the reason gives in seconds is one length takes, and a run given it takes the video.
+        assert.equal(offered(said), give, at);
+        assert.ok(give >= least && give <= most, at);
+        assert.equal(reason(frames, fps, give, where), null, at);
+      } else {
+        // No length that length takes fits that video, and the cut the line asks for takes one.
+        for (const tried of [least, most]) assert.ok(reason(frames, fps, tried, where), `${at}, given ${tried}`);
+        assert.equal(reason(cut.frames, cut.fps, cut.length, where), null, at);
+      }
+    }
+    // MakersMCP-Api's sentence for a picture past the hour by what its file states is quoted where it comes, hosted alone.
+    if (where === 'hosted') assert.ok(errors.some(entry => entry.includes(', and fit_music makes a fit only as long as its video, to a frame,')), where);
+    else assert.doesNotMatch(music, /makes a fit only as long as its video/);
+    assert.doesNotMatch(music, /the video's own length, as the reason says|"<video> is <seconds> s long and length is/, where);
+  }
+  // The length to give, as fit_music's parameter and analyze_music's Next line say it, is the video's to a frame, which the end of
+  // what length takes is for a picture at most a frame past it, not the video's exact length, which length refuses there.
+  for (const options of [{}, { where: 'hosted', limits: SERVER_LIMITS }]) {
+    const session = await connect({ definitions: loadKitDefinitions(), ...options });
+    try {
+      const { description } = session.tools.find(tool => tool.name === 'fit_music').inputSchema.properties.length;
+      assert.match(description, /^The video's length to a frame, as text: /, JSON.stringify(options));
+      assert.doesNotMatch(description, /exact/, JSON.stringify(options));
+    } finally {
+      await session.close();
+    }
+  }
+  const next = definition.tools.find(tool => tool.name === 'analyze_music').next.done.join(' ');
+  assert.match(next, /Call fit_music with this track, length the video's length to a frame, fps its frame rate/);
+  assert.doesNotMatch(next, /exact/);
 });
