@@ -201,7 +201,7 @@ const LEAVE_OUT_SETS: ReadonlyMap<string, ReadonlyArray<ReadonlyArray<string>>> 
   ['musicfit', [['fit_music']]],
 ] as Array<[string, string[][]]>).map(([kit, sets]) => [kit, Object.freeze(sets.map(set => Object.freeze([...set])))]));
 
-const FIXED = 'TEXTS_LEAVE_OUT is read only: which held tools the texts leave out is for makersmcp\'s texts to say.';
+const FIXED = 'TEXTS_LEAVE_OUT\'s set, delete and clear throw: which held tools the texts leave out is for makersmcp\'s texts to say.';
 
 /**
  * A Map whose set, delete and clear throw, frozen as it is made. Map's own methods called on it

@@ -3109,6 +3109,19 @@ test('hosted with only the longest wait given, as MakersMCP-Server gives its lim
   assert.match(await readTopics({ where: 'hosted', limits: LIMITS }, ['captions']), /A job stops after 13 minutes\. A video that could not be captioned/);
 });
 
+test('hosted, a link\'s file may be as large as the user\'s account takes, which differs by plan, so the texts name no size for it and quote the refusal that does', async () => {
+  // MakersMCP-Api takes 200 MB on Free and 500 MB on Pro (KITS_MAX_INPUT_MB and KITS_PRO_MAX_INPUT_MB), or what an admin set for
+  // the account, and MakersMCP-Server gives makersmcp no such limit: a number here would be false for every other account.
+  for (const limits of [SERVER_LIMITS, LIMITS]) {
+    const jobs = await readTopics({ where: 'hosted', limits }, ['jobs-and-files']);
+    assert.ok(jobs.includes('- Other files go as https links where a parameter takes a file: a public address that sends the file within 5 minutes. How large a file may be depends on the user\'s account, and a larger one fails with "The file is over <size>.", which names the most it takes.'), JSON.stringify(limits));
+    assert.doesNotMatch(jobs, /\d+ ?[KMG]B\b|megabytes?|gigabytes?/, JSON.stringify(limits));
+  }
+  const errors = readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors;
+  assert.ok(errors.some(entry => entry.text === 'The file is over <n> MB.' && /200 MB on Free and 500 MB on Pro/.test(entry.from)));
+  assert.ok(errors.some(entry => entry.text === 'The link took more than <n> minutes to send the file.' && /5 minutes in production/.test(entry.from)));
+});
+
 test('hosted texts promise no days for a job\'s files: links and job: references work until the time each result gives, which the texts point at', async () => {
   for (const limits of [{ maxWaitSeconds: 50 }, LIMITS, { ...LIMITS, keepSeconds: 900 }]) {
     const session = await connect({ definitions: loadKitDefinitions(), where: 'hosted', limits });
@@ -3406,6 +3419,36 @@ test('hosted with a keep time of 15 minutes, the launch kit gives each job\'s li
   assert.doesNotMatch(local, /a worker takes|links stop|one job at a time|brand kit last/);
 });
 
+test('hosted with two plans, the launch kit renders the 16:9 one last, so the fit and the places\' versions take its files right after its render and its check, and the track is read before the plan', async () => {
+  // A render takes minutes there, so the second render and its check between the 16:9 render and the steps that take its film.mp4
+  // and film.timeline.json could outlast that render's keep time, 15 minutes on Free, and the fit or the reframe would then fail as
+  // it starts, with "There is no job <job_id> with files to use.", use up one of the day's jobs and need the film rendered again.
+  const order = 'With two plans, render the 9:16 one first and the 16:9 one last, so that each step below that takes the 16:9 film\'s files starts right after the one before it, before any other job. When the time the 16:9 plan\'s result gave has passed by then, plan it again first.';
+  const hosted = { where: 'hosted', limits: { ...LIMITS, keepSeconds: 900 } };
+  for (const options of [hosted, { ...hosted, limits: SERVER_LIMITS }, { ...hosted, held: ['check_video'] }, { ...hosted, held: ['fit_music'] }, { ...hosted, kits: ['easybrandkit', 'launch-film', 'reframekit'] }]) {
+    const side = JSON.stringify(options);
+    const kit = await readTopics(options, ['launch-kit']);
+    // The order is said in the render's step, before its calls, and the steps that take the 16:9 film come after it.
+    const render = kit.indexOf('Render each plan with `render_launch_film`.');
+    const said = kit.indexOf(order);
+    assert.ok(render > 0 && said > render && said < kit.indexOf('render_launch_film {'), side);
+    for (const call of ['fit_music {', 'reframe_video {']) assert.ok(!kit.includes(call) || kit.indexOf(call) > said, `${side}: ${call}`);
+  }
+  // With neither fit_music nor reframekit, no step after the renders takes a film's files, so no order is said; and locally the
+  // files stay, so neither is it there.
+  for (const options of [{ ...hosted, kits: ['easybrandkit', 'launch-film'] }, {}]) {
+    assert.ok(!(await readTopics(options, ['launch-kit'])).includes('With two plans, render'), JSON.stringify(options));
+  }
+  // The track is read before the plan on both sides, as Tempo says, so no job that needs none of the render's files comes
+  // between the 16:9 render and the fit.
+  for (const options of [{}, hosted]) {
+    const kit = await readTopics(options, ['launch-kit']);
+    assert.ok(kit.includes('For the user\'s track, follow the music topic: `analyze_music` before the plan, as Tempo below says, then `fit_music` with `length` the film\'s length'), JSON.stringify(options));
+    assert.ok(kit.includes('`analyze_music` gives the track\'s tempo before the plan.'));
+    assert.doesNotMatch(kit, /`analyze_music`, then `fit_music`/);
+  }
+});
+
 test('the sets of a kit\'s tools the texts leave out by themselves are exported for a service, and a tool outside them held back alone is still named, so its whole kit is held back', async () => {
   const film = ['plan_launch_film', 'make_launch_film', 'render_launch_film', 'make_launch_stills'];
   const sorted = Object.fromEntries([...TEXTS_LEAVE_OUT].map(([kit, sets]) => [kit, sets.map(set => [...set].sort())]));
@@ -3415,7 +3458,8 @@ test('the sets of a kit\'s tools the texts leave out by themselves are exported 
   for (const sets of TEXTS_LEAVE_OUT.values()) assert.ok(Object.isFrozen(sets) && sets.every(set => Object.isFrozen(set)));
   assert.ok(TEXTS_LEAVE_OUT instanceof Map && Object.isFrozen(TEXTS_LEAVE_OUT));
   const answers = () => [textsLeaveOut('musicfit', ['fit_music']), textsLeaveOut('reframekit', ['reframe_video']), textsLeaveOut('launch-film', ['check_video'])];
-  const refused = /TEXTS_LEAVE_OUT is read only/;
+  // Their error says what throws, never that the map is read only, which Map's own methods called on it belie.
+  const refused = error => error instanceof TypeError && error.message === 'TEXTS_LEAVE_OUT\'s set, delete and clear throw: which held tools the texts leave out is for makersmcp\'s texts to say.';
   assert.throws(() => TEXTS_LEAVE_OUT.set('reframekit', [['reframe_video']]), refused);
   assert.throws(() => TEXTS_LEAVE_OUT.delete('musicfit'), refused);
   assert.throws(() => TEXTS_LEAVE_OUT.clear(), refused);
@@ -3444,6 +3488,10 @@ test('the sets of a kit\'s tools the texts leave out by themselves are exported 
   const fixed = docOf('src/texts.ts', 'class FixedMap');
   assert.equal(fixed, 'A Map whose set, delete and clear throw, frozen as it is made. Map\'s own methods called on it past these still change what it holds, so an answer that must not change reads a copy of its own, as textsLeaveOut does.');
   for (const doc of [declared, fixed]) assert.doesNotMatch(doc, /cannot change it|no caller can change/);
+  // The README says the same, and as little.
+  const readme = readFileSync(path.join(here, '..', 'README.md'), 'utf8');
+  assert.ok(readme.includes('`TEXTS_LEAVE_OUT`\'s `set`, `delete` and `clear` throw, and `textsLeaveOut` answers from a copy of its own.'));
+  assert.doesNotMatch(readme, /TEXTS_LEAVE_OUT`? is read only|read only map/);
   // And which other sets the workers hold back with their whole kit, musicfit's two tools while they cannot measure a sound.
   assert.ok(declared.includes('caption_video, reframe_video and plan_reframe while they cannot measure a job\'s video before it starts, and with them fit_music and analyze_music, the whole of musicfit, while they cannot measure its sound either.'), declared);
   // docs/kits.md says whose workers hold tools back, MakersMCP-Api's, and which other sets they hold back with their whole kit.
@@ -3483,17 +3531,20 @@ test('hosted, the refusals past a person\'s job limits and of a job whose files 
     "You are keeping <n> MB of finished jobs' files, the most kept at once. Wait for older jobs' files to expire (<time> after their jobs end). Your account page, <url>, shows your usage. Try again in <time>, after <date> UTC.",
     'It is not known whether <title> started. Check list_jobs before you start it again.',
     "There is no job <job_id> with files to use. list_jobs shows your jobs; a job's files can be used until the time its result gave.",
-    // MakersMCP-Server's wait, when an answer without the job comes for a job its request did not start (its 162b075).
-    'makersmcp.com could not say how job <job_id> is doing. The job keeps running there: call wait_for_job again in a minute, never the tool that started it.',
+    // MakersMCP-Server's wait, when no word of the job comes for a job no request of the process saw running (its 96ba831): it
+    // is not known whether that job still runs, as it may have ended.
+    'makersmcp.com could not say how job <job_id> is doing. It is not known whether the job still runs: call wait_for_job again in a minute, never the tool that started it.',
+    'makersmcp.com could not be reached to wait for job <job_id>. It is not known whether the job still runs: call wait_for_job again in a minute, never the tool that started it.',
   ]) assert.ok(errors.includes(entry), entry);
-  assert.ok(!errors.some(entry => /today's <n> jobs|Wait for one of them to end\. Try again|makersmcp\.com said: <text>|a few days|is doing\. Call wait_for_job/.test(entry)));
+  assert.ok(!errors.some(entry => /today's <n> jobs|Wait for one of them to end\. Try again|makersmcp\.com said: <text>|a few days|is doing\. Call wait_for_job|keeps running there/.test(entry)));
   const read = await readTopics({ where: 'hosted', limits: LIMITS }, ['jobs-and-files', 'troubleshooting']);
   assert.equal(read.split('"You have started the <n> jobs allowed in any 24 hours."').length - 1, 2);
   assert.match(read, /at most 29 jobs can start in any 24 hours\./);
   assert.doesNotMatch(read, /today's|in a day\b/);
-  // A wait that could not reach makersmcp.com, or could not read how the job is doing, keeps the job: the agent waits again and
-  // never calls the tool that started it, which would start a second job.
-  assert.ok(read.includes('or one that starts "makersmcp.com could not say how job <job_id> is doing.": the job keeps running, so call `wait_for_job` again in a minute, and never the tool that started it, which would start a second job.'));
+  // A wait that could not reach makersmcp.com, or could not read how the job is doing, may have lost a job that ended: the agent
+  // waits again and never calls the tool that started it, which would start a second job, and is not told the job runs.
+  assert.ok(read.includes('- "makersmcp.com could not be reached to wait for job <job_id>. It is not known whether the job still runs: call wait_for_job again in a minute, never the tool that started it.", or one that starts "makersmcp.com could not say how job <job_id> is doing.": the job may still run, so call `wait_for_job` again in a minute, and never the tool that started it, which would start a second job.'));
+  assert.doesNotMatch(read, /keeps running there|the job keeps running/);
   // A tool held back for now is refused with why, and nothing starts: a 409 of MakersMCP-Api, as for a video's shown size.
   assert.ok(errors.includes("<tool> is not available right now: held back while this service cannot measure a video's shown size before a job starts."));
   assert.ok(read.includes('or "<tool> is not available right now: <why>.", for a tool held back for now: tell the user, and try again later.'));
@@ -3534,6 +3585,11 @@ test('hosted, music says the fit itself counts toward a job\'s memory as MakersM
   const [pastWithOne, pastWithBoth] = [fitHeldSeconds / copies.voice / 60, fitHeldSeconds / copies.both / 60];
   assert.ok(music.includes('give a shorter `length` or a shorter track, and with a `video`, whose length the fit takes, a shorter cut of the video with `length` set to it.'));
   assert.ok(music.includes(`A fit longer than ${pastWithOne} minutes with a \`voice\` or a \`video\`, or ${pastWithBoth} with both, passes the hour whatever the track, and its call is refused before any job starts when \`length\` is in seconds, or in frames with \`fps\`.`));
+  // A video that runs past musicfit's longest length takes no fit, as a fit is as long as its video, so MakersMCP-Api refuses it
+  // with the video's own length before it counts the fit (video-bounds.js soundProblem, since its 228d666), asking for a shorter cut.
+  const lengthMax = loadKitDefinitions().find(kit => kit.kit === 'musicfit').facts.length_max;
+  assert.ok(errors.includes(`video runs <time>, and fit_music makes a fit only as long as its video, to a frame, and of ${lengthMax / 60} minutes at most, and here of at most <time> with <what> in a job. Give a shorter cut of the video with length set to it.`));
+  assert.ok(music.includes(`A fit is as long as its \`video\` and \`length\` is ${lengthMax} seconds at most, so a longer video takes no fit: its job fails the same way with "fit_music makes a fit only as long as its video", and only a shorter cut of it helps.`));
   const trouble = await readTopics(hosted, ['troubleshooting']);
   assert.ok(trouble.includes('A failure that says the time this job has left "is too little for <tool> to start on it" means its inputs took the rest of the job\'s time to come in: start it again, with a link that downloads faster if one was slow.'));
   assert.ok(trouble.includes(`A fit too long for that much sound fails the same way, with "fit_music here makes a fit of at most" and the longest that fits: offer a shorter \`length\`, or with a \`video\` a shorter cut of the video with \`length\` set to it. A fit longer than ${pastWithOne} minutes with a \`voice\` or a \`video\`, or ${pastWithBoth} with both, is refused as the call is made, before any job starts, when \`length\` is in seconds, or in frames with \`fps\`.`));

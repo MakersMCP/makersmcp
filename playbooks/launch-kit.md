@@ -177,6 +177,11 @@ make_launch_stills {"source": "job:<job_id>/film.json", "for": ["ph", "og", "x"]
 <!-- with check_video -->
    Once each render is done, check its film with `check_video` and `expect` {fact:launch-film.size_16_9}@{fact:launch-film.fps}, or {fact:launch-film.size_9_16}@{fact:launch-film.fps} for 9:16. Its `CHECK.md` gives the film's length under its heading and each cut's time in its Cuts table, the logo close last.
 <!-- end -->
+<!-- hosted -->
+<!-- with fit_music, reframekit -->
+   With two plans, render the 9:16 one first and the 16:9 one last, so that each step below that takes the 16:9 film's files starts right after the one before it, before any other job. When the time the 16:9 plan's result gave has passed by then, plan it again first.
+<!-- end -->
+<!-- end -->
 <!-- local -->
 ```call
 render_launch_film {"film": "launch/film-16x9/film.json"}
@@ -196,7 +201,7 @@ check_video {"film": "job:<job_id>/film.mp4", "expect": "{fact:launch-film.size_
 <!-- end -->
 <!-- end -->
 <!-- with fit_music -->
-6. For the user's track, follow the music topic: `analyze_music`, then `fit_music` with `length` the film's length and `hit` the time of its logo close, both from its film.timeline.json, and `fps` {fact:launch-film.fps}. Given the film as `video`, it also writes video.mp4, the film with the track under it.
+6. For the user's track, follow the music topic: `analyze_music` before the plan, as Tempo below says, then `fit_music` with `length` the film's length and `hit` the time of its logo close, both from its film.timeline.json, and `fps` {fact:launch-film.fps}. Given the film as `video`, it also writes video.mp4, the film with the track under it.
 <!-- local -->
    Give `fit_music` an `out_dir` inside the film's folder, like its music/, so that folder holds the film's track.
 ```call
