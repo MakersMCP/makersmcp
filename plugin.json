@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "makersmcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Free kits for makers in one MCP: brand kits, fonts, screenshots, demo videos, launch films, fitted music, a video in each place's shape and burned captions, made on your own machine.",
   "author": {
     "name": "Emin Budak",

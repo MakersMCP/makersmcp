@@ -22,14 +22,14 @@ More kits are on the way.
 
 ## Set it up
 
-You need Node 22 or newer and the Chrome, Chromium, Edge or Brave you already have. Demo videos, launch films, music, reframed videos and captions also need ffmpeg, which comes with ffprobe. Every setup runs `npx -y makersmcp@0.2.0`: keep the version in it, since `npx` can otherwise go on using an older copy it cached.
+You need Node 22 or newer and the Chrome, Chromium, Edge or Brave you already have. Demo videos, launch films, music, reframed videos and captions also need ffmpeg, which comes with ffprobe. Every setup runs `npx -y makersmcp@0.2.1`: keep the version in it, since `npx` can otherwise go on using an older copy it cached.
 
 Then ask your agent for what you need, like "make a launch film for linear.app" or "get the brand kit and the fonts of stripe.com".
 
 ### Claude Code
 
 ```bash
-claude mcp add makersmcp -- npx -y makersmcp@0.2.0
+claude mcp add makersmcp -- npx -y makersmcp@0.2.1
 ```
 
 Check it with `claude mcp get makersmcp`, or `/mcp` inside Claude Code.
@@ -44,7 +44,7 @@ Add this to `claude_desktop_config.json`, then quit Claude Desktop fully and ope
     "makersmcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "makersmcp@0.2.0"]
+      "args": ["-y", "makersmcp@0.2.1"]
     }
   }
 }
@@ -61,7 +61,7 @@ Open the command palette (Cmd+Shift+P, or Ctrl+Shift+P on Windows and Linux), ru
   "mcpServers": {
     "makersmcp": {
       "command": "npx",
-      "args": ["-y", "makersmcp@0.2.0"]
+      "args": ["-y", "makersmcp@0.2.1"]
     }
   }
 }
@@ -70,13 +70,13 @@ Open the command palette (Cmd+Shift+P, or Ctrl+Shift+P on Windows and Linux), ru
 ### VS Code
 
 ```bash
-code --add-mcp '{"name":"makersmcp","command":"npx","args":["-y","makersmcp@0.2.0"]}'
+code --add-mcp '{"name":"makersmcp","command":"npx","args":["-y","makersmcp@0.2.1"]}'
 ```
 
 ### Codex
 
 ```bash
-codex mcp add makersmcp -- npx -y makersmcp@0.2.0
+codex mcp add makersmcp -- npx -y makersmcp@0.2.1
 ```
 
 ### Windsurf
@@ -93,7 +93,7 @@ Add it under `mcp.servers` in your OpenClaw config:
     "servers": {
       "makersmcp": {
         "command": "npx",
-        "args": ["-y", "makersmcp@0.2.0"]
+        "args": ["-y", "makersmcp@0.2.1"]
       }
     }
   }
@@ -110,13 +110,13 @@ Add it under `mcp_servers` in `~/.hermes/config.yaml`, then run `/reload-mcp`:
 mcp_servers:
   makersmcp:
     command: "npx"
-    args: ["-y", "makersmcp@0.2.0"]
+    args: ["-y", "makersmcp@0.2.1"]
     timeout: 60
 ```
 
 ### Other clients
 
-Any MCP client that runs stdio servers can start it with `npx -y makersmcp@0.2.0`.
+Any MCP client that runs stdio servers can start it with `npx -y makersmcp@0.2.1`.
 
 ### Run it from source
 
@@ -134,12 +134,12 @@ In any setup above, use `node` as the command and the full path of `dist/index.j
 Every kit is on unless you say otherwise. To give your agent fewer tools, name the kits you use:
 
 ```bash
-npx -y makersmcp@0.2.0                                   # every kit
-npx -y makersmcp@0.2.0 --kits all                        # every kit, the same
-npx -y makersmcp@0.2.0 --kits easybrandkit,launch-film   # only these two
+npx -y makersmcp@0.2.1                                   # every kit
+npx -y makersmcp@0.2.1 --kits all                        # every kit, the same
+npx -y makersmcp@0.2.1 --kits easybrandkit,launch-film   # only these two
 ```
 
-In a client's settings, the same goes at the end of `args`, like `["-y", "makersmcp@0.2.0", "--kits", "easybrandkit,launch-film"]`.
+In a client's settings, the same goes at the end of `args`, like `["-y", "makersmcp@0.2.1", "--kits", "easybrandkit,launch-film"]`.
 
 ## Where the files go
 
@@ -151,7 +151,7 @@ A long job, like rendering a film, keeps going after the tool returns. The tool 
 
 ## When something fails
 
-- The tools don't appear: check that `node --version` says 22 or newer, then restart the client. `npx -y makersmcp@0.2.0 --check` lists what makersmcp found.
+- The tools don't appear: check that `node --version` says 22 or newer, then restart the client. `npx -y makersmcp@0.2.1 --check` lists what makersmcp found.
 - A kit's tools are missing: `--check` says why. Every kit comes with makersmcp, so look at `--kits` and `--kit-path`, and from source run `npm install` again after a pull.
 - A kit can't find Chrome, ffmpeg or ffprobe: set `CHROME_PATH` and `FFMPEG_PATH` in the server's `env`, and `FFPROBE_PATH` for an ffprobe that is not beside that ffmpeg. makersmcp gives them to every kit, to launch-film as `LAUNCH_FILM_CHROME`, `LAUNCH_FILM_FFMPEG` and `LAUNCH_FILM_FFPROBE` too, with the ffprobe beside that ffmpeg when no `FFPROBE_PATH` is set. Without them, it gives each kit the Chrome, the ffmpeg and the ffprobe `--check` shows. A setting names a program by its path, or by a command name on PATH like `ffmpeg`. `--check` also names a setting that leads to no program, and until it is fixed makersmcp starts no tool that reads a program from it.
 - A long job meets the client's time limit: no call waits longer than `wait_seconds`, 45 by default, counted from the start of the call. A job still running then comes back with a `job_id` and `next_action: wait_for_job`, and the agent should call that, never the first tool again, which would start a second job. A call the client gave up on is still covered: the same call again within 10 minutes continues its job, and says so, instead of starting another. Where a client lets you set a tool timeout, keep it above 45 seconds.
