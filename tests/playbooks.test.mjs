@@ -3542,8 +3542,8 @@ test('hosted, the refusals past a person\'s job limits and of a job whose files 
   assert.match(read, /at most 29 jobs can start in any 24 hours\./);
   assert.doesNotMatch(read, /today's|in a day\b/);
   // A wait that could not reach makersmcp.com, or could not read how the job is doing, may have lost a job that ended: the agent
-  // waits again and never calls the tool that started it, which would start a second job, and is not told the job runs.
-  assert.ok(read.includes('- "makersmcp.com could not be reached to wait for job <job_id>. It is not known whether the job still runs: call wait_for_job again in a minute, never the tool that started it.", or one that starts "makersmcp.com could not say how job <job_id> is doing.": the job may still run, so call `wait_for_job` again in a minute, and never the tool that started it, which would start a second job.'));
+  // waits again and never calls the tool that started it, which can start a second job, and is not told the job runs.
+  assert.ok(read.includes('- "makersmcp.com could not be reached to wait for job <job_id>. It is not known whether the job still runs: call wait_for_job again in a minute, never the tool that started it.", or one that starts "makersmcp.com could not say how job <job_id> is doing.": the job may still run, so call `wait_for_job` again in a minute, and never the tool that started it, which can start a second job.'));
   assert.doesNotMatch(read, /keeps running there|the job keeps running/);
   // A tool held back for now is refused with why, and nothing starts: a 409 of MakersMCP-Api, as for a video's shown size.
   assert.ok(errors.includes("<tool> is not available right now: held back while this service cannot measure a video's shown size before a job starts."));

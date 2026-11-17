@@ -378,8 +378,9 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
       // The kit, and a hosted service, check text: a number given for one is written as text.
       for (const name of numbers) if (typeof args[name] === 'number') args[name] = String(args[name]);
 
-      // An identical call whose answer did not reach the client, or one still waiting since
-      // retryAfterMs, is this call's own: it continues that job instead of starting another.
+      // An identical call whose answer did not reach the client, one that ended in an error after
+      // its job started, or one still waiting since retryAfterMs, is this call's own: it
+      // continues that job instead of starting another.
       // A backend without an identity gets a key no other call shares.
       const { ledger, repeatTiming: timing } = context;
       const identity = typeof backend.identity === 'string' && backend.identity ? backend.identity : undefined;
@@ -438,6 +439,10 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
       } catch (error) {
         // Only a cancel ends up here, or an error of the backend's that no answer can hide.
         if (extra.signal.aborted) return errorResult(`## ${tool.title}: canceled\n\nThe call was cancelled; its job keeps running, and list_jobs shows it.`);
+        // An error after the start gave a job, as a hosted wait's when the service cannot say
+        // whether the job still runs, ended the call without the job's result: an identical call
+        // continues the job, where letting it go as failed had that call start a second one.
+        if (record?.settled?.ok) outcome = 'unanswered';
         throw error;
       } finally {
         extra.signal.removeEventListener('abort', onAbort);

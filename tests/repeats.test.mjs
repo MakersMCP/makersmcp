@@ -10,8 +10,9 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer } from '../dist/server.js';
 
 // An identical kit tool call continues the job of an earlier one whose answer did not reach
-// its client, or of one still waiting since retryAfterMs, instead of starting a second job,
-// after Wiro-MCP's tests/run-model-retry.test.mjs. On a short clock: an identical call 300 ms
+// its client, of one that ended in an error after its job started, or of one still waiting
+// since retryAfterMs, instead of starting a second job, after Wiro-MCP's
+// tests/run-model-retry.test.mjs. On a short clock: an identical call 300 ms
 // after a still waiting one counts as its repeat, and one that ended unanswered can be
 // continued for 5 seconds.
 const TIMING = { retryAfterMs: 300, unansweredWindowMs: 5_000 };
@@ -33,6 +34,10 @@ class Service {
   jobs = new Map();
   started = [];
   waiters = new Map();
+  /** While true, every wait ends in MakersMCP-Server's error for a job it cannot say how is doing. */
+  waitFails = false;
+  /** While true, every start ends in MakersMCP-Server's error for a start it cannot confirm, and starts nothing. */
+  startFails = false;
 
   backend(identity) {
     return new ServiceBackend(this, identity);
@@ -61,6 +66,7 @@ class ServiceBackend {
 
   async start({ kit, tool, input }) {
     const { service } = this;
+    if (service.startFails) throw new Error(`It is not known whether ${tool.title} started. Check list_jobs before you start it again.`);
     service.started.push({ identity: this.identity, tool: tool.name, input });
     const id = `job${service.started.length}`;
     const view = { id, kit: kit.definition.kit, tool: tool.name, title: tool.title, status: 'running', exitCode: null, elapsedSeconds: 0 };
@@ -72,6 +78,7 @@ class ServiceBackend {
     const { service } = this;
     const view = service.jobs.get(id);
     if (!view) return undefined;
+    if (service.waitFails) throw new Error(`makersmcp.com could not say how job ${id} is doing. It is not known whether the job still runs: call wait_for_job again in a minute, never the tool that started it.`);
     if (view.status === 'running' && seconds > 0 && !signal?.aborted) {
       await new Promise(resolve => {
         const wake = () => {
@@ -140,7 +147,7 @@ async function callAndCancel(client, until, args = ARGS) {
   await assert.rejects(pending);
 }
 
-const CONTINUED = /^This call continued job (\S+), which an identical call started \d+ seconds? ago and whose answer did not reach you, instead of starting a second job\. For a separate run, (change an argument|give another out_dir)\.\n\n## Fake make: /;
+const CONTINUED = /^This call continued job (\S+), which an identical call started \d+ seconds? ago, instead of starting a second job\. For a separate run, (change an argument|give another out_dir)\.\n\n## Fake make: /;
 
 test('an identical call after one its client cancelled continues that job on any server of the process, instead of starting a second', async () => {
   const service = new Service();
@@ -236,6 +243,61 @@ test('a continued job that failed or was canceled is replaced by one new job', a
     } finally {
       await session.close();
     }
+  }
+});
+
+// MakersMCP-Server's wait ends in an error when the API gives no word of a job for the whole wait
+// and its process no longer keeps the job as last seen running, as once a list_jobs saw it end: it
+// is not known whether the job still runs. Its start gave the job, but the call ended without the
+// job's result, so an identical call continues it, as often as the wait fails, instead of starting
+// a second job that uses up another of the jobs of any 24 hours.
+test('an identical call after one whose wait ended in an error continues that job, instead of starting a second', async () => {
+  const service = new Service();
+  const session = await connect({ backend: service.backend(newUser()) });
+  try {
+    service.waitFails = true;
+    for (let n = 0; n < 2; n++) {
+      const failed = await call(session.client);
+      assert.equal(failed.isError, true);
+      assert.equal(text(failed), 'makersmcp.com could not say how job job1 is doing. It is not known whether the job still runs: call wait_for_job again in a minute, never the tool that started it.');
+    }
+    assert.equal(service.started.length, 1);
+    service.waitFails = false;
+    const again = call(session.client);
+    await sleep(100);
+    service.end('job1');
+    const result = await again;
+    assert.equal(service.started.length, 1);
+    assert.equal(result.structuredContent.job_id, 'job1');
+    assert.equal(result.structuredContent.status, 'done');
+    assert.equal(result.structuredContent.continued, true);
+    assert.deepEqual(CONTINUED.exec(text(result))?.slice(1), ['job1', 'change an argument'], text(result));
+    // Neither the note nor continued's description says the earlier call's answer did not reach the client, as this one's error
+    // named the job.
+    const { tools } = await session.client.listTools();
+    const listed = tools.find(tool => tool.name === 'fake_make');
+    assert.equal(listed.outputSchema.properties.continued.description, 'True when this call continued the job an identical call started, instead of starting another.');
+  } finally {
+    await session.close();
+  }
+});
+
+// A start that ended in an error gave no job, so the call leaves the ledger nothing to continue.
+test('a call whose start ended in an error leaves the ledger no job to continue', async () => {
+  const { startLedger, callKey } = await import('../dist/repeats.js');
+  const service = new Service();
+  const user = newUser();
+  const session = await connect({ backend: service.backend(user) });
+  try {
+    service.startFails = true;
+    const failed = await call(session.client);
+    assert.equal(failed.isError, true);
+    assert.equal(text(failed), 'It is not known whether Fake make started. Check list_jobs before you start it again.');
+    const { wait_seconds: _wait, ...input } = ARGS;
+    assert.equal(startLedger.records.has(callKey(user, 'fake_make', input)), false);
+    assert.equal(service.started.length, 0);
+  } finally {
+    await session.close();
   }
 });
 

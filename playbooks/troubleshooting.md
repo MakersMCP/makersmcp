@@ -44,7 +44,7 @@ Read the result before anything else: its first line says what happened, and the
 - "The kits are not available right now. Try again later.": tell the user.
 - A refusal that names an argument, like "<param> is required.", says what to change in it.
 - "makersmcp.com could not be reached, so it is not known whether <title> started. Check list_jobs before you start it again.", or one that starts "It is not known whether <title> started": the job may be running. Call `list_jobs`, wait for it there, and start it again only when it is not listed.
-- "makersmcp.com could not be reached to wait for job <job_id>. It is not known whether the job still runs: call wait_for_job again in a minute, never the tool that started it.", or one that starts "makersmcp.com could not say how job <job_id> is doing.": the job may still run, so call `wait_for_job` again in a minute, and never the tool that started it, which would start a second job. A `list_jobs` or `cancel_job` that could not reach it says to try again in a minute.
+- "makersmcp.com could not be reached to wait for job <job_id>. It is not known whether the job still runs: call wait_for_job again in a minute, never the tool that started it.", or one that starts "makersmcp.com could not say how job <job_id> is doing.": the job may still run, so call `wait_for_job` again in a minute, and never the tool that started it, which can start a second job. A `list_jobs` or `cancel_job` that could not reach it says to try again in a minute.
 <!-- end -->
 
 ## Failed jobs

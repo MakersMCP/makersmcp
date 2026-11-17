@@ -143,8 +143,9 @@ export interface KitBackend {
   /**
    * Whose jobs these are, the same for every backend whose wait and cancel reach the same
    * jobs, like a hosted service's user: a kit tool call identical to an earlier one of the same
-   * identity, whose answer did not reach the client, continues that call's job instead of
-   * starting another (repeats.ts). A backend without one starts a job for every call.
+   * identity, whose answer did not reach the client or which ended in an error after its job
+   * started, continues that call's job instead of starting another (repeats.ts). A backend
+   * without one starts a job for every call.
    */
   readonly identity?: string;
   /** For each definition, the kit as it runs here, or why it cannot. */
