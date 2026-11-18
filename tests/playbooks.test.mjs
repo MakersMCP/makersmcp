@@ -2,11 +2,11 @@
 // instructions, the index, the tool texts and the Next lines the way a client gets them,
 // on each side (hosted with and without its limits) and with every kit on and each kit
 // alone, and holds them to the rules of docs/kits.md: example calls valid with the real
-// schemas, every name and file real, quoted errors found in the kits, no words of the
-// other side, every tool and parameter covered, the lengths and the owner's style. It runs
-// on tests/fixtures/playbooks, on copies of those broken one rule at a time, and on the
-// package's own playbooks/ and kits/. The mechanism (loader, renderer, tool, results) has
-// tests of its own below.
+// schemas, every name and file real, quoted errors found in the code of the kit they are
+// of, no words of the other side, every tool and parameter covered, the lengths and the
+// owner's style. It runs on tests/fixtures/playbooks, on copies of those broken one rule at
+// a time, and on the package's own playbooks/ and kits/. The mechanism (loader, renderer,
+// tool, results) has tests of its own below.
 import assert from 'node:assert/strict';
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -585,21 +585,41 @@ function topicsNamed(content, names) {
 const ERROR_SECTION = /wrong|error|fail|trouble|fix|refus|cannot|not started/i;
 
 /**
- * The errors and other texts a topic quotes as a result shows them: in any section each one
- * in double quotes, and in a section about what goes wrong also code with words in it, since
- * elsewhere code holds examples, like a step of a steps file.
+ * The errors and other texts a topic quotes as a result shows them, each with the line it is
+ * on: in any section each one in double quotes, and in a section about what goes wrong also
+ * code with words in it, since elsewhere code holds examples, like a step of a steps file.
  */
 function quotedErrors(markdown) {
   const found = [];
   for (const section of sections(markdown)) {
     const errors = ERROR_SECTION.test(section.heading);
     for (const line of prose(section.text).split('\n')) {
-      if (errors) for (const span of spansOf(line)) if (span.length >= 12 && /\s/.test(span.trim())) found.push(span.trim());
+      if (errors) for (const span of spansOf(line)) if (span.length >= 12 && /\s/.test(span.trim())) found.push({ quote: span.trim(), line });
       const rest = line.replace(/(`+)(?:(?!\1)[\s\S])*?\1/g, ' ');
-      for (const quote of doubleQuoted(rest)) if (quote.length >= 12 && /\s/.test(quote)) found.push(quote);
+      for (const quote of doubleQuoted(rest)) if (quote.length >= 12 && /\s/.test(quote)) found.push({ quote, line });
     }
   }
   return found;
+}
+
+/**
+ * The kits whose code a quote on `line`, in a topic of `topicKit`, is looked up in: those of the
+ * kit tools the line names, else the topic's own kit, each with a kit its tools run (uses), as
+ * launch-film passes on easybrandkit's reason; and every kit for a line of one of makersmcp's own
+ * topics that names no kit's tool, like the setup's line on a missing ffmpeg, which quotes
+ * several kits. `words` says which, for a problem, and is null for every kit. Looked up in every
+ * kit's code together, a quote passed on another kit's words: troubleshooting quoted "Cannot
+ * read <file>: ffmpeg does not know this format" for analyze_music, which musicfit 0.2.3 never
+ * says and reframekit 0.1.3 does.
+ */
+function quoteKits(line, topicKit, definitions) {
+  const tools = definitions.flatMap(kit => kit.tools.map(tool => ({ kit, tool })));
+  const named = tools.filter(({ tool }) => hasWord(line, tool.name));
+  const own = named.length ? named : tools.filter(({ kit }) => kit.kit === topicKit);
+  if (!own.length) return { kits: definitions.map(kit => kit.kit), words: null };
+  const kits = [...new Set(own.flatMap(({ kit, tool }) => [kit.kit, ...Object.values(tool.uses ?? {})]))].filter(kit => definitions.some(entry => entry.kit === kit));
+  const of = named.length ? `${[...new Set(named.map(({ tool }) => tool.name))].join(' and ')}, which its line names` : 'this topic';
+  return { kits, words: `the kit${kits.length > 1 ? 's' : ''} of ${of}` };
 }
 
 const STOCK = /\b(?:seamless(?:ly)?|effortless(?:ly)?|leverag(?:e|es|ing)|robust|powerful|cutting[- ]edge|state[- ]of[- ]the[- ]art|game[- ]chang\w*|supercharg\w*|unlock\w*|elevat(?:e|es|ing)|empower\w*|delve|dive into|in today's|it's worth noting|best[- ]in[- ]class|world[- ]class|next[- ]level|revolutionary|stunning|effortlessly|harness(?:es|ing)?)\b/i;
@@ -695,7 +715,9 @@ function argumentsFor(schema) {
 
 /**
  * Every problem with a set of kits and playbooks, each as one line that says where and
- * what. `corpus` holds the texts quoted errors must come from; `budgets` the lengths.
+ * what. `corpus` holds the texts quoted errors must come from: `kits`, each kit's code by its
+ * id, of which a quote is looked up only in its own kit's (quoteKits), and `shared`, makersmcp's
+ * own and the hosted services' texts, which any quote may come from; `budgets` the lengths.
  */
 async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new Set(), held = [] }) {
   // held: the sets of tools a service holds back, each a config of its own, like [['check_video', 'fit_music'], ['fit_music']].
@@ -726,7 +748,18 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
   const allParams = new Set(definitions.flatMap(kit => kit.tools.flatMap(tool => Object.keys(tool.params))));
   const values = new Set(definitions.flatMap(kit => kit.tools.flatMap(tool => Object.values(tool.params).flatMap(param => param.values ?? []))));
   const topicNames = new Set(playbooks.topics.map(topic => topic.name));
-  const errorTexts = corpusOf(corpus, definitions);
+  // Each kit's code apart, and the texts any quote may come from, put together for the kits a quote is looked up in.
+  const shared = corpusOf(corpus.shared ?? [], definitions);
+  const ownCode = new Map(Object.entries(corpus.kits ?? {}).map(([kit, texts]) => [kit, corpusOf(texts, definitions)]));
+  const corpora = new Map();
+  const corpusFor = kits => {
+    const key = kits.join(',');
+    if (!corpora.has(key)) {
+      const own = kits.map(kit => ownCode.get(kit) ?? { texts: [], patterns: [] });
+      corpora.set(key, { texts: [...shared.texts, ...own.flatMap(entry => entry.texts)], patterns: [...shared.patterns, ...own.flatMap(entry => entry.patterns)] });
+    }
+    return corpora.get(key);
+  };
 
   // Every kit owns a topic.
   for (const kit of kitIds) {
@@ -944,9 +977,11 @@ async function lint({ definitions, dir, corpus, budgets = {}, extraNames = new S
           }
         }
 
-        // Errors quoted as a result shows them.
-        for (const quote of quotedErrors(markdown)) {
-          if (!knownError(quote, errorTexts)) add(where, `the error "${quote}" is in no kit's code, not in makersmcp's src and not in tests/fixtures/hosted-errors.json`);
+        // Errors quoted as a result shows them, each looked up in the code of the kit it is of.
+        for (const { quote, line } of quotedErrors(markdown)) {
+          const { kits, words } = quoteKits(line, topic?.kit, definitions);
+          if (knownError(quote, corpusFor(kits))) continue;
+          add(where, `the error "${quote}" is in no ${words ? `code of ${kits.join(' or ')} (${words})` : "kit's code"}, not in makersmcp's src and not in tests/fixtures/hosted-errors.json`);
         }
       }
 
@@ -1129,8 +1164,9 @@ async function resultProblems(definitions, dir, config, tool, view, state, topic
   return problems;
 }
 
-// The fixture kits' code, read as the package's kits are: a README.md there is no kit's message, and neither is a comment.
-const fixtureCorpus = () => codeTexts(path.join(FIXTURES, 'sources'));
+// The fixture kits' code, each kit's in a folder of its own, read as the package's kits are: a Markdown file there is no kit's
+// message, and neither is a comment.
+const fixtureCorpus = () => ({ kits: Object.fromEntries(['paintkit', 'soundkit'].map(kit => [kit, codeTexts(path.join(FIXTURES, 'sources', kit))])), shared: [] });
 const FIXTURE_BUDGETS = { topicMin: 50, startedMax: 6000, threeMax: 45000, descriptionMin: 100, descriptionMax: 1200 };
 
 /** A copy of the fixture topics with one change, in a folder of its own. */
@@ -1157,7 +1193,7 @@ test('the lint finds each kind of fault in a fixture broken one rule at a time',
     [{ 'painting.md': text => text.replace('"picture": "pictures/example/picture.png"', '"picture": "job:<job_id>/picture.png"') }, /a job: reference in a local call/],
     [{ 'painting.md': text => text.replace('`layers`, `length`', '`layerz`, `length`') }, /`layerz` is not a tool/],
     [{ 'painting.md': text => text.replace('Read `PAINT.md`', 'Read `PAINTS.md`') }, /`PAINTS\.md` is a file no tool this server lists writes/],
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> could not be opened as a picture"') }, /the error "<file> could not be opened as a picture" is in no kit's code/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> could not be opened as a picture"') }, /the error "<file> could not be opened as a picture" is in no code of paintkit \(the kit of this topic\)/],
     [{ 'painting.md': text => text.replace('A job stops after {limit:job_minutes} here, and', 'Save it in out_dir, and') }, /painting\.md, hosted.*out_dir, which a hosted server does not take/],
     [{ 'painting.md': text => text.replace('`keep` keeps the work files.', '`keep` keeps the work files. Give job:<job_id>/x.png.') }, /painting\.md, local.*a job: reference/],
     [{ 'painting.md': text => text.replace('checks it. It runs', 'checks it \u2014 it runs') }, /an em or en dash/],
@@ -1174,21 +1210,26 @@ test('the lint finds each kind of fault in a fixture broken one rule at a time',
     [{ 'painting.md': text => text.replace('description: Paints a picture', 'description: Saves in ~/paint on this machine. Paints a picture') }, /the resource makersmcp:\/\/playbooks\/painting's title and description, hosted.*on this machine/],
     [{ 'painting.md': text => text.replace('description: Paints a picture', 'description: Mixes with mix_sound. Paints a picture') }, /the resource makersmcp:\/\/playbooks\/painting's title and description, local, paintkit alone: names mix_sound/],
     // A word written beside a variable part is a word of the kit's own message.
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> then could not be read as a picture"') }, /the error "<file> then could not be read as a picture" is in no kit's code/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> then could not be read as a picture"') }, /the error "<file> then could not be read as a picture" is in no code of paintkit \(the kit of this topic\)/],
     // A quote's words in a kit's comment or in a Markdown file beside its code are prose, not a message of the kit.
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> is cut down to its widest side first"') }, /the error "<file> is cut down to its widest side first" is in no kit's code/],
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> keeps the last good copy of a picture"') }, /the error "<file> keeps the last good copy of a picture" is in no kit's code/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> is cut down to its widest side first"') }, /the error "<file> is cut down to its widest side first" is in no code of paintkit \(the kit of this topic\)/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> keeps the last good copy of a picture"') }, /the error "<file> keeps the last good copy of a picture" is in no code of paintkit \(the kit of this topic\)/],
     // So are the words of a block comment, of a doc comment, and of a comment after a regular expression that holds a quote
     // and an escaped slash, which a reader that missed the pattern, or its escape, would take for the start of a string.
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> cracks along its brush strokes"') }, /the error "<file> cracks along its brush strokes" is in no kit's code/],
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> fades out over its last beat"') }, /the error "<file> fades out over its last beat" is in no kit's code/],
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> stops at its first slash or quote mark"') }, /the error "<file> stops at its first slash or quote mark" is in no kit's code/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> cracks along its brush strokes"') }, /the error "<file> cracks along its brush strokes" is in no code of paintkit \(the kit of this topic\)/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> fades out over its last beat"') }, /the error "<file> fades out over its last beat" is in no code of paintkit \(the kit of this topic\)/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> stops at its first slash or quote mark"') }, /the error "<file> stops at its first slash or quote mark" is in no code of paintkit \(the kit of this topic\)/],
     // And of a comment after a string that holds an escaped quote, after a pattern with a / in a character class, and
     // after a pattern that follows return: a reader that ended the string at that quote, the pattern at that /, or took the
     // pattern for a division would take what follows for a string that runs over the comment.
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> peels at its corner first"') }, /the error "<file> peels at its corner first" is in no kit's code/],
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> keeps its shape in cold water"') }, /the error "<file> keeps its shape in cold water" is in no kit's code/],
-    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> warps in damp air"') }, /the error "<file> warps in damp air" is in no kit's code/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> peels at its corner first"') }, /the error "<file> peels at its corner first" is in no code of paintkit \(the kit of this topic\)/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> keeps its shape in cold water"') }, /the error "<file> keeps its shape in cold water" is in no code of paintkit \(the kit of this topic\)/],
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"<file> warps in damp air"') }, /the error "<file> warps in damp air" is in no code of paintkit \(the kit of this topic\)/],
+    // A quote is looked up in the code of its own kit, the topic's or that of a tool its line names: a soundkit message quoted
+    // on a line of the painting topic that names no tool, or on a line of the sound topic that names paint_picture, is no
+    // message of paintkit's, though the painting topic may quote it beside mix_sound and the sound topic beside no tool.
+    [{ 'painting.md': text => text.replace('"<file> could not be read as a picture"', '"The sound is silent"') }, /^painting\.md, [^:]+: the error "The sound is silent" is in no code of paintkit \(the kit of this topic\)/],
+    [{ 'sound.md': text => text.replace('- "The sound is silent": give another `track`.', '- "The sound is silent", after `paint_picture`: give another `track`.') }, /^sound\.md, [^:]+: the error "The sound is silent" is in no code of paintkit \(the kit of paint_picture, which its line names\)/],
     // A topic named in code, or as one to read, is one the server offers.
     [{ 'painting.md': text => text.replace('3. No sound kit is on here, so the picture stays silent.', '3. The `sound` topic has the rest.') }, /painting\.md, .*paintkit alone: names the sound topic, which this server does not offer/],
     [{ 'painting.md': text => text.replace('3. No sound kit is on here, so the picture stays silent.', '3. Read `sound` for a sound.') }, /painting\.md, .*paintkit alone: names the sound topic, which this server does not offer/],
@@ -1263,19 +1304,22 @@ test('the lint measures topics and descriptions in every config, so one past its
 });
 
 /**
- * The code the package's quoted errors are looked for in, each file with its comments blanked by the same reader: every
- * kit's, makersmcp's src, and the SDK's and zod's files that word a refused call and an unknown tool.
+ * The code the package's quoted errors are looked for in, each file with its comments blanked by the same reader: each
+ * kit's apart, by its id, as a quote is looked up in the code of its own kit (quoteKits), and in `shared` makersmcp's src
+ * and the SDK's and zod's files that word a refused call and an unknown tool, which any quote may come from.
  */
 function packageCode(definitions) {
-  return [
-    ...definitions.flatMap(kit => {
+  return {
+    kits: Object.fromEntries(definitions.map(kit => {
       const installed = resolveKit(kit);
-      return installed.dir ? codeTexts(installed.dir) : [];
-    }),
-    ...codeTexts(path.join(here, '..', 'src')),
-    // The schema's refusals and an unknown tool, as the SDK and zod word them.
-    ...['@modelcontextprotocol/sdk/server/mcp.js', 'zod/v4/locales/en.js'].map(name => withoutComments(readFileSync(requireHere.resolve(name), 'utf8'))),
-  ];
+      return [kit.kit, installed.dir ? codeTexts(installed.dir) : []];
+    })),
+    shared: [
+      ...codeTexts(path.join(here, '..', 'src')),
+      // The schema's refusals and an unknown tool, as the SDK and zod word them.
+      ...['@modelcontextprotocol/sdk/server/mcp.js', 'zod/v4/locales/en.js'].map(name => withoutComments(readFileSync(requireHere.resolve(name), 'utf8'))),
+    ],
+  };
 }
 
 /** Every set of tools a service may hold back of kits that stay on: one set of TEXTS_LEAVE_OUT of each kit, or none, but not none of all. */
@@ -1299,17 +1343,17 @@ test('the kits in kits/ and the topics in playbooks/ pass every check of the lin
     [requireHere.resolve('@modelcontextprotocol/sdk/server/mcp.js'), 'High-level MCP server that provides a simpler API'],
   ]) {
     assert.ok(readFileSync(file, 'utf8').includes(words), `${file} no longer says "${words}"`);
-    assert.ok(!code.some(entry => entry.includes(words)), `the lint reads "${words}", which only a comment of ${file} holds`);
+    assert.ok(![...code.shared, ...Object.values(code.kits).flat()].some(entry => entry.includes(words)), `the lint reads "${words}", which only a comment of ${file} holds`);
   }
-  const corpus = [
-    ...code,
-    ...readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors.map(entry => entry.text),
-  ];
+  const corpus = {
+    kits: code.kits,
+    shared: [...code.shared, ...readJson(path.join(here, 'fixtures', 'hosted-errors.json')).errors.map(entry => entry.text)],
+  };
   // The SDK puts a schema's refusal together from two of its files: the tool in mcp.js, each reason with its place in zod-compat.js.
   const sdk = name => readFileSync(requireHere.resolve(`@modelcontextprotocol/sdk/server/${name}`), 'utf8');
   assert.ok(sdk('mcp.js').includes('`Input validation error: Invalid arguments for tool ${toolName}: ${errorMessage}`'), 'the SDK words a refused call another way now');
   assert.ok(sdk('zod-compat.js').includes('`${i.message} at ${getDotPath(i.path)}`'), 'the SDK words a refusal\'s place another way now');
-  corpus.push('Input validation error: Invalid arguments for tool <tool>: <reason> at <path>');
+  corpus.shared.push('Input validation error: Invalid arguments for tool <tool>: <reason> at <path>');
   // Each set of tools the texts leave out by themselves (TEXTS_LEAVE_OUT), alone and beside each set of the other kit. The
   // workers of MakersMCP-Api hold check_video and fit_music back for a release whose loudness filter their ffmpeg cannot run,
   // both or each alone, and launch-film's four film tools until launch-film's security fix is on makersmcp.com (KITS_HELD_TOOLS
@@ -1327,6 +1371,32 @@ test('the kits in kits/ and the topics in playbooks/ pass every check of the lin
     // The lint says why.
   }
   assert.deepEqual(problems, [], `${problems.length} problems:\n${problems.join('\n')}`);
+});
+
+// A quote is looked up in the code of the kit whose tool its line names, else of the topic's own kit, not in every kit's
+// together: troubleshooting gave analyze_music "Cannot read <file>: ffmpeg does not know this format", which musicfit 0.2.3
+// never says, and the lint passed it as reframekit 0.1.3 builds the same words.
+test('a quoted error is looked up in the code of the kit whose tool its line names, else of the topic\'s own kit, so one that only another kit says fails', () => {
+  const definitions = loadKitDefinitions();
+  const code = packageCode(definitions);
+  const corpus = kits => corpusOf([...code.shared, ...kits.flatMap(kit => code.kits[kit])], definitions);
+  const old = 'Cannot read <file>: ffmpeg does not know this format';
+  const line = `- \`analyze_music\`: "${old}", "<file> has no audio stream" or "<file> has no audio" means the file is no track ffmpeg reads.`;
+  const { kits, words } = quoteKits(line, 'makersmcp', definitions);
+  assert.deepEqual(kits, ['musicfit']);
+  assert.equal(words, 'the kit of analyze_music, which its line names');
+  assert.equal(knownError(old, corpus(kits)), false, 'musicfit 0.2.3 does not say it');
+  assert.equal(knownError('Cannot read <file>: it is not a kind of file ffmpeg reads, or it is cut short or damaged', corpus(kits)), true);
+  // A message one kit says is no other kit's: musicfit's no sound read, quoted beside a tool of easycaptionkit.
+  const said = 'ffmpeg reads no sound in <file>';
+  assert.equal(knownError(said, corpus(quoteKits(`- \`fit_music\`: "${said}"`, 'makersmcp', definitions).kits)), true);
+  assert.equal(knownError(said, corpus(quoteKits(`- \`caption_video\`: "${said}"`, 'makersmcp', definitions).kits)), false);
+  // A line that names no kit's tool takes the topic's own kit, with a kit its tools run, and in makersmcp's own topics every kit.
+  assert.deepEqual(quoteKits(`- "${said}": ask the user for another file.`, 'musicfit', definitions), { kits: ['musicfit'], words: 'the kit of this topic' });
+  assert.deepEqual(quoteKits('- "not the brand\'s own site": ask for the product\'s own site.', 'launch-film', definitions), { kits: ['launch-film', 'easybrandkit'], words: 'the kits of this topic' });
+  assert.deepEqual(quoteKits('- "musicfit needs ffmpeg": the troubleshooting topic.', 'makersmcp', definitions), { kits: definitions.map(kit => kit.kit), words: null });
+  // A line that names tools of two kits takes both, a tool that runs another kit that one too.
+  assert.deepEqual(quoteKits('- `make_launch_film` and then `fit_music`: "x y z w"', 'makersmcp', definitions).kits, ['launch-film', 'easybrandkit', 'musicfit']);
 });
 
 // The mechanism.

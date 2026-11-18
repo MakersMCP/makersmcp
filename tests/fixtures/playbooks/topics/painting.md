@@ -39,7 +39,7 @@ check_picture {"picture": "job:<job_id>/picture.png", "expect": "1200x630"}
 ```
 <!-- end -->
 <!-- with soundkit -->
-3. For a sound under it, see the sound topic: `mix_sound` mixes one at {fact:soundkit.rate} Hz.
+3. For a sound under it, see the sound topic: `mix_sound` mixes one at {fact:soundkit.rate} Hz, and says "The sound is silent" of a track with none.
 <!-- end -->
 <!-- without soundkit -->
 3. No sound kit is on here, so the picture stays silent.
