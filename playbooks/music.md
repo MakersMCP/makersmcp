@@ -10,7 +10,7 @@ order: 70
 ---
 # Music fitted to a film or a demo
 
-`fit_music` makes a music track as long as a video by cutting or looping whole bars, lands its drop on a chosen moment (the hit), ends it on a beat, ducks it under a voice and sets its loudness. Given the video, it also writes video.mp4: the video's picture as it was, with the track under it. `analyze_music` reads the track's tempo, bars, drop and ending first.
+`fit_music` makes a music track as long as a video by cutting or looping whole bars, lands its drop on a chosen moment (the hit), ends it on a beat, ducks it under a voice and sets its loudness. Given the video, it also writes video.mp4, the video with the track under it. `analyze_music` reads the track's tempo, bars, drop and ending first.
 
 ## Decide first
 
@@ -84,7 +84,7 @@ fit_music {"track": "https://example.com/track.mp3", "length": "32", "hit": "27.
 <!-- end -->
 <!-- end -->
 3. Read `FIT.md`: its "Where to listen" table gives the start, each seam, the hit and the end. Show `seams.png`, and act on any warning.
-4. With `video`, video.mp4 is the video with the track under it, the file to hand over once the user has heard it. Without it, the next section says how the track goes under the video.
+4. With `video`, video.mp4 is the file to hand over once the user has heard it. Without it, the next section says how the track goes under the video.
 <!-- with check_video -->
 5. Check it with `check_video`, then hand it over.
 <!-- end -->
@@ -105,7 +105,7 @@ ffmpeg -i <video> -i <fit folder>/fitted.wav -map 0:v -map 1:a -c:v copy -c:a aa
 The track then replaces the video's sound. With a `voice`, give `mix.wav` instead.
 <!-- end -->
 <!-- hosted -->
-Without `video`, nothing here lays the track: hand over the links to the video and the track.
+Without `video`, nothing here lays the track.
 <!-- end -->
 A track handed over alone goes under the whole video from its first frame, in the app the user cuts video with, without trimming or stretching it: it is already as long, to a frame.
 
@@ -174,9 +174,13 @@ A failed `fit_music` or `analyze_music` job gives its reason:
 - "<length, hit or drop> takes a time such as 32, 32.5s, 960f or 1:05": one of those forms.
 - "No drop found to land on hit": give `drop`, or leave `hit` out.
 - "No way to fit this track to that length": try without `hit`, or with another `end`.
-- "The track is silent", "The track has no whole bar of music", "<file> has no audio stream" or "ffmpeg reads no sound in <file>": ask the user for another file.
+- "The track is silent", "The track has no whole bar of music", "ffmpeg reads no sound in <file>" or "ffmpeg finds no sound stream in <file>": ask the user for another file.
+- "ffmpeg finds no picture in <video>" or "<video> reads as a still picture": ask for the video, or a whole copy.
 - "Cannot read <file>:" and why, as "it is cut short or damaged" or ffmpeg's own words: ask the user for a whole copy of that file, or one in a common format such as WAV, MP3 or MP4, one without the tag for "it starts with an ID3v2 tag", and an MP4 copy of a video for "ffmpeg finds no size for its picture".
-- A file cut short or damaged can also read as a shorter one, or one with no sound: when a length or a sound is not what the user said, ask for a whole copy.
+- A file cut short or damaged can also read as another file than it is: when its length, its sound or its picture is not what the user said, ask for a whole copy.
+<!-- local -->
+- A file behind two or more ID3v2 tags can be taken for another kind: when the video's own sound, the track or the voice reads as none though the user says it has sound, ask for a copy without the tags.
+<!-- end -->
 - "<video> has sound of its own for <time> of its <length> s, so say what becomes of it with video_sound": ask the user whether it is effects, speech or music, and give `video_sound`.
 - "and length is <length> s: give length <seconds>": give `length` those seconds.
 <!-- hosted -->
@@ -208,7 +212,7 @@ Warnings come with a done job, in `FIT.md` too:
 - video.mp4, the video with the track under it, or the video and the track to lay in, with their paths.
 <!-- end -->
 <!-- hosted -->
-- The link to video.mp4, the video with the track under it, or the links to the video and to the track to lay in.
+- The link to video.mp4, or the links to the video and to the track to lay in.
 <!-- end -->
 <!-- with reframekit -->
 - Each place's version made with `reframe_video` from video.mp4, which carries the track, never from the video it went under. No timeline or steps file is beside video.mp4 under its name, so give `reframe_video` the shots of the video it went under, as the reframe topic shows.
