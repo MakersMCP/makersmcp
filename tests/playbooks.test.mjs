@@ -3648,11 +3648,18 @@ test('hosted, music says the fit itself counts toward a job\'s memory as MakersM
     // A fit under a video is as long as the video, so a shorter one there takes a shorter cut of it (video-bounds.js fitOf and
     // soundProblem), and once the fit's copies alone pass the hour no sound is short enough, so the refusal asks for none.
     'video runs <time>, and fit_music makes a fit as long as its video: a fit of <time> with <what> from <sound>, and fit_music here makes a fit of at most <time> with <what>',
-    'besides each sound a few times over, and a longer one needs more than a job has here. Give a shorter cut of the video with length set to it, cut the sound shorter, or run fit_music on your own machine with makersmcp.',
-    'besides each sound a few times over, and a longer one needs more than a job has here. Give a shorter cut of the video with length set to it, or run fit_music on your own machine with makersmcp.',
-    'besides each sound a few times over, and a longer one needs more than a job has here. Give a shorter length, or run fit_music on your own machine with makersmcp.',
+    'more than once with <what>, each sound counted as long as its file states. Give a shorter cut of the video with length set to it, cut the sound shorter, or run fit_music on your own machine with makersmcp.',
+    'more than once with <what>, each sound counted as long as its file states. Give a shorter cut of the video with length set to it, or run fit_music on your own machine with makersmcp.',
+    'more than once with <what>, each sound counted as long as its file states. Give a shorter length, or run fit_music on your own machine with makersmcp.',
     "this job has left is too little for <tool> to start on it, as its inputs took the rest of the job's time to come in. Start it again, with a link that downloads faster if one was slow.",
   ]) assert.ok(errors.some(entry => entry.includes(words)), words);
+  // Both bounds say what they count, each sound as long as its file states, as MakersMCP-Api's change for musicfit 0.2.3 words
+  // them, and give no reason of memory for the sounds: musicfit 0.2.3 reads a video's own sound only up to two seconds past the
+  // fit, so a job refused for a sound its file states as longer would not have needed more than a job has.
+  const counted = errors.filter(entry => / here (?:reads at most \d+ minutes of sound|makes a fit of at most <time>(?: with <what>)? from that much sound) in a job/.test(entry));
+  assert.equal(counted.length, 9);
+  for (const entry of counted) assert.ok(entry.includes(', each sound counted as long as its file states. '), entry);
+  assert.ok(!errors.some(entry => /a few times over|whole in memory|a longer one needs more than a job has here/.test(entry)));
   // The numbers come from MakersMCP-Api's figures (video-bounds.js SOUND_SECONDS, FIT_HELD_SECONDS, FIT_SECONDS, FIT_SHARE and
   // fitCopies), as tests/fixtures/hosted-errors.json records them.
   const { soundSeconds, fitHeldSeconds, fitSeconds, fitShare, fitCopies } = hostedBounds();
