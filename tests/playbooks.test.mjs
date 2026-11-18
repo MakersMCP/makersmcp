@@ -2434,11 +2434,11 @@ test('a tool MakersMCP-Server holds back is not listed and no text names it, whi
     assert.ok(made.structuredContent.next.endsWith(`Give the user the frames/sheet.jpg link from the list below: two stills a clip. ${unwatched}`), made.structuredContent.next);
     // analyze_music, whose music topic is not offered, points at troubleshooting, which lists its errors then.
     session.backend.view = (request, id) => ({ id, kit: 'musicfit', tool: 'analyze_music', title: 'Read a track', status: 'failed', exitCode: 1, elapsedSeconds: 2,
-      failure: 'musicfit: Cannot read in/x.mp3: ffmpeg does not know this format' });
+      failure: 'musicfit: Cannot read in/x.mp3: it is not a kind of file ffmpeg reads, or it is cut short or damaged' });
     const analyzed = await session.client.callTool({ name: 'analyze_music', arguments: { track: 'https://example.com/x.mp3' } });
     assert.equal(analyzed.structuredContent.next, "The troubleshooting playbook (makersmcp_playbook) lists this tool's errors and their fixes.");
     const troubleshooting = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: ['troubleshooting'] } }));
-    assert.match(troubleshooting, /- `analyze_music`: "Cannot read <file>: ffmpeg does not know this format"/);
+    assert.match(troubleshooting, /- `analyze_music`: "Cannot read <file>:" and why, as "it is not a kind of file ffmpeg reads, or it is cut short or damaged"/);
     // FIT.md's flags of fit_music read as its parameters, from the whole kit file, and the topics say no tool fits a track now.
     session.backend.view = (request, id) => ({ id, kit: 'musicfit', tool: 'analyze_music', title: 'Read a music track', status: 'done', exitCode: 0, elapsedSeconds: 2,
       folder: 'musicfit-track', files: [{ path: 'FIT.md', bytes: 400, url: 'https://x/FIT.md' }], expiresAt: 1800000000,
@@ -3340,11 +3340,12 @@ test('hosted, fit_music says a length in frames under a video needs fps, as Make
   assert.match(local.fps.description, /\(default: the video's with video, else 30\)\./);
   for (const name of ['length', 'fps', 'video']) assert.doesNotMatch(local[name].description, /needs fps/, name);
   // The music and troubleshooting topics say so on the hosted side, and quote the refusal. Music says it where the numbers come
-  // from and with the refusal, and its second step gives fps the video's frame rate.
+  // from, with the refusal, once, which keeps the topic within its 12,000 characters there, and its second step gives fps the
+  // video's frame rate.
   const topics = await readTopics({ where: 'hosted', limits: SERVER_LIMITS }, ['music', 'troubleshooting']);
-  assert.match(topics, /whose frame rate counts `hit` and `drop` in frames unless `fps` is given\. A `length` in frames with a `video` needs `fps` here: without it the call is refused before any job starts\./);
+  assert.match(topics, /whose frame rate counts `hit` and `drop` in frames unless `fps` is given\. A `length` in frames with a `video` needs `fps` here: without it the call is refused before any job starts, with "length in frames with a video needs fps here"\./);
   assert.match(topics, /\n2\. Fit it with `fit_music`: `length` and `hit` as text, like "29\.333" or "600f", `fps` the video's,/);
-  assert.match(topics, /A `length` in frames with a `video` and no `fps` is refused as the call is made too, with "length in frames with a video needs fps here": give `fps`, the video's frame rate, or `length` in seconds\./);
+  assert.doesNotMatch(topics, /and no `fps` is refused as the call is made too, with "length in frames with a video needs fps here"/);
   assert.match(topics, /A `length` in frames with a `video` and no `fps` is refused as the call is made too: give `fps`, the video's frame rate, or `length` in seconds\./);
   const localTopics = await readTopics({}, ['music']);
   assert.match(localTopics, /give it as `video`, whose frame rate counts the frames unless `fps` is given\./);
@@ -3631,7 +3632,7 @@ test('hosted, music says the fit itself counts toward a job\'s memory as MakersM
   assert.ok(fixture.errors.some(entry => entry.text === 'length takes 1 second to an hour.' && /lengthProblem \(LENGTH_OUTSIDE\), a 400 from Kits\/Start/.test(entry.from)));
   assert.ok(fixture.errors.some(entry => entry.text === 'length takes a time such as 32, 32.5s, 960f or 1:05, not <value>.' && /lengthProblem, a 400 from Kits\/Start/.test(entry.from)));
   assert.match(fixture.about, /and the one for a fit under a video that runs past the hour at 228d666, and the two for a length musicfit refuses as it reads its arguments at 9135762;/);
-  assert.ok(music.includes(`A \`length\` outside ${lengthMin} to ${lengthMax} seconds, or one musicfit cannot read as a time, is refused as the call is made, in musicfit's own words: "length takes 1 second to an hour" or "length takes a time such as 32, 32.5s, 960f or 1:05".`));
+  assert.ok(music.includes(`A \`length\` outside ${lengthMin} to ${lengthMax} seconds, or one musicfit cannot read as a time, is refused as the call is made, in musicfit's own words.`));
   const trouble = await readTopics(hosted, ['troubleshooting']);
   assert.ok(trouble.includes('A failure that says the time this job has left "is too little for <tool> to start on it" means its inputs took the rest of the job\'s time to come in: start it again, with a link that downloads faster if one was slow.'));
   assert.ok(trouble.includes(`A fit too long for that much sound fails the same way, with "fit_music here makes a fit of at most" and the longest that fits: offer a shorter \`length\`, or with a \`video\` a shorter cut of the video with \`length\` set to it. A fit longer than ${pastWithOne} minutes with a \`voice\` or a \`video\`, or ${pastWithBoth} with both, is refused as the call is made, before any job starts, when \`length\` is in seconds, or in frames with \`fps\`.`));
@@ -3778,4 +3779,130 @@ test('music gives each reason musicfit gives for a video that is not length long
   const next = definition.tools.find(tool => tool.name === 'analyze_music').next.done.join(' ');
   assert.match(next, /Call fit_music with this track, length the video's length to a frame, fps its frame rate/);
   assert.doesNotMatch(next, /exact/);
+});
+
+// musicfit 0.2.3 refuses a track, a voice or a video it cannot read with a reason that says why (unread.js, video.js unread and
+// probe, audio.js decode and unreadSound): cut short or damaged, empty, no kind of file ffmpeg reads, an ID3v2 tag at its start,
+// no size for its picture, no sound read, or ffmpeg's own words after the file's name. A failed fit_music or analyze_music job's
+// Next line sends the agent to the music topic, and with fit_music held back to troubleshooting, so each reason, as the installed
+// musicfit's own code words it, meets a line there that says what to ask the user for, on both sides, through the quote of its
+// own fix where it has one; no topic quotes what 0.2.2 said in their place; and hosted, the bound on a job's sound says what it
+// counts, as MakersMCP-Api counts it, with no reason of memory that 0.2.3 no longer bears out for a video's own sound.
+test('music gives each reason musicfit gives for a file it cannot read a line on both sides, troubleshooting does for analyze_music while fit_music is held back, and no topic quotes what musicfit 0.2.2 said in their place', async () => {
+  const definition = loadKitDefinitions().find(kit => kit.kit === 'musicfit');
+  const { dir } = resolveKit(definition);
+  const lib = name => createRequire(path.join(dir, 'package.json'))(`./skills/musicfit/scripts/lib/${name}.js`);
+  const source = name => readFileSync(path.join(dir, 'skills', 'musicfit', 'scripts', 'lib', `${name}.js`), 'utf8');
+  const { indexError, refusedByBoxes, unknown, noData } = lib('unread');
+  const { unreadSound } = lib('audio');
+  const { unread, pastEnd, PAST } = lib('video');
+  const file = path.join(LOCAL_DIR, 'in', 'cut.mp4');
+  // What ffmpeg prints for a file it could not open, in its own words, and for one it finds no data in.
+  const ownWords = `${file}: Invalid argument\n`;
+  const noDataFound = '[in#0 @ 0x55d1] EBML header parsing failed\nError opening input: Invalid data found when processing input\n';
+  // The start of the line of the music topic a reason meets.
+  const read = '- "Cannot read <file>:" and why, as "it is cut short or damaged" or ffmpeg\'s own words: ';
+  const none = '- "The track is silent", ';
+  // Those its read makes in place are held to its code, with a length or a count where it gives one.
+  for (const [name, words] of [
+    ['audio', '`Cannot read ${file}: it is cut short or damaged (ffmpeg could read ${(samples.length / channels / rate).toFixed(2)} s of its sound)`'],
+    ['audio', 'noAudio(`ffmpeg reads no sound in ${file}`)'],
+    ['video', '`Cannot read ${file}: it is cut short or damaged, so ffmpeg finds no frames in it`'],
+    ['video', '`Cannot read ${file}: it is cut short or damaged (ffmpeg could read ${frames} ${frames === 1 ? "frame" : "frames"}, ${seconds.toFixed(2)} s'],
+    ['video', '`Cannot read ${file}: it is empty`'],
+    ['fit', '`The voice runs ${timeline ? pastEnd(over) : `${over.toFixed(2)} s`} past the end and was cut there.`'],
+  ]) assert.ok(source(name).includes(words), `${name}.js no longer says ${words}`);
+  // Each reason as the installed musicfit makes it, from those lines and the file's boxes, with the line it meets and the quote
+  // there that holds it: its own fix's, or else "Cannot read <file>:", whose fix is a whole copy.
+  const sound = [
+    [indexError(file).message, read, 'it is cut short or damaged'],
+    [`Cannot read ${file}: it is cut short or damaged (ffmpeg could read 2.50 s of its sound)`, read, 'it is cut short or damaged'],
+    [unknown(file).message, read, 'it is cut short or damaged'],
+    [refusedByBoxes(file, { index: 'whole', tagged: true }).message, read, 'it starts with an ID3v2 tag'],
+    [noData(file, { tagged: true }).message, read, 'it starts with an ID3v2 tag'],
+    [unreadSound(file, noDataFound, { tagged: true }).message, read, 'it starts with an ID3v2 tag'],
+    [unreadSound(file, noDataFound, {}).message, read, 'it is cut short or damaged'],
+    [unreadSound(file, ownWords, {}).message, read, 'Cannot read <file>:'],
+    [`ffmpeg reads no sound in ${file}`, none, 'ffmpeg reads no sound in <file>'],
+    [unreadSound(file, "Stream map '0:a:0' matches no streams.\n", {}).message, none, '<file> has no audio stream'],
+  ];
+  const video = [
+    [unread(file, '[matroska,webm @ 0x55d1] File ended prematurely\n', {}).message, read, 'it is cut short or damaged'],
+    [`Cannot read ${file}: it is cut short or damaged, so ffmpeg finds no frames in it`, read, 'it is cut short or damaged'],
+    [`Cannot read ${file}: it is cut short or damaged (ffmpeg could read 12 frames, 0.40 s of the 2.00 s it says it holds)`, read, 'it is cut short or damaged'],
+    [`Cannot read ${file}: it is empty`, read, 'Cannot read <file>:'],
+    [unread(file, noDataFound, {}).message, read, 'it is cut short or damaged'],
+    [unread(file, noDataFound, { tagged: true }).message, read, 'it starts with an ID3v2 tag'],
+    [unread(file, "Input #0, mpegts, from 'cut.ts':\n  Duration: 00:00:01.00, start: 1.400000, bitrate: 2 kb/s\n  Stream #0:0[0x100]: Video: h264 ([27][0][0][0] / 0x001B), none, 90k tbr, 90k tbn\n", {}).message, read, 'ffmpeg finds no size for its picture'],
+    [unread(file, ownWords, {}).message, read, 'Cannot read <file>:'],
+  ];
+  // The reasons are the kit's own, each of the kind the test means.
+  const words = list => list.map(([said]) => said.replace(file, '<file>').replace(/: give a (?:whole )?copy[^]*$/, ''));
+  const unreadable = 'Cannot read <file>: it is not a kind of file ffmpeg reads, or it is cut short or damaged';
+  const tagged = 'Cannot read <file>: it starts with an ID3v2 tag, which ffmpeg 9 does not read past in many kinds of file, or it is not a kind of file ffmpeg reads, or it is cut short or damaged';
+  assert.deepEqual(words(sound), [
+    'Cannot read <file>: it is cut short or damaged, so ffmpeg finds no index in it',
+    'Cannot read <file>: it is cut short or damaged (ffmpeg could read 2.50 s of its sound)',
+    unreadable,
+    'Cannot read <file>: it starts with an ID3v2 tag, and ffmpeg can read an MP4, a MOV or an M4A behind one from the wrong place, or not at all',
+    tagged,
+    tagged,
+    unreadable,
+    'Cannot read <file>: ffmpeg: Invalid argument',
+    'ffmpeg reads no sound in <file>',
+    '<file> has no audio stream',
+  ]);
+  assert.deepEqual(words(video), [
+    'Cannot read <file>: it is cut short or damaged',
+    'Cannot read <file>: it is cut short or damaged, so ffmpeg finds no frames in it',
+    'Cannot read <file>: it is cut short or damaged (ffmpeg could read 12 frames, 0.40 s of the 2.00 s it says it holds)',
+    'Cannot read <file>: it is empty',
+    unreadable,
+    tagged,
+    'Cannot read <file>: ffmpeg finds no size for its picture',
+    'Cannot read <file>: ffmpeg: Invalid argument',
+  ]);
+  for (const options of [{}, { where: 'hosted', limits: SERVER_LIMITS }, { where: 'hosted', limits: LIMITS }]) {
+    const side = JSON.stringify(options);
+    const music = await readTopics(options, ['music']);
+    const wrong = sections(music).find(section => section.heading === 'When something goes wrong');
+    const listed = wrong.text.split('\n').filter(line => line.startsWith('- '));
+    for (const [said, start, quote] of [...sound, ...video]) {
+      const lines = listed.filter(line => line.startsWith(start));
+      assert.equal(lines.length, 1, `${side}: ${start}`);
+      assert.ok(doubleQuoted(lines[0]).includes(quote) && quotedPattern(quote).test(said), `${side}: ${said} is not held by "${quote}" in ${lines[0]}`);
+    }
+    // Each fix as musicfit's guide gives it: a whole copy, one in a common format, one without the tag, an MP4 copy.
+    assert.ok(music.includes(`\n${read}ask the user for a whole copy of that file, or one in a common format such as WAV, MP3 or MP4, one without the tag for "it starts with an ID3v2 tag", and an MP4 copy of a video for "ffmpeg finds no size for its picture".\n`), side);
+    assert.ok(music.includes('\n- A file cut short or damaged can also read as a shorter one, or one with no sound: when a length or a sound is not what the user said, ask for a whole copy.\n'), side);
+    // The voice that is the video's own sound is read up to two seconds past the fit, so the warning says by how much only up
+    // to a second and a half, and more than a second beyond that: the topic's quote holds both.
+    const warned = '- "The voice runs <how far> past the end" or "No speech was found in the voice track": check the voice with the user.';
+    assert.ok(music.includes(`\n${warned}\n`), side);
+    for (const over of [0.8, PAST]) assert.ok(quotedPattern('The voice runs <how far> past the end').test(`The voice runs ${pastEnd(over)} past the end and was cut there.`), `${over}`);
+    assert.equal(pastEnd(PAST), 'more than a second');
+  }
+  // Hosted, MakersMCP-Api counts each sound as long as its file states (video-bounds.js readMedia and soundProblem), a video's own
+  // sound too, which musicfit 0.2.3 reads only PAST seconds past the fit (video.js ownSound): the topic gives no reason of memory.
+  const hosted = await readTopics({ where: 'hosted', limits: LIMITS }, ['music']);
+  assert.ok(hosted.includes("- Here a job's track, voice and video's own sound may run 15 minutes together at most, each as long as its file states: past that the job fails before the kit starts with \"<tool> here reads at most 15 minutes of sound in a job\", naming each length."));
+  // With fit_music held back, troubleshooting has analyze_music's errors, and each reason its track can get meets its line.
+  const trouble = await readTopics({ where: 'hosted', limits: LIMITS, held: ['fit_music'] }, ['troubleshooting']);
+  const analyze = trouble.split('\n').filter(line => line.startsWith('- `analyze_music`: '));
+  assert.equal(analyze.length, 1);
+  for (const [said] of sound) assert.ok(doubleQuoted(analyze[0]).some(quote => quotedPattern(quote).test(said)), said);
+  assert.match(analyze[0], /ask the user for a whole copy of it, or one in a common format such as WAV, MP3 or M4A, and one without the tag for "it starts with an ID3v2 tag"\./);
+  // What musicfit 0.2.2 said in their place, and the reason of memory, are in no topic on either side.
+  for (const options of [{}, { where: 'hosted', limits: LIMITS }, { where: 'hosted', limits: LIMITS, held: ['fit_music'] }]) {
+    const session = await connect({ definitions: loadKitDefinitions(), ...options });
+    try {
+      const topics = session.tools.find(tool => tool.name === 'makersmcp_playbook').inputSchema.properties.topics.items.enum;
+      for (const name of topics) {
+        const topic = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [name] } }));
+        assert.doesNotMatch(topic, /does not know this format|has no audio"|had no sound of its own|so ffmpeg finds no streams|whole in memory/, `${JSON.stringify(options)} ${name}`);
+      }
+    } finally {
+      await session.close();
+    }
+  }
 });

@@ -161,6 +161,6 @@ Kit messages can name the kit's command line flags, like --timeout or --page. A 
 <!-- end -->
 <!-- with analyze_music -->
 <!-- without fit_music -->
-- `analyze_music`: "Cannot read <file>: ffmpeg does not know this format", "<file> has no audio stream" or "<file> has no audio" means the file is no track ffmpeg reads, so ask the user for another file. A link that fails says why, as jobs-and-files lists. No tool here fits a track now, so the line of its FIT.md about fitting the track does not apply here.
+- `analyze_music`: "Cannot read <file>:" and why, as "it is not a kind of file ffmpeg reads, or it is cut short or damaged" or ffmpeg's own words, means ffmpeg cannot read that track as it is: ask the user for a whole copy of it, or one in a common format such as WAV, MP3 or M4A, and one without the tag for "it starts with an ID3v2 tag". "<file> has no audio stream" or "ffmpeg reads no sound in <file>": ask for another file. A track cut short or damaged can also read as a shorter one, or one with no sound: when its length or its sound is not what the user said, ask for a whole copy. A link that fails says why, as jobs-and-files lists. No tool here fits a track now, so the line of its FIT.md about fitting the track does not apply here.
 <!-- end -->
 <!-- end -->

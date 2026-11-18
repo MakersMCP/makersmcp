@@ -40,7 +40,7 @@ order: 70
 - Any other video: ask the user for its length and frame rate, or give it as `video`, whose frame rate counts the frames unless `fps` is given.
 <!-- end -->
 <!-- hosted -->
-- Any other video: ask the user for its length and frame rate, or give it as `video`, whose frame rate counts `hit` and `drop` in frames unless `fps` is given. A `length` in frames with a `video` needs `fps` here: without it the call is refused before any job starts.
+- Any other video: ask the user for its length and frame rate, or give it as `video`, whose frame rate counts `hit` and `drop` in frames unless `fps` is given. A `length` in frames with a `video` needs `fps` here: without it the call is refused before any job starts, with "length in frames with a video needs fps here".
 <!-- end -->
 
 ## Steps
@@ -123,9 +123,6 @@ check_video {"film": "launch/film-16x9/music/video.mp4", "expect": "{fact:launch
 check_video {"film": "job:<fit_job_id>/video.mp4", "expect": "{fact:launch-film.size_16_9}@{fact:launch-film.fps}", "cues": "job:<fit_job_id>/cues.json", "cuts": "job:<film_job_id>/film.timeline.json"}
 ```
 <!-- end -->
-<!-- with make_launch_film, plan_launch_film -->
-- A film planned by `plan_launch_film` with `music` false fails the silence check until a track is under it; with `sfx` false too it is silent throughout, which passes with the warning "the sound is silent throughout" unless `lufs` is given.
-<!-- end -->
 - A track with no steady beat has empty `beats`, which `check_video` refuses.
 <!-- with easyscreenshotkit -->
 - For a demo, give `cuts` the clicks' `pressedAt` in seconds, like "2.25,4.632,7.017": `steps.json` is no cuts file.
@@ -154,8 +151,8 @@ For a film already made, say which cuts `check_video` found off the beat.
 <!-- end -->
 - `wait_seconds`: both tools finish in seconds, and a long `video` takes a minute or more.
 <!-- hosted -->
-- Here a job's track, voice and video's own sound may run 15 minutes together at most, as both tools hold each whole in memory a few times over: past that the job fails before the kit starts with "<tool> here reads at most 15 minutes of sound in a job", naming each length. `fit_music` counts no sound of its `video` with `video_sound` drop, or when that video is the file given as `track` or `voice`.
-- The fit counts too: `fit_music` holds its `length` once in memory, three times with a `voice` or with a `video`, and five times with both. Those copies together may run an hour at most, and the sounds with a quarter of them 20 minutes. So from a track of 14 minutes it makes a fit of at most 24 minutes, from one of 15 minutes 20, and from one of 3 minutes the whole hour, or 20 minutes with a voice of a minute. Past that the job fails before the kit starts with "fit_music here makes a fit of at most", naming the longest that fits: give a shorter `length` or a shorter track, and with a `video`, whose length the fit takes, a shorter cut of the video with `length` set to it. A fit longer than 20 minutes with a `voice` or a `video`, or 12 with both, passes the hour whatever the track, and its call is refused before any job starts when `length` is in seconds, or in frames with `fps`. A `length` in frames with a `video` and no `fps` is refused as the call is made too, with "length in frames with a video needs fps here": give `fps`, the video's frame rate, or `length` in seconds. A `length` outside {fact:musicfit.length_min} to {fact:musicfit.length_max} seconds, or one musicfit cannot read as a time, is refused as the call is made, in musicfit's own words: "length takes 1 second to an hour" or "length takes a time such as 32, 32.5s, 960f or 1:05".
+- Here a job's track, voice and video's own sound may run 15 minutes together at most, each as long as its file states: past that the job fails before the kit starts with "<tool> here reads at most 15 minutes of sound in a job", naming each length. `fit_music` counts no sound of its `video` with `video_sound` drop, or when that video is the file given as `track` or `voice`.
+- The fit counts too: `fit_music` holds its `length` once in memory, three times with a `voice` or with a `video`, and five times with both. Those copies together may run an hour at most, and the sounds with a quarter of them 20 minutes. So from a track of 14 minutes it makes a fit of at most 24 minutes, from one of 15 minutes 20, and from one of 3 minutes the whole hour, or 20 minutes with a voice of a minute. Past that the job fails before the kit starts with "fit_music here makes a fit of at most", naming the longest that fits: give a shorter `length` or a shorter track, and with a `video`, whose length the fit takes, a shorter cut of the video with `length` set to it. A fit longer than 20 minutes with a `voice` or a `video`, or 12 with both, passes the hour whatever the track, and its call is refused before any job starts when `length` is in seconds, or in frames with `fps`. A `length` outside {fact:musicfit.length_min} to {fact:musicfit.length_max} seconds, or one musicfit cannot read as a time, is refused as the call is made, in musicfit's own words.
 <!-- end -->
 
 `analyze_music` takes `track`, `bpm` and `meter` the same way. It has no `fps`: its frames count at {fact:musicfit.analyze_fps} a second, so use its times in seconds.
@@ -177,7 +174,9 @@ A failed `fit_music` or `analyze_music` job gives its reason:
 - "<length, hit or drop> takes a time such as 32, 32.5s, 960f or 1:05": one of those forms.
 - "No drop found to land on hit": give `drop`, or leave `hit` out.
 - "No way to fit this track to that length": try without `hit`, or with another `end`.
-- "The track is silent", "The track has no whole bar of music" or "<file> has no audio stream": ask the user for another file.
+- "The track is silent", "The track has no whole bar of music", "<file> has no audio stream" or "ffmpeg reads no sound in <file>": ask the user for another file.
+- "Cannot read <file>:" and why, as "it is cut short or damaged" or ffmpeg's own words: ask the user for a whole copy of that file, or one in a common format such as WAV, MP3 or MP4, one without the tag for "it starts with an ID3v2 tag", and an MP4 copy of a video for "ffmpeg finds no size for its picture".
+- A file cut short or damaged can also read as a shorter one, or one with no sound: when a length or a sound is not what the user said, ask for a whole copy.
 - "<video> has sound of its own for <time> of its <length> s, so say what becomes of it with video_sound": ask the user whether it is effects, speech or music, and give `video_sound`.
 - "and length is <length> s: give length <seconds>": give `length` those seconds.
 <!-- hosted -->
@@ -200,7 +199,7 @@ Warnings come with a done job, in `FIT.md` too:
 - "The bars may have three beats" or "The bars have three beats": when the cuts sound off, fit again with `meter`.
 - "No steady beat found" or "The beat is weak": the parts join with one-second crossfades, so listen to every seam.
 - "Only <N> s of the track comes before its drop": an earlier `hit`, or a later `drop`.
-- "The voice runs <N> s past the end" or "No speech was found in the voice track": check the voice with the user.
+- "The voice runs <how far> past the end" or "No speech was found in the voice track": check the voice with the user.
 - `FIT.md` says "no clear drop was found", or names the wrong drop: give `drop` a candidate `analyze_music` listed.
 
 ## Hand over
