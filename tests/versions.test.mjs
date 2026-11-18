@@ -15,6 +15,14 @@ test('every manifest carries the version in package.json', () => {
   assert.equal(server.name, mcpName);
 });
 
+// A release commit moves the lockfile's root with the other version fields, as npm install writes it from package.json (kit
+// lessons 9.5).
+test('the lockfile\'s root carries the version in package.json', () => {
+  const lock = read('package-lock.json');
+  assert.equal(lock.version, version);
+  assert.equal(lock.packages[''].version, version);
+});
+
 test('the MCP configs and the README run the release in package.json', () => {
   for (const file of ['mcp.json', '.mcp.json']) {
     assert.deepEqual(read(file).mcpServers.makersmcp.args, ['-y', `makersmcp@${version}`], file);
