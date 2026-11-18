@@ -112,7 +112,7 @@ check_video {"film": "https://example.com/with-music.mp4", "cues": "https://exam
 - A track with no steady beat has no beats, and the check refuses its cues.
 - A launch film cuts on the bars of its own look's music, so a track at another tempo lands some cuts off its beat. That is how it was made, and nothing here retimes the film: tell the user.
 <!-- with fit_music -->
-- A cues length warning means the cues are for another length: fit the track to the video's exact length.
+- A cues length warning means the cues are for another length: fit the track to the video's length, to a frame.
 <!-- end -->
 <!-- without fit_music -->
 - A cues length warning means the track the cues are of is longer or shorter than the video by more than a second.

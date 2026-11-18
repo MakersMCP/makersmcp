@@ -2,7 +2,7 @@
 name: music
 title: Music fitted to a film or a demo
 index: analyze_music and fit_music: a track fitted to a film or a demo and laid under it, the hit, a voice
-description: Fits a music track to a video's exact length with musicfit, lands its drop on a chosen moment, ducks it under a voice, sets its loudness and lays it under the video, keeping, voicing or dropping the video's own sound. Use it when a track from the user, a library or a music model has to fit a launch film, a demo or any cut.
+description: Fits a music track to a video's length, to a frame, with musicfit, lands its drop on a chosen moment, ducks it under a voice, sets its loudness and lays it under the video, keeping, voicing or dropping the video's own sound. Use it when a track from the user, a library or a music model has to fit a launch film, a demo or any cut.
 kit: musicfit
 requires: [musicfit, fit_music]
 optional: [easyscreenshotkit, reframekit, check_video, make_launch_film, plan_launch_film]
@@ -10,11 +10,11 @@ order: 70
 ---
 # Music fitted to a film or a demo
 
-`fit_music` makes a music track exactly as long as a video by cutting or looping whole bars, lands its drop on a chosen moment (the hit), ends it on a beat, ducks it under a voice and sets its loudness. Given the video, it also writes video.mp4: the video's picture as it was, with the track under it. `analyze_music` reads the track's tempo, bars, drop and ending first.
+`fit_music` makes a music track as long as a video by cutting or looping whole bars, lands its drop on a chosen moment (the hit), ends it on a beat, ducks it under a voice and sets its loudness. Given the video, it also writes video.mp4: the video's picture as it was, with the track under it. `analyze_music` reads the track's tempo, bars, drop and ending first.
 
 ## Decide first
 
-- The video's exact length, its frame rate and the moment for the drop: the next section says where each comes from.
+- The video's length to a frame, its frame rate and the moment for the drop: the next section says where each comes from.
 - The track: any file ffmpeg reads, a video's sound too. No tool here makes music, so when the user has none, say so and ask for one. An instrumental a little longer than the video fits best: seams follow bars and can cut a sung line, and the tempo and pitch never change.
 - The video's own sound, when the track goes under it as `video`: `video_sound` keep for sound effects, voice for speech, drop for music of its own. A video with more than a faint room tone is refused until it is given, so ask the user what that sound is when it is not known.
 - Never call a track cleared for use: musicfit does not check rights.
@@ -57,9 +57,6 @@ analyze_music {"track": "https://example.com/track.mp3"}
 ```
 <!-- end -->
 2. Fit it with `fit_music`: `length` and `hit` as text, like "29.333" or "600f", `fps` the video's, and the video as `video` with its `video_sound`. Give `drop` only when the drop `FIT.md` names is not the one the user means.
-<!-- hosted -->
-   A `length` in frames with a `video` needs `fps` here, or the call is refused before any job starts.
-<!-- end -->
 <!-- with make_launch_film, plan_launch_film -->
    For a launch film, `length` is its `seconds`, `hit` its logo `start` and `fps` {fact:launch-film.fps}.
 <!-- local -->
@@ -110,7 +107,7 @@ The track then replaces the video's sound. With a `voice`, give `mix.wav` instea
 <!-- hosted -->
 Without `video`, nothing here lays the track: hand over the links to the video and the track.
 <!-- end -->
-A track handed over alone goes under the whole video from its first frame, in the app the user cuts video with, without trimming or stretching it: it is already exactly as long.
+A track handed over alone goes under the whole video from its first frame, in the app the user cuts video with, without trimming or stretching it: it is already as long, to a frame.
 
 <!-- with check_video -->
 ## Checking it
@@ -183,11 +180,14 @@ A failed `fit_music` or `analyze_music` job gives its reason:
 - "The track is silent", "The track has no whole bar of music" or "<file> has no audio stream": ask the user for another file.
 - "<video> has sound of its own for <time> of its <length> s, so say what becomes of it with video_sound": ask the user whether it is effects, speech or music, and give `video_sound`.
 - "and length is <length> s: give length <seconds>": give `length` those seconds.
+<!-- hosted -->
+  Here, past 20 minutes with a `video`, 12 with a `voice` too, and less with more sound (Every parameter, above), ask the user for a shorter cut.
+<!-- end -->
 <!-- local -->
 - "longer than the hour length takes at most": ask the user for a cut of an hour or less, with `length` set to its length.
 <!-- end -->
 <!-- hosted -->
-- "longer than the hour length takes at most", or "fit_music makes a fit only as long as its video" for a video whose picture runs past the hour by what its file states, a Matroska or WebM picture counting as long as the whole file: ask the user for a cut of an hour or less, with `length` set to its length.
+- "longer than the hour length takes at most", or "fit_music makes a fit only as long as its video" for a video whose picture runs past the hour by what its file states, a Matroska or WebM picture counting as long as the whole file: ask the user for a cut a job here takes, as above, with `length` set to its length.
 <!-- end -->
 - "shorter than the 1 second length takes at least": ask the user for a longer cut.
 <!-- local -->
