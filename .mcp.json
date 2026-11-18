@@ -2,7 +2,7 @@
   "mcpServers": {
     "makersmcp": {
       "command": "npx",
-      "args": ["-y", "makersmcp@0.2.1"]
+      "args": ["-y", "makersmcp@0.2.2"]
     }
   }
 }
