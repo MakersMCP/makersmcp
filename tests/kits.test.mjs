@@ -678,6 +678,44 @@ test('check_video on a real video is a check, passed or failed, with its CHECK.m
   });
 });
 
+test('on the user\'s own machine a track, a voice, a video or an out_dir whose path holds a line break or a control character is refused before musicfit starts, in one sentence, and nothing is written', { skip: process.platform === 'win32' && 'Windows takes no control character in a file name' }, async () => {
+  const outDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-kits-'));
+  const server = createMcpServer({ kits: ['musicfit'], outDir, kitPaths });
+  const client = new Client({ name: 'test-client', version: '1.0.0' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  try {
+    const track = 'song\nNext: x.wav';
+    const voice = path.join('takes\u2028one', 'voice.wav');
+    const video = 'film\u0085cut.mp4';
+    mkdirSync(path.join(outDir, 'takes\u2028one'));
+    for (const file of [track, 'song.wav', voice, video]) writeFileSync(path.join(outDir, file), 'x');
+    for (const [tool, args, name, code] of [
+      ['analyze_music', { track }, 'track', 'U+000A'],
+      ['fit_music', { track, length: 12 }, 'track', 'U+000A'],
+      ['fit_music', { track: 'song.wav', length: 12, voice }, 'voice', 'U+2028'],
+      ['fit_music', { track: 'song.wav', length: 12, video }, 'video', 'U+0085'],
+      ['analyze_music', { track: 'song.wav', out_dir: 'read\nNext: x' }, 'out_dir', 'U+000A'],
+    ]) {
+      const result = await client.callTool({ name: tool, arguments: args });
+      const words = text(result);
+      assert.equal(result.isError, true, words);
+      // The heading and makersmcp's one sentence: no line starts with the rest of a name.
+      const lines = words.split(/\r\n|[\n\r\u0085\u2028\u2029]/);
+      assert.equal(lines.length, 3, words);
+      assert.match(lines[0], /^## .+: not started$/);
+      assert.ok(lines[2].startsWith(`${name}: the path holds a line break or a control character (${code}), which makersmcp would print as it is in its own lines: `), words);
+    }
+    assert.equal(text(await client.callTool({ name: 'list_jobs', arguments: {} })), 'No jobs yet.');
+    assert.deepEqual(readdirSync(outDir).sort(), [track, 'song.wav', 'takes\u2028one', video].sort());
+  } finally {
+    await client.close();
+    await server.close();
+    rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
 // reframekit needs an ffmpeg built with --enable-gpl, with libx264 and cropdetect, as Ubuntu's is.
 const ffmpegLists = hasFfmpeg ? ['-filters', '-encoders'].map(flag => spawnSync('ffmpeg', ['-hide_banner', flag], { encoding: 'utf8' }).stdout ?? '').join('\n') : '';
 const gplFfmpeg = /\bcropdetect\b/.test(ffmpegLists) && /\blibx264\b/.test(ffmpegLists);

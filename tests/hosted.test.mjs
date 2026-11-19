@@ -200,6 +200,14 @@ test('a hosted file param refuses a local path, and a job the service refuses is
   });
 });
 
+test('hosted, an earlier job\'s file whose path holds a control character the schema lets through goes to the service as it is, which keeps its own files', async () => {
+  await withHosted(async (client, backend) => {
+    const result = await client.callTool({ name: 'fake_file', arguments: { file: 'job:job0/film\u0001.json', wait_seconds: 0 } });
+    assert.equal(result.structuredContent.status, 'running', text(result));
+    assert.deepEqual(backend.started.map(entry => entry.input.file), ['job:job0/film\u0001.json']);
+  });
+});
+
 test('hosted, a call that gives out_dir is refused with why, and starts nothing', async () => {
   await withHosted(async (client, backend) => {
     const result = await client.callTool({ name: 'fake_make', arguments: { url: 'https://example.com', out_dir: 'mine' } });

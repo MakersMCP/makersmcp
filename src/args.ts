@@ -75,6 +75,16 @@ export function textPattern(param: ParamDefinition): RegExp {
   return inFull(param.pattern);
 }
 
+/**
+ * Whether the kit gets a parameter's value as a path: every value of a path, and a value of a
+ * url_or_path or a text_or_path that is no link, or no text the parameter takes as it is.
+ */
+function readsAsPath(param: ParamDefinition, text: string): boolean {
+  if (param.type === 'url_or_path') return !isUrl(text);
+  if (param.type === 'text_or_path') return !textPattern(param).test(text);
+  return param.type === 'path';
+}
+
 /** The host part of a folder name, the way the kits name theirs: launch-film-linear.app. */
 export function hostOf(value: string): string | undefined {
   if (!isUrl(value)) return undefined;
@@ -135,8 +145,7 @@ export function buildCommand(
     if (value === undefined || value === null || value === '') continue;
     if (param.type === 'path' || param.type === 'url_or_path' || param.type === 'text_or_path') {
       const text = String(value);
-      const kept = (param.type === 'url_or_path' && isUrl(text))
-        || (param.type === 'text_or_path' && textPattern(param).test(text));
+      const kept = !readsAsPath(param, text);
       // A kit that tells a file by the value itself, like one that ends in .json, takes what it
       // matches for a file, a link too, and anything else for an address.
       const asFile = param.type === 'url_or_path' && param.filePattern !== undefined ? inFull(param.filePattern) : undefined;
@@ -707,10 +716,36 @@ function namesInWords(names: string[]): string {
 }
 
 // The C0 and C1 control characters and the line and paragraph separators, each a line break or a
-// character that does not show. A folder named after a file, like musicfit-{stem:track}, takes _
-// for each of them in the file's name: makersmcp's own lines print the folder as it is, and a line
-// break there would start a line of their own with the rest of the name.
+// character that does not show. makersmcp's own lines print a folder and a path as they are, and a
+// line break there would start a line of their own with the rest of the name: so a folder named
+// after a file, like musicfit-{stem:track}, takes _ for each of them in the file's name, and on the
+// user's own machine a call that gives a path holding one starts nothing (unprintablePath).
 const LINE_BREAK_OR_CONTROL = /[\u0000-\u001f\u0080-\u009f\u2028\u2029]/g;
+
+/**
+ * The sentence that refuses a call on the user's own machine whose path, a file's or out_dir,
+ * holds a character of LINE_BREAK_OR_CONTROL, which makersmcp's own lines, like the Folder and
+ * Next lines and its refusals, would print as it is; undefined for a call that gives no such
+ * path. A link, or the text a parameter takes as it is, is no path, so it is not looked at here.
+ */
+export function unprintablePath(tool: ToolDefinition, input: Record<string, unknown>): string | undefined {
+  const paths: Array<[string, string]> = [];
+  for (const [name, param] of Object.entries(tool.params)) {
+    const value = input[name];
+    if (typeof value === 'string' && readsAsPath(param, value)) paths.push([name, value]);
+  }
+  if (tool.out?.flag && typeof input.out_dir === 'string') paths.push(['out_dir', input.out_dir]);
+  for (const [name, value] of paths) {
+    const at = value.search(LINE_BREAK_OR_CONTROL);
+    if (at < 0) continue;
+    const code = `U+${value.charCodeAt(at).toString(16).toUpperCase().padStart(4, '0')}`;
+    const fix = name === 'out_dir'
+      ? 'give another out_dir'
+      : 'ask the user to rename the file or the folder whose name holds it, or copy the file to a path without it and give that one';
+    return `${name}: the path holds a line break or a control character (${code}), which makersmcp would print as it is in its own lines: ${fix}.`;
+  }
+  return undefined;
+}
 
 /** Fills {host}, {dir:param}, {stem:param} and {param}, or gives undefined. */
 function fill(template: string, tool: ToolDefinition, values: Record<string, unknown>): string | undefined {

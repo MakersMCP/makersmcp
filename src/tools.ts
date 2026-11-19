@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { textPattern } from './args.js';
+import { textPattern, unprintablePath } from './args.js';
 import { NotStartedError, type AvailableKit, type JobView, type KitBackend } from './backend.js';
 import { strictInput } from './input.js';
 import type { ParamDefinition, ToolDefinition } from './kits.js';
@@ -377,6 +377,10 @@ export function registerKitTool(server: McpServer, context: ToolContext, kit: Av
       if (hosted) for (const [name, param] of Object.entries(tool.params)) if (param.where === 'local' && param.hostedDefault !== undefined) args[name] = param.hostedDefault;
       // The kit, and a hosted service, check text: a number given for one is written as text.
       for (const name of numbers) if (typeof args[name] === 'number') args[name] = String(args[name]);
+      // Here makersmcp's own lines print the paths a call gives as they are, so a line break in one would start a line of
+      // their own: such a call starts nothing. Hosted, a file comes as a link or an earlier job's, which holds no whitespace.
+      const unprintable = hosted ? undefined : unprintablePath(tool, args);
+      if (unprintable) return errorResult(`## ${tool.title}: not started\n\n${unprintable}`);
 
       // An identical call whose answer did not reach the client, one that ended in an error after
       // its job started, or one still waiting since retryAfterMs, is this call's own: it

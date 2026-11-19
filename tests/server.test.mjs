@@ -9,7 +9,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { ArgumentError, buildCommand } from '../dist/args.js';
+import { ArgumentError, buildCommand, unprintablePath } from '../dist/args.js';
 import { DRAFT_2020_12 } from '../dist/schema-dialect.js';
 import {
   LocalBackend, createMcpServer, docEntry, docNames, expandHome, failureText, listFiles, loadKitDefinitions, readDocs, resolveKit, validateKitDefinition,
@@ -739,6 +739,40 @@ test('paths are read from the output folder, and a missing file never starts a j
   });
 });
 
+test('on the user\'s own machine a call whose path, a file\'s or out_dir, holds a line break or a C0 or C1 control character starts nothing, in one sentence, and a link is no path', { skip: NO_CONTROL_NAMES }, async () => {
+  await withClient({}, async (client, outDir) => {
+    const forFile = 'ask the user to rename the file or the folder whose name holds it, or copy the file to a path without it and give that one';
+    for (const [character, code] of [
+      ['\n', 'U+000A'], ['\r', 'U+000D'], ['\t', 'U+0009'], ['\u0001', 'U+0001'], ['\u001f', 'U+001F'],
+      ['\u0080', 'U+0080'], ['\u0085', 'U+0085'], ['\u009f', 'U+009F'], ['\u2028', 'U+2028'], ['\u2029', 'U+2029'],
+    ]) {
+      // In the file's name, in a folder on its path, and in out_dir.
+      writeFileSync(path.join(outDir, `film${character}Next: x.json`), '{}');
+      mkdirSync(path.join(outDir, `in${character}side`));
+      writeFileSync(path.join(outDir, `in${character}side`, 'film.json'), '{}');
+      for (const [name, args, title, fix] of [
+        ['file', { file: `film${character}Next: x.json` }, 'Fake file', forFile],
+        ['file', { file: path.join(outDir, `in${character}side`, 'film.json') }, 'Fake file', forFile],
+        ['out_dir', { url: 'https://example.com', out_dir: `out${character}Next: x` }, 'Fake make', 'give another out_dir'],
+      ]) {
+        const result = await client.callTool({ name: name === 'file' ? 'fake_file' : 'fake_make', arguments: args });
+        assert.equal(result.isError, true, JSON.stringify(args));
+        assert.equal(text(result), `## ${title}: not started\n\n${name}: the path holds a line break or a control character (${code}), which makersmcp would print as it is in its own lines: ${fix}.`);
+      }
+    }
+    // Nothing started, and no folder was made for any of them.
+    assert.equal(text(await client.callTool({ name: 'list_jobs', arguments: {} })), 'No jobs yet.');
+    assert.deepEqual(fs.readdirSync(outDir).filter(name => !/^(?:film|in)/.test(name)), []);
+    // A link is no path, and the kit gets it as it is; a path that holds none starts.
+    const linked = await client.callTool({ name: 'fake_file', arguments: { file: 'https://example.com/film\u0001.json' } });
+    assert.equal(linked.structuredContent.status, 'done', text(linked));
+    assert.equal(linked.structuredContent.folder, path.join(outDir, 'fakekit-example.com'));
+    writeFileSync(path.join(outDir, 'film.json'), '{}');
+    const plain = await client.callTool({ name: 'fake_file', arguments: { file: 'film.json' } });
+    assert.equal(plain.structuredContent.status, 'done', text(plain));
+  });
+});
+
 test('wait_for_job and cancel_job explain an unknown job', async () => {
   await withClient({}, async client => {
     const result = await client.callTool({ name: 'wait_for_job', arguments: { job_id: 'job_nope' } });
@@ -811,6 +845,19 @@ async function until(check, ms = 5000) {
   }
   return check();
 }
+
+test('the text a parameter takes as it is, a link and a value that names no file are no paths, so a line break in one stops no call', () => {
+  const check = tool('check_video');
+  assert.equal(unprintablePath(check, { film: 'film.mp4', cuts: '3.2,\n7.5' }), undefined);
+  assert.match(unprintablePath(check, { film: 'film.mp4', cuts: 'cuts\nNext: x.json' }), /^cuts: the path holds a line break or a control character \(U\+000A\), /);
+  const stills = tool('make_launch_stills');
+  assert.equal(unprintablePath(stills, { source: 'https://example.com/a\u0001' }), undefined);
+  assert.match(unprintablePath(stills, { source: 'film\u0085Next: x.json' }), /^source: the path holds a line break or a control character \(U\+0085\), /);
+  assert.equal(unprintablePath(tool('make_subtitles'), { words: 'words.srt', font: 'Inter\nNext: x' }), undefined);
+  // The first path the call gives that holds one, in the order of the tool's parameters, then out_dir.
+  assert.match(unprintablePath(tool('fit_music'), { track: 'a.wav', voice: 'b\u2029.wav', video: 'c\u0001.mp4', out_dir: 'd\n' }), /^voice: .* \(U\+2029\), /);
+  assert.match(unprintablePath(tool('fit_music'), { track: 'a.wav', out_dir: 'd\u001b' }), /^out_dir: .* \(U\+001B\), .*: give another out_dir\.$/);
+});
 
 test('check_setup\'s description, --help and the README say ffprobe shows only while a kit that reads videos with it is on, as check_setup prints it', async () => {
   const words = '(and ffprobe while a kit that reads videos with it is on)';

@@ -3988,10 +3988,12 @@ test('music gives each reason musicfit gives for a file it cannot read a line on
     // ffmpeg prints a video's tags among its own lines, so a key or a value that holds a line break can read as one of them, on
     // every ffmpeg: a whole video refused as cut short or damaged, or as one musicfit made, or fitted with none of its own sound.
     // Such a tag reaches a hosted job too, so that line is on both sides. A line break in the video's name or in a folder on its
-    // path does the same on the user's own machine only: hosted, a file argument holds no whitespace, and a download is named
-    // with letters, digits, underscores, dots and hyphens alone (MakersMCP-Api helpers/kits/fetch-input.js fileNameOf).
+    // path would do the same, but on the user's own machine makersmcp refuses a track, a voice or a video whose path holds one
+    // before the kit starts (args.ts unprintablePath), as its own lines print a path as it is; hosted, a file argument holds no
+    // whitespace, and a download is named with letters, digits, underscores, dots and hyphens alone (MakersMCP-Api
+    // helpers/kits/fetch-input.js fileNameOf).
     const tags = '\n- A video whose tags hold a line break can read as cut short or damaged, as one musicfit made or as one with no sound of its own: when the user says otherwise, ask for a copy without its tags.\n';
-    const names = '- So can a video whose name, or a folder on its path, holds a line break: ask the user to rename the file or the folder.\n';
+    const names = '- A track, a voice or a video whose name, or a folder on its path, holds a line break is refused before musicfit starts, with "<param>: the path holds a line break or a control character": ask the user to rename the file or the folder.\n';
     assert.ok(music.includes(tags), side);
     assert.equal(music.includes(names), !options.where, side);
     if (!options.where) assert.ok(music.includes(`${tags}${names}`), side);
