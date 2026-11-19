@@ -3660,6 +3660,10 @@ test('hosted, music says the fit itself counts toward a job\'s memory as MakersM
   assert.equal(counted.length, 9);
   for (const entry of counted) assert.ok(entry.includes(', each sound counted as long as its file states. '), entry);
   assert.ok(!errors.some(entry => /a few times over|whole in memory|a longer one needs more than a job has here/.test(entry)));
+  // That change is on no branch yet, so the about text says where it waits and names no branch as holding it.
+  const { about } = readJson(path.join(here, 'fixtures', 'hosted-errors.json'));
+  assert.match(about, /as the change to MakersMCP-Api for musicfit 0\.2\.3 words them, which no branch holds on [\d-]+: it waits as a patch, api-musicfit-023\.patch,/);
+  assert.doesNotMatch(about, /feature\/makersmcp-022/);
   // The numbers come from MakersMCP-Api's figures (video-bounds.js SOUND_SECONDS, FIT_HELD_SECONDS, FIT_SECONDS, FIT_SHARE and
   // fitCopies), as tests/fixtures/hosted-errors.json records them.
   const { soundSeconds, fitHeldSeconds, fitSeconds, fitShare, fitCopies } = hostedBounds();
