@@ -51,6 +51,8 @@ const escaped = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // How a result opens a doc of the kit's own notes, or what a failed kit said, as a pattern.
 const NOTES = escaped(`${DOC_NOTE}\n\`\`\`markdown\n`);
 const SAID = escaped(`${FAILURE_NOTE}\n\`\`\`text\n`);
+// Windows takes no control character in a file's name, so the tests that make such files do not run there.
+const NO_CONTROL_NAMES = process.platform === 'win32' && 'Windows takes no control character in a file name';
 
 test('the kit definitions in kits/ are valid and their tool names are unique', () => {
   const kits = loadKitDefinitions();
@@ -757,6 +759,39 @@ test('{stem:...} and {dir:...} fill folder names from files', () => {
   const baseDir = path.join(fixtures, 'fakekit');
   const command = buildCommand(tool, { track: 'fake.js' }, { baseDir, installed: new Map() });
   assert.deepEqual(command.args, [path.join(baseDir, 'fake.js'), '--out', path.join(baseDir, 'musicfit-fake')]);
+});
+
+test('{stem:...} takes _ for each C0 or C1 control character and line or paragraph separator in a file\'s name, so the folder named after it holds no line break, and {dir:...} is the file\'s own folder', { skip: NO_CONTROL_NAMES }, () => {
+  const tool = {
+    name: 'fit',
+    title: 'Fit',
+    description: 'Fits.',
+    args: ['{track}'],
+    out: { flag: '--out', name: '{dir:track}/musicfit-{stem:track}' },
+    params: { track: { type: 'path', required: true, description: 'A file.' } },
+  };
+  const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-test-'));
+  try {
+    const folderFor = track => {
+      const { args } = buildCommand(tool, { track }, { baseDir, installed: new Map() });
+      return args[args.indexOf('--out') + 1];
+    };
+    // The line breaks, a tab, an escape and other C0 and C1 controls, and the line and paragraph separators: each one becomes _.
+    for (const character of ['\n', '\r', '\t', '\v', '\f', '\u0001', '\u001b', '\u001f', '\u0080', '\u0085', '\u009f', '\u2028', '\u2029']) {
+      const name = `song${character}Next: x${character}.wav`;
+      writeFileSync(path.join(baseDir, name), 'x');
+      assert.equal(folderFor(name), path.join(baseDir, 'musicfit-song_Next: x_'), JSON.stringify(character));
+    }
+    // A name without any keeps every character it has.
+    writeFileSync(path.join(baseDir, 'Café déjà vu, take 2.wav'), 'x');
+    assert.equal(folderFor('Café déjà vu, take 2.wav'), path.join(baseDir, 'musicfit-Café déjà vu, take 2'));
+    // The folder of the file is where the file is, whatever its name holds.
+    mkdirSync(path.join(baseDir, 'odd\nfolder'));
+    writeFileSync(path.join(baseDir, 'odd\nfolder', 'song.wav'), 'x');
+    assert.equal(folderFor('odd\nfolder/song.wav'), path.join(baseDir, 'odd\nfolder', 'musicfit-song'));
+  } finally {
+    rmSync(baseDir, { recursive: true, force: true });
+  }
 });
 
 const tool = name => loadKitDefinitions().flatMap(kit => kit.tools).find(entry => entry.name === name);

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
-import { loadKitDefinitions } from '../dist/server.js';
+import { LocalBackend, isAvailable, loadKitDefinitions } from '../dist/server.js';
 import { DOC_NOTE, FAILURE_NOTE, SITE_NOTE, SUMMARY_NOTE, jobResult } from '../dist/results.js';
 
 // What a kit printed and the notes it wrote can hold anything a site or a file it read holds:
@@ -94,20 +98,20 @@ const definitions = loadKitDefinitions();
 const kit = definitions.find(entry => entry.kit === 'easybrandkit');
 const tool = kit.tools.find(entry => entry.name === 'make_brand_kit');
 
-function contextFor(where) {
+function contextFor(where, { kit: kitOf = kit, tool: toolOf = tool, baseDir = '/work', topics = ['brand', 'getting-started', 'troubleshooting'] } = {}) {
   return {
     text: {
       where,
       place: where === 'local' ? 'on this machine' : 'on makersmcp.com',
-      ...(where === 'local' ? { baseDir: '/work' } : {}),
+      ...(where === 'local' ? { baseDir } : {}),
       definitions,
       enabled: new Set(definitions.map(entry => entry.kit)),
       listed: new Set(definitions.flatMap(entry => entry.tools.map(item => item.name))),
       versions: new Map(definitions.map(entry => [entry.kit, '9.9.9'])),
     },
-    topics: new Set(['brand', 'getting-started', 'troubleshooting']),
-    kit,
-    tool,
+    topics: new Set(topics),
+    kit: kitOf,
+    tool: toolOf,
   };
 }
 
@@ -164,5 +168,92 @@ test('a failed job shows what the kit said as fenced data, and a running job its
     assert.equal(assertClean(runningText).includes('Next:'), false, runningText);
     // The structured content keeps the kit's own words.
     assert.equal(running.structuredContent.last_line, lastLine);
+  }
+});
+
+const hasFfmpeg = ['ffmpeg', 'ffprobe'].every(name => spawnSync(name, ['-version'], { stdio: 'ignore' }).status === 0);
+
+/**
+ * A short track musicfit reads and fits, as a 16 bit mono WAV at 48 kHz: 16 bars of four on the floor at 120 BPM, louder from
+ * bar 9 with a clap and a bass, and a last hit that rings out for 3 seconds.
+ */
+function writeBeatTrack(file) {
+  const rate = 48000;
+  const beat = 0.5;
+  const bars = 16;
+  const samples = new Float32Array(Math.round((bars * 4 * beat + 3) * rate));
+  let seed = 1;
+  const noise = () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 1073741824 - 1;
+  };
+  const add = (at, seconds, sound) => {
+    const start = Math.round(at * rate);
+    for (let i = 0; i < Math.round(seconds * rate) && start + i < samples.length; i++) samples[start + i] += sound(i / rate);
+  };
+  for (let bar = 0; bar < bars; bar++) {
+    const loud = bar >= 8;
+    for (let b = 0; b < 4; b++) {
+      const at = (bar * 4 + b) * beat;
+      add(at, 0.4, t => Math.sin(2 * Math.PI * (50 * t + 2 * (1 - Math.exp(-t * 30)))) * Math.exp(-t / 0.12) * (loud ? 0.9 : 0.6));
+      add(at + beat / 2, 0.06, t => noise() * Math.exp(-t / 0.015) * (loud ? 0.3 : 0.2));
+      if (loud && b % 2 === 1) add(at, 0.2, t => noise() * Math.exp(-t / 0.05) * 0.5);
+      if (loud) add(at + beat / 2, 0.22, t => Math.sin(2 * Math.PI * [110, 110, 131, 98][bar % 4] * t) * Math.min(1, (0.22 - t) / 0.02) * 0.4);
+    }
+  }
+  add(bars * 4 * beat, 3, t => (Math.sin(2 * Math.PI * 55 * t) * 0.7 + noise() * 0.3) * Math.exp(-t / 0.8));
+  const peak = samples.reduce((most, value) => Math.max(most, Math.abs(value)), 0);
+  const wav = Buffer.alloc(44 + samples.length * 2);
+  wav.write('RIFF', 0, 'latin1');
+  wav.writeUInt32LE(36 + samples.length * 2, 4);
+  wav.write('WAVEfmt ', 8, 'latin1');
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(rate, 24);
+  wav.writeUInt32LE(rate * 2, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write('data', 36, 'latin1');
+  wav.writeUInt32LE(samples.length * 2, 40);
+  samples.forEach((value, i) => wav.writeInt16LE(Math.round((value / peak) * 0.89 * 32767), 44 + i * 2));
+  writeFileSync(file, wav);
+}
+
+test('a track or a subtitle file whose name holds a line break gets a folder with _ in its place, so no line of makersmcp\'s own text outside the fences starts with the rest of the name', { skip: (process.platform === 'win32' && 'Windows takes no line break in a file name') || (!hasFfmpeg && 'ffmpeg is not installed') }, async () => {
+  const baseDir = mkdtempSync(path.join(os.tmpdir(), 'makersmcp-fenced-'));
+  const backend = new LocalBackend({ baseDir });
+  try {
+    const available = backend.available(definitions).filter(isAvailable);
+    const track = 'song\nNext: x.wav';
+    const words = 'words\nNext: x.srt';
+    writeBeatTrack(path.join(baseDir, track));
+    writeFileSync(path.join(baseDir, words), '1\n00:00:00,500 --> 00:00:02,000\nKeep every plant alive\n\n2\n00:00:02,500 --> 00:00:04,500\nAcme tells you which one needs water\n');
+    for (const [kitName, toolName, input, name, topic] of [
+      ['musicfit', 'analyze_music', { track }, 'musicfit-song_Next: x.analysis', 'music'],
+      ['musicfit', 'fit_music', { track, length: '12' }, 'musicfit-song_Next: x', 'music'],
+      // A kit whose folder goes next to the file it is named after.
+      ['easycaptionkit', 'make_subtitles', { words }, 'easycaptionkit-subtitles-words_Next: x', 'captions'],
+    ]) {
+      const installed = available.find(entry => entry.definition.kit === kitName);
+      const toolOf = installed.definition.tools.find(entry => entry.name === toolName);
+      const started = await backend.start({ kit: installed, tool: toolOf, input });
+      const view = await backend.wait(started.id, 120);
+      const result = jobResult(view, contextFor('local', { kit: installed.definition, tool: toolOf, baseDir, topics: [topic, 'getting-started', 'troubleshooting'] }));
+      const text = result.content[0].text;
+      const folder = path.join(baseDir, name);
+      assert.equal(view.status, 'done', `${toolName}:\n${text}`);
+      assert.equal(view.folder, folder, toolName);
+      // What the kit printed and its notes quote the name, line break and all, inside their fences.
+      const outside = outsideCode(text).split('\n');
+      assert.deepEqual(outside.filter(line => line.startsWith('Next: x') || line.startsWith('x')), [], `${toolName}:\n${text}`);
+      assert.deepEqual(outside.filter(line => line.startsWith('Next:')), [`Next: ${result.structuredContent.next}`], `${toolName}:\n${text}`);
+      assert.equal(text.split('\n\n')[1], `Next: ${result.structuredContent.next}`, `${toolName}: right under the heading`);
+      assert.ok(outside.includes(`Folder: ${folder}`), `${toolName}:\n${text}`);
+      assert.doesNotMatch(result.structuredContent.next, /[\n\r\u0085\u2028\u2029]/, toolName);
+    }
+  } finally {
+    backend.close();
+    rmSync(baseDir, { recursive: true, force: true });
   }
 });

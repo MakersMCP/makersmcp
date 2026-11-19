@@ -706,6 +706,12 @@ function namesInWords(names: string[]): string {
   return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]!;
 }
 
+// The C0 and C1 control characters and the line and paragraph separators, each a line break or a
+// character that does not show. A folder named after a file, like musicfit-{stem:track}, takes _
+// for each of them in the file's name: makersmcp's own lines print the folder as it is, and a line
+// break there would start a line of their own with the rest of the name.
+const LINE_BREAK_OR_CONTROL = /[\u0000-\u001f\u0080-\u009f\u2028\u2029]/g;
+
 /** Fills {host}, {dir:param}, {stem:param} and {param}, or gives undefined. */
 function fill(template: string, tool: ToolDefinition, values: Record<string, unknown>): string | undefined {
   let ok = true;
@@ -726,7 +732,7 @@ function fill(template: string, tool: ToolDefinition, values: Record<string, unk
       return '';
     }
     if (fn === 'dir') return path.dirname(value);
-    if (fn === 'stem') return path.basename(value, path.extname(value));
+    if (fn === 'stem') return path.basename(value, path.extname(value)).replace(LINE_BREAK_OR_CONTROL, '_');
     return value;
   });
   return ok ? filled : undefined;
