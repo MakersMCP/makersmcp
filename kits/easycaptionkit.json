@@ -31,7 +31,7 @@
         "max_chars": { "type": "integer", "flag": "--max-chars", "min": 8, "max": 80, "default": "what fits the safe width, at most 42", "description": "Characters a line may take, {bounds:caption_video.max_chars} (default: {default:caption_video.max_chars})." },
         "size": { "type": "number", "flag": "--size", "min": 2, "max": 20, "default": "6.5, or 9.5 for the word style", "description": "The letters' size in percent of a phone's width, or of the frame's short side, {bounds:caption_video.size} (default {default:caption_video.size}). A line too wide for the free space is drawn smaller." },
         "box": { "type": "boolean", "flag": "--box", "default": false, "description": "A dark box behind the words instead of an outline." },
-        "libass": { "type": "boolean", "flag": "--libass", "default": false, "where": "local", "description": "Draw the captions with ffmpeg's libass instead of Chrome, for a machine where Chrome cannot start; it needs an ffmpeg built with libass and draws no color emoji." }
+        "libass": { "type": "boolean", "flag": "--libass", "default": false, "where": "local", "description": "Draw the captions with ffmpeg's libass instead of Chrome, for a machine where Chrome cannot start; it needs an ffmpeg built with libass, and for a font kit's WOFF2 files one whose FreeType reads WOFF2, and draws no color emoji." }
       },
       "docs": ["CAPTIONS.md"],
       "writes": ["captioned.mp4", "captioned.timeline.json", "captions.srt", "captions.vtt", "captions.ass", "words.json", "captions.json", "sheet.png", "safe-zones.png", "CAPTIONS.md"],

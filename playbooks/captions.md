@@ -107,7 +107,7 @@ Only ads have published margins, and apps move their buttons, so tell the user t
 - `box`: a dark box behind the words instead of an outline.
 - `video`: for `caption_video` the video to caption, and for `make_subtitles` the video read for its size and length.
 <!-- local -->
-- `libass`, for `caption_video`: ffmpeg's libass draws the captions where Chrome cannot start, as in a container without its sandbox; it needs an ffmpeg built with libass and draws no color emoji.
+- `libass`, for `caption_video`: ffmpeg's libass draws the captions where Chrome cannot start, as in a container without its sandbox; it needs an ffmpeg built with libass and draws no color emoji. To draw letters from `fonts` whose files are WOFF2, as a font kit's mostly are, it needs an ffmpeg whose FreeType reads WOFF2, which a static build of BtbN's FFmpeg-Builds does not.
 - `out_dir`: easycaptionkit-<video's name> next to the video for `caption_video`. A run replaces the files an earlier run wrote there and leaves anything else.
 <!-- end -->
 <!-- local -->
@@ -141,7 +141,8 @@ A failed job gives its reason, and the folder is as it was:
 - CAPTIONS.md says the brand font was asked for by name and this machine does not have it: give `fonts`, a font kit.
 - CAPTIONS.md says some letters show as boxes: no font drew them. Never hand over a video with boxes in its captions; ask the user for a font kit whose font has those letters.
 <!-- local -->
-- "easycaptionkit needs Chrome", "easycaptionkit needs ffmpeg" or "easycaptionkit needs ffprobe": the troubleshooting topic. With no Chrome that starts, `libass` draws the captions without it.
+- "easycaptionkit needs Chrome", "easycaptionkit needs ffmpeg" or "easycaptionkit needs ffprobe": the troubleshooting topic. With no Chrome that starts, `libass` can draw the captions without it, from a font kit's WOFF2 files only with an ffmpeg whose FreeType reads them.
+- "This ffmpeg's libass cannot use" or "libass cannot be given" with `libass` and `fonts`: that font file is one the font kit gives for the weight and style captions.ass sets letters in, and libass cannot use it or is not given it, so the run stopped before it drew, also where the file is for letters the captions do not hold, as the file for another script of a family split by unicode-range. Ask the user for another file of the font, such as a TTF or OTF file, or, where the file is WOFF2 and this ffmpeg's FreeType reads no WOFF2, for an ffmpeg whose FreeType does, in FFMPEG_PATH; where Chrome starts, call `caption_video` again without `libass`. "ffmpeg failed when asked whether libass can use the font files": tell the user how that ffmpeg ended.
 <!-- end -->
 
 ## Hand over

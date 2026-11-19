@@ -62,7 +62,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "easybrandkit": "^0.4.2",
-    "easycaptionkit": "^0.1.4",
+    "easycaptionkit": "^0.1.5",
     "easyfontkit": "^0.1.5",
     "easyscreenshotkit": "^0.1.3",
     "launch-film": "^0.3.1",
