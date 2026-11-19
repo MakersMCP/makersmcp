@@ -3834,7 +3834,7 @@ test('music gives each reason musicfit gives for a video that is not length long
   for (const options of [{}, { where: 'hosted', limits: SERVER_LIMITS }]) {
     const side = JSON.stringify(options);
     const music = await readTopics(options, ['music']);
-    assert.ok(music.includes('\n- The video\'s length to a frame, its frame rate and the moment for the drop: '), side);
+    assert.ok(music.includes('\n- The video\'s length to a frame, its frame rate and the moment for the drop.\n'), side);
     assert.ok(music.includes('\n`fit_music` makes a music track as long as a video by cutting or looping whole bars, '), side);
     assert.ok(music.includes('without trimming or stretching it: it is already as long, to a frame.\n'), side);
     assert.doesNotMatch(music, /exact length|exactly as long/, side);
@@ -3966,17 +3966,31 @@ test('music gives each reason musicfit gives for a file it cannot read a line on
       assert.equal(lines.length, 1, `${side}: ${start}`);
       assert.ok(doubleQuoted(lines[0]).includes(quote) && quotedPattern(quote).test(said), `${side}: ${said} is not held by "${quote}" in ${lines[0]}`);
     }
-    // Each fix as musicfit's guide gives it: a whole copy, one in a common format, one without the tag, an MP4 copy.
-    assert.ok(music.includes(`\n${read}ask the user for a whole copy of that file, or one in a common format such as WAV, MP3 or MP4, one without the tag for "it starts with an ID3v2 tag", and an MP4 copy of a video for "ffmpeg finds no size for its picture".\n`), side);
+    // Each fix as musicfit's guide gives it: a whole copy, one in a common format, one without the tag, and one whose picture
+    // starts with its sound for a picture ffmpeg finds no size for, as that of a whole MPEG-TS whose picture starts some seconds
+    // after its sound. An MP4 copy of such a TS made the plain way holds only its sound on ffmpeg 4.4.2, 8.0.1 and 9.0.2, so no
+    // topic asks for an MP4 copy (below).
+    assert.ok(music.includes(`\n${read}ask the user for a whole copy of that file, or one in a common format such as WAV, MP3 or MP4, one without the tag for "it starts with an ID3v2 tag", and one whose picture starts with its sound for "ffmpeg finds no size for its picture".\n`), side);
     assert.ok(music.includes('\n- "ffmpeg finds no picture in <video>" or "<video> reads as a still picture": ask for the video, or a whole copy.\n'), side);
     // A file cut short or damaged can read as another file than it is (musicfit's Limits): a shorter or a longer one, one with no
     // sound or no picture, or only a still one, so the topic names no one shape and says when to ask for a whole copy.
     assert.ok(music.includes('\n- A file cut short or damaged can also read as another file than it is: when its length, its sound or its picture is not what the user said, ask for a whole copy.\n'), side);
     assert.doesNotMatch(music, /can also read as a shorter one, or one with no sound/, side);
     // Behind two or more ID3v2 tags ffmpeg 4.4 and 8 can take a file for another kind and go on, where ffmpeg 9, which the hosted
-    // service runs, refuses it with the tag named: the user's own machine may run either.
-    const twoTags = '\n- A file behind two or more ID3v2 tags can be taken for another kind: when the video\'s own sound, the track or the voice reads as none though the user says it has sound, ask for a copy without the tags.\n';
+    // service runs, refuses it with the tag named: the user's own machine may run either. A video taken so can read as another
+    // length than its own, which a refusal then gives as the length to use, so the user is asked whether it is that long first.
+    const twoTags = '\n- A file behind two or more ID3v2 tags can be taken for another kind: a video can then read as another length than its own and be refused with that length to use, so before you give `length` the seconds a refusal gives, ask the user whether the video is that long. When it is not, or when the video\'s own sound, the track or the voice reads as none though the user says it has sound, ask for a copy without the tags.\n';
     assert.equal(music.includes(twoTags), !options.where, side);
+    // ffmpeg prints a video's tags among its own lines, so a key or a value that holds a line break can read as one of them, on
+    // every ffmpeg: a whole video refused as cut short or damaged, or as one musicfit made, or fitted with none of its own sound.
+    // Such a tag reaches a hosted job too, so that line is on both sides. A line break in the video's name or in a folder on its
+    // path does the same on the user's own machine only: hosted, a file argument holds no whitespace, and a download is named
+    // with letters, digits, underscores, dots and hyphens alone (MakersMCP-Api helpers/kits/fetch-input.js fileNameOf).
+    const tags = '\n- A video whose tags hold a line break can read as cut short or damaged, as one musicfit made or as one with no sound of its own: when the user says otherwise, ask for a copy without its tags.\n';
+    const names = '- So can a video whose name, or a folder on its path, holds a line break: ask the user to rename the file or the folder.\n';
+    assert.ok(music.includes(tags), side);
+    assert.equal(music.includes(names), !options.where, side);
+    if (!options.where) assert.ok(music.includes(`${tags}${names}`), side);
     // The voice that is the video's own sound is read up to two seconds past the fit, so the warning says by how much only up
     // to a second and a half, and more than a second beyond that: the topic's quote holds both.
     const warned = '- "The voice runs <how far> past the end" or "No speech was found in the voice track": check the voice with the user.';
@@ -3984,6 +3998,19 @@ test('music gives each reason musicfit gives for a file it cannot read a line on
     for (const over of [0.8, PAST]) assert.ok(quotedPattern('The voice runs <how far> past the end').test(`The voice runs ${pastEnd(over)} past the end and was cut there.`), `${over}`);
     assert.equal(pastEnd(PAST), 'more than a second');
   }
+  // Those fixes are musicfit's own: its guide gives them to an assistant, and its README's Limits say why to a person.
+  const guide = readFileSync(path.join(dir, 'skills', 'musicfit', 'SKILL.md'), 'utf8');
+  const readme = readFileSync(path.join(dir, 'README.md'), 'utf8');
+  for (const words of [
+    '"ffmpeg finds no size for its picture" means ffmpeg cannot tell how large the video\'s picture is, as when the video is cut short or damaged, or its picture starts some seconds into the file: ask for a whole copy, or for one whose picture starts with its sound.',
+    'a video can then read as another length than its own and be refused with that length to use, so before you pass on a length a refusal gives, ask the user whether the video is that long. When it is not, or when the video\'s own sound, the track or the voice reads as none though the user says it has sound, ask for a copy without the tags.',
+    'a whole one can be refused as cut short or damaged, or as one musicfit made, or go on with none of its own sound. When the path holds a line break, ask the user to rename the file or the folder; when it holds none and the user says the video plays whole, has sound of its own or was not made by musicfit, ask for a copy without its tags.',
+  ]) assert.ok(guide.includes(words), words);
+  for (const words of [
+    'is refused as one ffmpeg finds no size for its picture: give one whose picture starts with its sound.',
+    'so a video can read as another length than its own and be refused with that length to use,',
+    'A video whose name, a folder on its path, or the key or the value of one of its tags holds a line break can be read as another video than it is',
+  ]) assert.ok(readme.includes(words), words);
   // Hosted, MakersMCP-Api counts each sound as long as its file states (video-bounds.js readMedia and soundProblem), a video's own
   // sound too, which musicfit 0.2.3 reads only PAST seconds past the fit (video.js ownSound): the topic gives no reason of memory.
   const hosted = await readTopics({ where: 'hosted', limits: LIMITS }, ['music']);
@@ -3995,14 +4022,14 @@ test('music gives each reason musicfit gives for a file it cannot read a line on
   for (const [said] of sound) assert.ok(doubleQuoted(analyze[0]).some(quote => quotedPattern(quote).test(said)), said);
   assert.match(analyze[0], /ask the user for a whole copy of it, or one in a common format such as WAV, MP3 or M4A, and one without the tag for "it starts with an ID3v2 tag"\./);
   assert.ok(analyze[0].includes('A track cut short can also read as a shorter one, and a damaged one as another file than it is, a shorter or a longer one, or one with no sound: when its length or its sound is not what the user said, ask for a whole copy.'));
-  // What musicfit 0.2.2 said in their place, and the reason of memory, are in no topic on either side.
+  // What musicfit 0.2.2 said in their place, the reason of memory and an MP4 copy asked for are in no topic on either side.
   for (const options of [{}, { where: 'hosted', limits: LIMITS }, { where: 'hosted', limits: LIMITS, held: ['fit_music'] }]) {
     const session = await connect({ definitions: loadKitDefinitions(), ...options });
     try {
       const topics = session.tools.find(tool => tool.name === 'makersmcp_playbook').inputSchema.properties.topics.items.enum;
       for (const name of topics) {
         const topic = text(await session.client.callTool({ name: 'makersmcp_playbook', arguments: { topics: [name] } }));
-        assert.doesNotMatch(topic, /does not know this format|has no audio"|has no audio stream|has no picture to lay|is a still picture, not a video|"ffmpeg: Could not write header|had no sound of its own|so ffmpeg finds no streams|whole in memory/, `${JSON.stringify(options)} ${name}`);
+        assert.doesNotMatch(topic, /does not know this format|has no audio"|has no audio stream|has no picture to lay|is a still picture, not a video|"ffmpeg: Could not write header|had no sound of its own|so ffmpeg finds no streams|whole in memory|MP4 copy/, `${JSON.stringify(options)} ${name}`);
       }
     } finally {
       await session.close();

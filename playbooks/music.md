@@ -14,7 +14,7 @@ order: 70
 
 ## Decide first
 
-- The video's length to a frame, its frame rate and the moment for the drop: the next section says where each comes from.
+- The video's length to a frame, its frame rate and the moment for the drop.
 - The track: any file ffmpeg reads, a video's sound too. No tool here makes music, so when the user has none, say so and ask for one. An instrumental a little longer than the video fits best: seams follow bars and can cut a sung line, and the tempo and pitch never change.
 - The video's own sound, when the track goes under it as `video`: `video_sound` keep for sound effects, voice for speech, drop for music of its own. A video with more than a faint room tone is refused until it is given, so ask the user what that sound is when it is not known.
 - Never call a track cleared for use: musicfit does not check rights.
@@ -84,7 +84,10 @@ fit_music {"track": "https://example.com/track.mp3", "length": "32", "hit": "27.
 <!-- end -->
 <!-- end -->
 3. Read `FIT.md`: its "Where to listen" table gives the start, each seam, the hit and the end. Show `seams.png`, and act on any warning.
-4. With `video`, video.mp4 is the file to hand over once the user has heard it. Without it, the next section says how the track goes under the video.
+4. With `video`, video.mp4 is the file to hand over once the user has heard it.
+<!-- local -->
+   Without it, the next section says how the track goes under the video.
+<!-- end -->
 <!-- with check_video -->
 5. Check it with `check_video`, then hand it over.
 <!-- end -->
@@ -94,7 +97,7 @@ fit_music {"track": "https://example.com/track.mp3", "length": "32", "hit": "27.
 
 ## Laying it under the video
 
-`video` lays it: video.mp4 keeps the video's picture as it was, copied, with the track under it at `lufs`, and the video's own sound kept as effects, set as speech or left out, as `video_sound` says. The video has to be `length` long, to a frame. With a `voice`, the music dips under it there too.
+`video` lays it: video.mp4 keeps the video's picture as it was, copied, with the track under it at `lufs`, and the video's own sound as `video_sound` says. The video has to be `length` long, to a frame. With a `voice`, the music dips under it there too.
 <!-- local -->
 Without `video`, one ffmpeg command does it when you can run commands, with the paths the results gave:
 
@@ -107,7 +110,7 @@ The track then replaces the video's sound. With a `voice`, give `mix.wav` instea
 <!-- hosted -->
 Without `video`, nothing here lays the track.
 <!-- end -->
-A track handed over alone goes under the whole video from its first frame, in the app the user cuts video with, without trimming or stretching it: it is already as long, to a frame.
+A track handed over alone goes under the whole video from its first frame, without trimming or stretching it: it is already as long, to a frame.
 
 <!-- with check_video -->
 ## Checking it
@@ -176,10 +179,14 @@ A failed `fit_music` or `analyze_music` job gives its reason:
 - "No way to fit this track to that length": try without `hit`, or with another `end`.
 - "The track is silent", "The track has no whole bar of music", "ffmpeg reads no sound in <file>" or "ffmpeg finds no sound stream in <file>": ask the user for another file.
 - "ffmpeg finds no picture in <video>" or "<video> reads as a still picture": ask for the video, or a whole copy.
-- "Cannot read <file>:" and why, as "it is cut short or damaged" or ffmpeg's own words: ask the user for a whole copy of that file, or one in a common format such as WAV, MP3 or MP4, one without the tag for "it starts with an ID3v2 tag", and an MP4 copy of a video for "ffmpeg finds no size for its picture".
+- "Cannot read <file>:" and why, as "it is cut short or damaged" or ffmpeg's own words: ask the user for a whole copy of that file, or one in a common format such as WAV, MP3 or MP4, one without the tag for "it starts with an ID3v2 tag", and one whose picture starts with its sound for "ffmpeg finds no size for its picture".
 - A file cut short or damaged can also read as another file than it is: when its length, its sound or its picture is not what the user said, ask for a whole copy.
 <!-- local -->
-- A file behind two or more ID3v2 tags can be taken for another kind: when the video's own sound, the track or the voice reads as none though the user says it has sound, ask for a copy without the tags.
+- A file behind two or more ID3v2 tags can be taken for another kind: a video can then read as another length than its own and be refused with that length to use, so before you give `length` the seconds a refusal gives, ask the user whether the video is that long. When it is not, or when the video's own sound, the track or the voice reads as none though the user says it has sound, ask for a copy without the tags.
+<!-- end -->
+- A video whose tags hold a line break can read as cut short or damaged, as one musicfit made or as one with no sound of its own: when the user says otherwise, ask for a copy without its tags.
+<!-- local -->
+- So can a video whose name, or a folder on its path, holds a line break: ask the user to rename the file or the folder.
 <!-- end -->
 - "<video> has sound of its own for <time> of its <length> s, so say what becomes of it with video_sound": ask the user whether it is effects, speech or music, and give `video_sound`.
 - "and length is <length> s: give length <seconds>": give `length` those seconds.
