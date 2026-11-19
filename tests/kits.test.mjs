@@ -691,11 +691,14 @@ test('on the user\'s own machine a track, a voice, a video or an out_dir whose p
     const video = 'film\u0085cut.mp4';
     mkdirSync(path.join(outDir, 'takes\u2028one'));
     for (const file of [track, 'song.wav', voice, video]) writeFileSync(path.join(outDir, file), 'x');
+    // A track whose name holds no line break but whose path has one at its end: the sentence asks for the path without it.
     for (const [tool, args, name, code] of [
       ['analyze_music', { track }, 'track', 'U+000A'],
       ['fit_music', { track, length: 12 }, 'track', 'U+000A'],
       ['fit_music', { track: 'song.wav', length: 12, voice }, 'voice', 'U+2028'],
       ['fit_music', { track: 'song.wav', length: 12, video }, 'video', 'U+0085'],
+      ['analyze_music', { track: 'song.wav\n' }, 'track', 'U+000A'],
+      ['fit_music', { track: 'song.wav\r', length: 12 }, 'track', 'U+000D'],
       ['analyze_music', { track: 'song.wav', out_dir: 'read\nNext: x' }, 'out_dir', 'U+000A'],
     ]) {
       const result = await client.callTool({ name: tool, arguments: args });
@@ -705,7 +708,10 @@ test('on the user\'s own machine a track, a voice, a video or an out_dir whose p
       const lines = words.split(/\r\n|[\n\r\u0085\u2028\u2029]/);
       assert.equal(lines.length, 3, words);
       assert.match(lines[0], /^## .+: not started$/);
-      assert.ok(lines[2].startsWith(`${name}: the path holds a line break or a control character (${code}), which makersmcp would print as it is in its own lines: `), words);
+      const fix = name === 'out_dir'
+        ? 'give another out_dir, or leave it out.'
+        : `give ${name} without it, and if the name of the file or of a folder on its path holds it, ask the user to rename that one or copy the file to a path without it.`;
+      assert.equal(lines[2], `${name}: the path holds a line break or a control character (${code}), which makersmcp would print as it is in its own lines: ${fix}`, words);
     }
     assert.equal(text(await client.callTool({ name: 'list_jobs', arguments: {} })), 'No jobs yet.');
     assert.deepEqual(readdirSync(outDir).sort(), [track, 'song.wav', 'takes\u2028one', video].sort());

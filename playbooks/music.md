@@ -186,7 +186,7 @@ A failed `fit_music` or `analyze_music` job gives its reason:
 <!-- end -->
 - A video whose tags hold a line break can read as cut short or damaged, as one musicfit made or as one with no sound of its own: when the user says otherwise, ask for a copy without its tags.
 <!-- local -->
-- A track, a voice or a video whose name, or a folder on its path, holds a line break is refused before musicfit starts, with "<param>: the path holds a line break or a control character": ask the user to rename the file or the folder.
+- A track, a voice or a video given by a path that holds a line break is refused before musicfit starts, with "<param>: the path holds a line break or a control character": give the path without it, and when the name of the file or of a folder on the path holds it, ask the user to rename that one or copy the file to a path without it.
 <!-- end -->
 - "<video> has sound of its own for <time> of its <length> s, so say what becomes of it with video_sound": ask the user whether it is effects, speech or music, and give `video_sound`.
 - "and length is <length> s: give length <seconds>": give `length` those seconds.

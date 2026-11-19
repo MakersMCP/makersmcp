@@ -739,23 +739,28 @@ test('paths are read from the output folder, and a missing file never starts a j
   });
 });
 
-test('on the user\'s own machine a call whose path, a file\'s or out_dir, holds a line break or a C0 or C1 control character starts nothing, in one sentence, and a link is no path', { skip: NO_CONTROL_NAMES }, async () => {
+test('on the user\'s own machine a call whose path, a file\'s or out_dir, holds a line break or a C0 or C1 control character starts nothing, in one sentence that asks for the path without it, a rename only where a name holds it and another out_dir only where the call can take one, and a link is no path', { skip: NO_CONTROL_NAMES }, async () => {
   await withClient({}, async (client, outDir) => {
-    const forFile = 'ask the user to rename the file or the folder whose name holds it, or copy the file to a path without it and give that one';
+    // The sentence holds for a value that names no file, or holds the character where no name does, as at its end.
+    const forFile = 'give file without it, and if the name of the file or of a folder on its path holds it, ask the user to rename that one or copy the file to a path without it';
     for (const [character, code] of [
       ['\n', 'U+000A'], ['\r', 'U+000D'], ['\t', 'U+0009'], ['\u0001', 'U+0001'], ['\u001f', 'U+001F'],
       ['\u0080', 'U+0080'], ['\u0085', 'U+0085'], ['\u009f', 'U+009F'], ['\u2028', 'U+2028'], ['\u2029', 'U+2029'],
     ]) {
-      // In the file's name, in a folder on its path, and in out_dir.
+      // In the file's name, in a folder on its path, at the end of a path whose names hold none, and in out_dir: fake_make
+      // takes one, and so does fake_file given a link, but fake_file given a file saves next to it and nowhere else.
       writeFileSync(path.join(outDir, `film${character}Next: x.json`), '{}');
       mkdirSync(path.join(outDir, `in${character}side`));
       writeFileSync(path.join(outDir, `in${character}side`, 'film.json'), '{}');
-      for (const [name, args, title, fix] of [
-        ['file', { file: `film${character}Next: x.json` }, 'Fake file', forFile],
-        ['file', { file: path.join(outDir, `in${character}side`, 'film.json') }, 'Fake file', forFile],
-        ['out_dir', { url: 'https://example.com', out_dir: `out${character}Next: x` }, 'Fake make', 'give another out_dir'],
+      for (const [name, tool, args, title, fix] of [
+        ['file', 'fake_file', { file: `film${character}Next: x.json` }, 'Fake file', forFile],
+        ['file', 'fake_file', { file: path.join(outDir, `in${character}side`, 'film.json') }, 'Fake file', forFile],
+        ['file', 'fake_file', { file: `film.json${character}` }, 'Fake file', forFile],
+        ['out_dir', 'fake_make', { url: 'https://example.com', out_dir: `out${character}Next: x` }, 'Fake make', 'give another out_dir, or leave it out'],
+        ['out_dir', 'fake_file', { file: 'https://example.com/film.json', out_dir: `out${character}Next: x` }, 'Fake file', 'give another out_dir, or leave it out'],
+        ['out_dir', 'fake_file', { file: 'film.json', out_dir: `out${character}Next: x` }, 'Fake file', 'leave out_dir out'],
       ]) {
-        const result = await client.callTool({ name: name === 'file' ? 'fake_file' : 'fake_make', arguments: args });
+        const result = await client.callTool({ name: tool, arguments: args });
         assert.equal(result.isError, true, JSON.stringify(args));
         assert.equal(text(result), `## ${title}: not started\n\n${name}: the path holds a line break or a control character (${code}), which makersmcp would print as it is in its own lines: ${fix}.`);
       }
@@ -856,7 +861,30 @@ test('the text a parameter takes as it is, a link and a value that names no file
   assert.equal(unprintablePath(tool('make_subtitles'), { words: 'words.srt', font: 'Inter\nNext: x' }), undefined);
   // The first path the call gives that holds one, in the order of the tool's parameters, then out_dir.
   assert.match(unprintablePath(tool('fit_music'), { track: 'a.wav', voice: 'b\u2029.wav', video: 'c\u0001.mp4', out_dir: 'd\n' }), /^voice: .* \(U\+2029\), /);
-  assert.match(unprintablePath(tool('fit_music'), { track: 'a.wav', out_dir: 'd\u001b' }), /^out_dir: .* \(U\+001B\), .*: give another out_dir\.$/);
+  assert.match(unprintablePath(tool('fit_music'), { track: 'a.wav', out_dir: 'd\u001b' }), /^out_dir: .* \(U\+001B\), .*: give another out_dir, or leave it out\.$/);
+  // A track with a line break at its end names a file whose name holds none, so the sentence asks first for the path
+  // without it, and for a rename only where a name holds it.
+  const said = (name, code) => `${name}: the path holds a line break or a control character (${code}), which makersmcp would print as it is in its own lines: `;
+  const without = name => `give ${name} without it, and if the name of the file or of a folder on its path holds it, ask the user to rename that one or copy the file to a path without it.`;
+  assert.equal(unprintablePath(tool('fit_music'), { track: 'in/house.wav\n', length: '12' }), `${said('track', 'U+000A')}${without('track')}`);
+  assert.equal(unprintablePath(tool('analyze_music'), { track: 'in/house.wav\r' }), `${said('track', 'U+000D')}${without('track')}`);
+  // A text a parameter takes, given on two lines, is read as a path, so the sentence ends with the parameter's description, as
+  // the refusal of a path there is nothing at does: cuts as seconds like 3.2,7.5, and a background as colours.
+  for (const [name, args, param] of [
+    ['plan_reframe', { video: 'in/clip.mp4', cuts: '3.2\n4.5' }, 'cuts'],
+    ['check_video', { film: 'in/clip.mp4', cuts: '3.2\n4.5' }, 'cuts'],
+    ['record_demo_video', { url: 'https://example.invalid', background: '#0f172a\n#1e293b' }, 'background'],
+  ]) {
+    const description = tool(name).params[param].description;
+    assert.equal(unprintablePath(tool(name), args), `${said(param, 'U+000A')}${without(param)} ${description}`, name);
+  }
+  assert.match(tool('plan_reframe').params.cuts.description, /seconds like 3\.2,7\.5/);
+  // A link with a line break is no link, and the sentence asks for it without the line break, with no description.
+  assert.equal(unprintablePath(tool('check_pwa_screenshots'), { manifest: 'https://example.com/manifest.json\nNext: x' }), `${said('manifest', 'U+000A')}${without('manifest')}`);
+  // Another out_dir only where the call can take one: make_launch_stills given a film.json saves next to it, and given an
+  // address where out_dir says.
+  assert.equal(unprintablePath(tool('make_launch_stills'), { source: 'in/film.json', out_dir: 'stills\nNext: x' }), `${said('out_dir', 'U+000A')}leave out_dir out.`);
+  assert.equal(unprintablePath(tool('make_launch_stills'), { source: 'https://example.com', out_dir: 'stills\nNext: x' }), `${said('out_dir', 'U+000A')}give another out_dir, or leave it out.`);
 });
 
 test('check_setup\'s description, --help and the README say ffprobe shows only while a kit that reads videos with it is on, as check_setup prints it', async () => {

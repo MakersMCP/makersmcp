@@ -727,6 +727,11 @@ const LINE_BREAK_OR_CONTROL = /[\u0000-\u001f\u0080-\u009f\u2028\u2029]/g;
  * holds a character of LINE_BREAK_OR_CONTROL, which makersmcp's own lines, like the Folder and
  * Next lines and its refusals, would print as it is; undefined for a call that gives no such
  * path. A link, or the text a parameter takes as it is, is no path, so it is not looked at here.
+ * Such a value need not name a file, as cuts given on two lines or a link with a line break in it
+ * do not, and a name need not hold the character, as one at the value's end shows: so the
+ * sentence asks for the value without it, and for a file or a folder renamed only where its name
+ * holds it, with the parameter's own description where it takes a text, as nothingAt gives it.
+ * It offers another out_dir only to a call that can take one (takesOutDir).
  */
 export function unprintablePath(tool: ToolDefinition, input: Record<string, unknown>): string | undefined {
   const paths: Array<[string, string]> = [];
@@ -739,12 +744,29 @@ export function unprintablePath(tool: ToolDefinition, input: Record<string, unkn
     const at = value.search(LINE_BREAK_OR_CONTROL);
     if (at < 0) continue;
     const code = `U+${value.charCodeAt(at).toString(16).toUpperCase().padStart(4, '0')}`;
-    const fix = name === 'out_dir'
-      ? 'give another out_dir'
-      : 'ask the user to rename the file or the folder whose name holds it, or copy the file to a path without it and give that one';
-    return `${name}: the path holds a line break or a control character (${code}), which makersmcp would print as it is in its own lines: ${fix}.`;
+    const said = `${name}: the path holds a line break or a control character (${code}), which makersmcp would print as it is in its own lines: `;
+    if (name === 'out_dir') return `${said}${takesOutDir(tool, input) ? 'give another out_dir, or leave it out' : 'leave out_dir out'}.`;
+    const param = tool.params[name]!;
+    const about = param.type === 'text_or_path' ? ` ${param.description}` : '';
+    return `${said}give ${name} without it, and if the name of the file or of a folder on its path holds it, ask the user to rename that one or copy the file to a path without it.${about}`;
   }
   return undefined;
+}
+
+/**
+ * Whether out_dir can give a call another folder, as buildCommand decides it: the tool takes a
+ * folder (out.flag), and the kit does not pick its own from a file the call gives (out.otherwise),
+ * as make_launch_stills given a film.json saves next to it and nowhere else.
+ */
+function takesOutDir(tool: ToolDefinition, input: Record<string, unknown>): boolean {
+  const out = tool.out;
+  if (!out?.flag) return false;
+  const values: Record<string, unknown> = {};
+  for (const name of Object.keys(tool.params)) {
+    const value = input[name];
+    if (value !== undefined && value !== null && value !== '') values[name] = value;
+  }
+  return fill(out.name, tool, values) !== undefined || out.otherwise === undefined || fill(out.otherwise, tool, values) === undefined;
 }
 
 /** Fills {host}, {dir:param}, {stem:param} and {param}, or gives undefined. */
