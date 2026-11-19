@@ -4044,3 +4044,23 @@ test('music gives each reason musicfit gives for a file it cannot read a line on
     }
   }
 });
+
+test('jobs-and-files, troubleshooting and the README say which paths makersmcp prints as they are that no call is refused for: the base folder on the user\'s own machine, and, with launch-film on, a file a film.json names and a file or a folder in a brand/ folder', async () => {
+  // A call is refused for a path it gives that holds a line break (args.ts unprintablePath), but not for the base folder,
+  // which results and refusals print as it is, nor for the files a film.json names, which the refusal of a job still writing
+  // names (jobs.ts FolderBusyError), nor for the names a brand/ folder holds, which the refusal of a call that would lose them
+  // names (args.ts notAKitsOwn).
+  const folder = "\n- makersmcp's own lines print the base folder as it is wherever they name a path in it, as the Folder line, the paths in the Next lines and in refusals, and the line of `check_setup` that says where files go do, and no call is refused for a line break in it. Such a line break would start a line that is not makersmcp's with the rest of the path: ask the user to start makersmcp in a folder whose path holds none, or to set --out or MAKERSMCP_OUT to one.\n";
+  const film = "\n  A refusal prints a file a film.json names, and a file or a folder in a brand/ folder, as it is, and no call is refused for a line break in one: such a line break starts a line that is not makersmcp's, so ask the user to rename that one.\n";
+  for (const [options, local, launchFilm] of [
+    [{}, true, true],
+    [{ kits: ['musicfit'] }, true, false],
+    [{ where: 'hosted', limits: LIMITS }, false, true],
+  ]) {
+    const side = JSON.stringify(options);
+    assert.equal((await readTopics(options, ['jobs-and-files'])).includes(folder), local, side);
+    assert.equal((await readTopics(options, ['troubleshooting'])).includes(film), local && launchFilm, side);
+  }
+  const readme = readFileSync(path.join(here, '..', 'README.md'), 'utf8');
+  assert.ok(readme.includes("They print as they are some paths and names that no call gives, which no call is refused for: the folder makersmcp saves in and the folders on its path, wherever its lines name a path in it, and, in a refusal, a file a film.json names or a file or a folder in a `brand/` folder."));
+});

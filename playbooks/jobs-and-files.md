@@ -55,6 +55,7 @@ A start makersmcp.com could not confirm says so: "makersmcp.com could not be rea
 ## Files on this machine
 
 - The base folder is {base_dir}. Every relative path in a call, a file going in or an `out_dir`, is read from there, and a leading ~ is the home folder.
+- makersmcp's own lines print the base folder as it is wherever they name a path in it, as the Folder line, the paths in the Next lines and in refusals, and the line of `check_setup` that says where files go do, and no call is refused for a line break in it. Such a line break would start a line that is not makersmcp's with the rest of the path: ask the user to start makersmcp in a folder whose path holds none, or to set --out or MAKERSMCP_OUT to one.
 - Each kit tool that saves files uses one folder: `out_dir` when given, else a folder named after its input. In those names <host> is the address's host without www and without the port, so two sites on one host share a folder, and so do two apps of one store.
 <!-- end -->
 <!-- with easybrandkit -->
