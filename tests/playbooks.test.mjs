@@ -3655,7 +3655,8 @@ test('hosted, music says the fit itself counts toward a job\'s memory as MakersM
   ]) assert.ok(errors.some(entry => entry.includes(words)), words);
   // Both bounds say what they count, each sound as long as its file states, as MakersMCP-Api's change for musicfit 0.2.3 words
   // them, and give no reason of memory for the sounds: musicfit 0.2.3 reads a video's own sound only up to two seconds past the
-  // fit, so a job refused for a sound its file states as longer would not have needed more than a job has.
+  // end of its picture, which the fit matches to a frame, so a job refused for a sound its file states as longer would not have
+  // needed more than a job has.
   const counted = errors.filter(entry => / here (?:reads at most \d+ minutes of sound|makes a fit of at most <time>(?: with <what>)? from that much sound) in a job/.test(entry));
   assert.equal(counted.length, 9);
   for (const entry of counted) assert.ok(entry.includes(', each sound counted as long as its file states. '), entry);
@@ -3999,8 +4000,8 @@ test('music gives each reason musicfit gives for a file it cannot read a line on
     assert.ok(music.includes(tags), side);
     assert.equal(music.includes(names), !options.where, side);
     if (!options.where) assert.ok(music.includes(`${tags}${names}`), side);
-    // The voice that is the video's own sound is read up to two seconds past the fit, so the warning says by how much only up
-    // to a second and a half, and more than a second beyond that: the topic's quote holds both.
+    // The voice that is the video's own sound is read up to two seconds past the end of its picture, so the warning says by how
+    // much only up to a second and a half, and more than a second beyond that: the topic's quote holds both.
     const warned = '- "The voice runs <how far> past the end" or "No speech was found in the voice track": check the voice with the user.';
     assert.ok(music.includes(`\n${warned}\n`), side);
     for (const over of [0.8, PAST]) assert.ok(quotedPattern('The voice runs <how far> past the end').test(`The voice runs ${pastEnd(over)} past the end and was cut there.`), `${over}`);
@@ -4020,7 +4021,8 @@ test('music gives each reason musicfit gives for a file it cannot read a line on
     'A video whose name, a folder on its path, or the key or the value of one of its tags holds a line break can be read as another video than it is',
   ]) assert.ok(readme.includes(words), words);
   // Hosted, MakersMCP-Api counts each sound as long as its file states (video-bounds.js readMedia and soundProblem), a video's own
-  // sound too, which musicfit 0.2.3 reads only PAST seconds past the fit (video.js ownSound): the topic gives no reason of memory.
+  // sound too, which musicfit 0.2.3 reads only PAST seconds past the end of its picture (video.js ownSound): the topic gives no
+  // reason of memory.
   const hosted = await readTopics({ where: 'hosted', limits: LIMITS }, ['music']);
   assert.ok(hosted.includes("- Here a job's track, voice and video's own sound may run 15 minutes together at most, each as long as its file states: past that the job fails before the kit starts with \"<tool> here reads at most 15 minutes of sound in a job\", naming each length."));
   // With fit_music held back, troubleshooting has analyze_music's errors, and each reason its track can get meets its line.
